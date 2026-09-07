@@ -1,0 +1,48 @@
+id: amanita-muscaria
+gbifKey: 2526057
+name:
+  la: Amanita muscaria
+  ru: Мухомор красный
+  en: Fly agaric
+edibility: poisonous
+lookalikes: []
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: flat
+    diameter: [80, 200]
+    color: "#d0201a"
+    surface: warty
+    surfaceColor: "#fffdf0"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#fffdf0"
+  stipe:
+    height: [80, 200]
+    width: [10, 25]
+    color: "#fffdf0"
+    ring: pendant
+    volva: bulbous-rings
+  flesh:
+    color: "#fffdf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [betula, picea, pinus]
+  substrate: soil
+  biomes: [forest-mixed, forest-coniferous, forest-broadleaved]
+  season: [7, 8, 9, 10]
+  moisture: [0.3, 0.8]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Ярко-красная шляпка в белых хлопьях, белое кольцо на ножке и вздутое
+    основание с поясками вольвы. Ядовит. Растёт с берёзой и елью, часто рядом с
+    ним попадаются подберёзовики и белые — те же деревья, тот же тип почвы.
+  en: >-
+    A bright red cap with white warts, a white pendant ring and a swollen base
+    ringed with volval remnants. Poisonous. Grows with birch and spruce — the
+    same partners as many prized boletes, so it is a useful signpost.

@@ -1,0 +1,50 @@
+id: pleurotus-ostreatus
+gbifKey: 5247092
+name:
+  la: Pleurotus ostreatus
+  ru: Вешенка обыкновенная
+  en: Oyster mushroom
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: depressed
+    diameter: [50, 150]
+    color: "#8c8578"
+    surface: smooth
+    surfaceColor: "#8c8578"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#f5f0e6"
+  stipe:
+    height: [10, 30]
+    width: [10, 25]
+    color: "#f0ebe0"
+    ring: none
+    volva: none
+  flesh:
+    color: "#fffdf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: deadwood
+  biomes: [forest-broadleaved, forest-mixed, park-urban, cave-adit]
+  season: [9, 10, 11, 12, 1, 2, 3, 4]
+  moisture: [0.4, 0.9]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Растёт черепитчатыми пучками на мёртвой лиственной древесине — пнях, валеже,
+    старых тополях. Ножка короткая и сдвинута вбок, пластинки далеко сбегают на
+    неё. Съедобна. Не микоризный гриб: искать надо не под деревом, а на дереве,
+    и поздней осенью, когда всё остальное уже отошло.
+  en: >-
+    Grows in overlapping clusters on dead hardwood — stumps, fallen trunks, old
+    poplars. The short stipe sits off to one side and the gills run far down it.
+    Edible. Not mycorrhizal: look on the wood, not under the tree, and late in
+    the year when little else is left.
