@@ -2,7 +2,7 @@ import { defineConfig } from 'vitest/config'
 import pkg from './package.json'
 
 export default defineConfig({
-  // Pages отдаёт проект по пути /<repo>/, поэтому база относительная.
+  // Pages serves the project under /<repo>/, so the base must be relative.
   base: './',
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   build: {

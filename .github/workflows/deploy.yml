@@ -1,7 +1,7 @@
 name: Deploy to GitHub Pages
 
-# Собирает и публикует приложение на GitHub Pages при каждом пуше в master.
-# Разовая настройка: Settings → Pages → Source: "GitHub Actions".
+# Builds and publishes the app to GitHub Pages on every push to master.
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions".
 on:
   push:
     branches: [master]

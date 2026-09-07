@@ -1,9 +1,9 @@
 /**
- * Стартует ли собранное приложение на самом деле?
+ * Does the built app actually start?
  *
- * Юнит-тесты никогда не загружают main.ts, а сборка может быть зелёной при
- * чёрном экране. Здесь готовый бандл поднимается в headless-Chrome, и проверка
- * падает, если сцена не создалась или модуль бросил исключение.
+ * Unit tests never load main.ts, and a build can be green while the screen is
+ * black. Here the real bundle is served to a headless Chrome, and the check
+ * fails if the scene was never created or the module threw.
  *
  * Usage: npm run build && npm run boot-check
  */
@@ -24,13 +24,13 @@ const TYPES = {
 }
 
 if (!existsSync(DIST)) {
-  console.error('boot-check: нет dist/ — сначала `npm run build`')
+  console.error('boot-check: no dist/ — run `npm run build` first')
   process.exit(1)
 }
 
 const bundle = readdirSync(join(DIST, 'assets')).find((f) => /^index-.*\.js$/.test(f))
 if (!bundle) {
-  console.error('boot-check: в dist/assets нет index-бандла')
+  console.error('boot-check: no index bundle in dist/assets')
   process.exit(1)
 }
 
@@ -74,7 +74,7 @@ const CHROME = [
 ].find((p) => existsSync(p))
 
 if (!CHROME) {
-  console.log('boot-check: Chrome не найден — пропускаю')
+  console.log('boot-check: no Chrome found — skipping')
   process.exit(0)
 }
 
@@ -92,12 +92,13 @@ server.listen(PORT, () => {
   chrome.stdout.on('data', (d) => (dom += d))
   chrome.on('close', () => {
     server.close()
+    // Read the title, not the body: the page's own source contains the words.
     const title = /<title>([^<]*)<\/title>/.exec(dom)?.[1] ?? ''
     if (title === 'BOOTED') {
-      console.log('boot-check: OK — приложение стартует')
+      console.log('boot-check: OK — the app starts')
       process.exit(0)
     }
-    console.error('boot-check: ПРОВАЛ —', title || 'вердикта нет; страница не выполнилась')
+    console.error('boot-check: FAILED —', title || 'no verdict; the page never ran')
     process.exit(1)
   })
 })

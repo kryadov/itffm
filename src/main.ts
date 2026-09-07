@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 declare global {
-  // boot-check ждёт этот флаг: он выставляется только если модуль дошёл до конца.
+  // boot-check waits on this flag: it is set only if the module ran to the end.
   interface Window { __READY?: boolean }
 }
 

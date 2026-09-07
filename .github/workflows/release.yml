@@ -1,6 +1,6 @@
 name: Release
 
-# Релиз при пуше тега версии: git tag v0.2.0 && git push --tags
+# Cuts a release when a version tag is pushed: git tag v0.2.0 && git push --tags
 on:
   push:
     tags: ['v*.*.*']

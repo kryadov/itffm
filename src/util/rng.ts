@@ -1,7 +1,8 @@
 /**
- * Детерминированный PRNG (mulberry32). Всё, что генерируется в игре — грибы,
- * деревья, рельеф, раскладка — идёт отсюда, а не из Math.random: одинаковый
- * seed обязан давать одинаковый лес в любом браузере и после перезагрузки.
+ * Deterministic PRNG (mulberry32). Everything generated in the game —
+ * mushrooms, trees, terrain, placement — draws from here rather than
+ * Math.random: the same seed must give the same forest in every browser and
+ * across reloads.
  */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0
@@ -13,7 +14,7 @@ export function mulberry32(seed: number): () => number {
   }
 }
 
-/** FNV-1a. Нужен, чтобы получать seed из строк: id вида, названия места. */
+/** FNV-1a. Turns strings into seeds: a species id, a place name. */
 export function hashString(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {
@@ -27,7 +28,7 @@ export function randRange(rng: () => number, [min, max]: [number, number]): numb
   return min + rng() * (max - min)
 }
 
-/** Взвешенный выбор. undefined, если суммарный вес равен нулю. */
+/** Weighted pick. Returns undefined when every weight is zero. */
 export function pickWeighted<T>(
   rng: () => number,
   items: readonly T[],

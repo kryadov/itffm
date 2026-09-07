@@ -3,16 +3,16 @@ export type CapShape =
   | 'funnel' | 'conical' | 'ovoid'
 
 export interface ProfilePoint {
-  /** Радиус в долях радиуса шляпки (в capSurface) или в метрах (в capCrossSection). */
+  /** Radius, in cap radii for capSurface, in metres for capCrossSection. */
   r: number
-  /** Высота там же. */
+  /** Height, in the same units. */
   y: number
 }
 
 /**
- * Высота верхней поверхности шляпки в долях радиуса, u = 0 в центре, 1 на краю.
- * Формы подобраны так, чтобы читались силуэтом: именно по силуэту грибник
- * узнаёт гриб за десять шагов, а не по цвету пластинок.
+ * Height of the cap's upper surface in cap radii, u = 0 at the centre, 1 at the
+ * rim. The shapes are tuned to read as silhouettes: a forager recognises a
+ * mushroom by its outline ten paces off, long before the gill colour.
  */
 const HEIGHT: Record<CapShape, (u: number) => number> = {
   hemispherical: (u) => Math.sqrt(Math.max(0, 1 - u * u)),
@@ -35,10 +35,11 @@ export function capSurface(shape: CapShape, segments: number): ProfilePoint[] {
 }
 
 /**
- * Замкнутое сечение шляпки в метрах: сверху от центра к краю, затем снизу
- * обратно к ножке. Одно тело вращения по нему даёт цельную шляпку с изнанкой.
+ * A closed cap cross-section in metres: over the top from centre to rim, then
+ * back underneath to the stipe. One lathe over it yields a solid cap with a
+ * real underside.
  *
- * @param age 0 — молодая форма, 1 — зрелая; между ними линейная интерполяция
+ * @param age 0 is the young form, 1 the mature one; linear in between
  */
 export function capCrossSection(
   shape: CapShape,
@@ -58,7 +59,7 @@ export function capCrossSection(
     y: (p.y * (1 - t) + mature[i].y * t) * capRadius,
   }))
 
-  // Изнанка: та же кривая, опущенная на толщину мякоти, обрезанная у ножки.
+  // The underside: the same curve dropped by the flesh thickness, cut at the stipe.
   const bottom: ProfilePoint[] = []
   for (let i = top.length - 1; i >= 0; i--) {
     const r = top[i].r

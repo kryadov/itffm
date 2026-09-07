@@ -1,0 +1,244 @@
+import type { CapShape } from '../mushroom/profile'
+
+export const CAP_SHAPES = ['hemispherical', 'convex', 'flat', 'depressed', 'funnel', 'conical', 'ovoid'] as const
+export const EDIBILITY = ['edible', 'conditional', 'inedible', 'poisonous', 'deadly'] as const
+export const HYMENIUM = ['gills', 'pores', 'teeth', 'smooth', 'maze'] as const
+export const ATTACHMENT = ['free', 'adnate', 'adnexed', 'decurrent'] as const
+export const SURFACE = ['smooth', 'warty', 'scaly', 'fibrous', 'viscid', 'velvety'] as const
+export const RING = ['none', 'pendant', 'ascending', 'fugacious'] as const
+export const VOLVA = ['none', 'sheathing', 'bulbous-rings', 'marginate'] as const
+export const BRUISING = ['none', 'blue', 'red', 'brown', 'black'] as const
+export const LATEX = ['none', 'white', 'orange', 'red'] as const
+export const SUBSTRATE = ['soil', 'litter', 'deadwood', 'livewood', 'dung', 'moss', 'sand', 'burnt'] as const
+export const BIOMES = [
+  'forest-broadleaved', 'forest-coniferous', 'forest-mixed', 'meadow-scrub',
+  'dunes-coast', 'wetland', 'cave-adit', 'park-urban', 'alpine',
+] as const
+export const TREE_GENERA = [
+  'betula', 'picea', 'pinus', 'quercus', 'populus', 'salix',
+  'alnus', 'fagus', 'tilia', 'acer', 'carpinus', 'larix', 'abies',
+] as const
+export const GREGARIOUS = ['solitary', 'scattered', 'clustered', 'troops', 'rings'] as const
+export const FREQUENCY = ['common', 'occasional', 'rare'] as const
+
+export type Edibility = (typeof EDIBILITY)[number]
+export type HymeniumType = (typeof HYMENIUM)[number]
+export type Attachment = (typeof ATTACHMENT)[number]
+export type Surface = (typeof SURFACE)[number]
+export type RingType = (typeof RING)[number]
+export type VolvaType = (typeof VOLVA)[number]
+export type Substrate = (typeof SUBSTRATE)[number]
+export type Biome = (typeof BIOMES)[number]
+export type TreeGenus = (typeof TREE_GENERA)[number]
+export type Gregarious = (typeof GREGARIOUS)[number]
+export type Frequency = (typeof FREQUENCY)[number]
+export type Range = [number, number]
+
+/** Everything the mesh generator needs to build this species. */
+export interface Morphology {
+  cap: { shape: CapShape; ageShape: CapShape; diameter: Range; color: string; surface: Surface; surfaceColor: string }
+  hymenium: { type: HymeniumType; attachment: Attachment; color: string }
+  stipe: { height: Range; width: Range; color: string; ring: RingType; volva: VolvaType }
+  flesh: { color: string; bruising: (typeof BRUISING)[number] }
+  latex: (typeof LATEX)[number]
+}
+
+/** Everything the world generator needs to decide where this species grows. */
+export interface Ecology {
+  mycorrhizal: TreeGenus[]
+  substrate: Substrate
+  biomes: Biome[]
+  /** Months, 1..12. */
+  season: number[]
+  moisture: Range
+  gregarious: Gregarious
+  frequency: Frequency
+}
+
+export interface MediaRef {
+  src: string
+  license: string
+  author: string
+  source: string
+}
+
+export interface Species {
+  id: string
+  gbifKey: number
+  name: { la: string; ru: string; en: string }
+  edibility: Edibility
+  lookalikes: string[]
+  morphology: Morphology
+  ecology: Ecology
+  media: MediaRef[]
+  text: { ru: string; en: string }
+}
+
+class SpeciesError extends Error {
+  constructor(file: string, field: string, why: string) {
+    super(`${file}: field ${field} — ${why}`)
+  }
+}
+
+function path(prefix: string, field: string): string {
+  return prefix ? `${prefix}.${field}` : field
+}
+
+function get(obj: unknown, field: string, file: string, prefix: string): unknown {
+  if (typeof obj !== 'object' || obj === null) {
+    throw new SpeciesError(file, prefix || '(root)', 'expected an object')
+  }
+  const v = (obj as Record<string, unknown>)[field]
+  if (v === undefined) throw new SpeciesError(file, path(prefix, field), 'missing')
+  return v
+}
+
+function str(obj: unknown, field: string, file: string, prefix: string): string {
+  const v = get(obj, field, file, prefix)
+  if (typeof v !== 'string' || v.length === 0) {
+    throw new SpeciesError(file, path(prefix, field), 'expected a non-empty string')
+  }
+  return v
+}
+
+function oneOf<T extends string>(obj: unknown, field: string, allowed: readonly T[], file: string, prefix: string): T {
+  const v = str(obj, field, file, prefix)
+  if (!(allowed as readonly string[]).includes(v)) {
+    throw new SpeciesError(file, path(prefix, field), `"${v}" — allowed: ${allowed.join(', ')}`)
+  }
+  return v as T
+}
+
+function color(obj: unknown, field: string, file: string, prefix: string): string {
+  const v = str(obj, field, file, prefix)
+  if (!/^#[0-9a-fA-F]{6}$/.test(v)) {
+    throw new SpeciesError(file, path(prefix, field), `"${v}" — expected hex #rrggbb`)
+  }
+  return v
+}
+
+function range(obj: unknown, field: string, file: string, prefix: string): Range {
+  const v = get(obj, field, file, prefix)
+  const full = path(prefix, field)
+  if (!Array.isArray(v) || v.length !== 2 || v.some((n) => typeof n !== 'number')) {
+    throw new SpeciesError(file, full, 'expected two numbers [min, max]')
+  }
+  if (v[0] > v[1]) throw new SpeciesError(file, full, `range is inverted: ${v[0]} > ${v[1]}`)
+  return [v[0], v[1]]
+}
+
+function listOf<T extends string>(obj: unknown, field: string, allowed: readonly T[], file: string, prefix: string): T[] {
+  const v = get(obj, field, file, prefix)
+  const full = path(prefix, field)
+  if (!Array.isArray(v)) throw new SpeciesError(file, full, 'expected a list')
+  for (const item of v) {
+    if (typeof item !== 'string' || !(allowed as readonly string[]).includes(item)) {
+      throw new SpeciesError(file, full, `"${String(item)}" — allowed: ${allowed.join(', ')}`)
+    }
+  }
+  return v as T[]
+}
+
+/**
+ * Parses and checks one species. Throws a SpeciesError naming the file and the
+ * field: these errors are the guard rail on hand-curated data, so they have to
+ * say exactly where the typo is.
+ */
+export function validateSpecies(raw: unknown, file: string): Species {
+  const id = str(raw, 'id', file, '')
+  if (!/^[a-z0-9-]+$/.test(id)) throw new SpeciesError(file, 'id', 'lowercase letters, digits and hyphens only')
+
+  const gbifKey = get(raw, 'gbifKey', file, '')
+  if (typeof gbifKey !== 'number' || !Number.isInteger(gbifKey)) {
+    throw new SpeciesError(file, 'gbifKey', 'expected an integer')
+  }
+
+  const nameObj = get(raw, 'name', file, '')
+  const name = {
+    la: str(nameObj, 'la', file, 'name'),
+    ru: str(nameObj, 'ru', file, 'name'),
+    en: str(nameObj, 'en', file, 'name'),
+  }
+
+  const mo = get(raw, 'morphology', file, '')
+  const capObj = get(mo, 'cap', file, 'morphology')
+  const hyObj = get(mo, 'hymenium', file, 'morphology')
+  const stObj = get(mo, 'stipe', file, 'morphology')
+  const flObj = get(mo, 'flesh', file, 'morphology')
+
+  const morphology: Morphology = {
+    cap: {
+      shape: oneOf(capObj, 'shape', CAP_SHAPES, file, 'morphology.cap'),
+      ageShape: oneOf(capObj, 'ageShape', CAP_SHAPES, file, 'morphology.cap'),
+      diameter: range(capObj, 'diameter', file, 'morphology.cap'),
+      color: color(capObj, 'color', file, 'morphology.cap'),
+      surface: oneOf(capObj, 'surface', SURFACE, file, 'morphology.cap'),
+      surfaceColor: color(capObj, 'surfaceColor', file, 'morphology.cap'),
+    },
+    hymenium: {
+      type: oneOf(hyObj, 'type', HYMENIUM, file, 'morphology.hymenium'),
+      attachment: oneOf(hyObj, 'attachment', ATTACHMENT, file, 'morphology.hymenium'),
+      color: color(hyObj, 'color', file, 'morphology.hymenium'),
+    },
+    stipe: {
+      height: range(stObj, 'height', file, 'morphology.stipe'),
+      width: range(stObj, 'width', file, 'morphology.stipe'),
+      color: color(stObj, 'color', file, 'morphology.stipe'),
+      ring: oneOf(stObj, 'ring', RING, file, 'morphology.stipe'),
+      volva: oneOf(stObj, 'volva', VOLVA, file, 'morphology.stipe'),
+    },
+    flesh: {
+      color: color(flObj, 'color', file, 'morphology.flesh'),
+      bruising: oneOf(flObj, 'bruising', BRUISING, file, 'morphology.flesh'),
+    },
+    latex: oneOf(mo, 'latex', LATEX, file, 'morphology'),
+  }
+
+  const ec = get(raw, 'ecology', file, '')
+  const season = get(ec, 'season', file, 'ecology')
+  if (!Array.isArray(season) || season.length === 0 || season.some((m) => typeof m !== 'number' || m < 1 || m > 12)) {
+    throw new SpeciesError(file, 'ecology.season', 'expected a non-empty list of months 1..12')
+  }
+  const moisture = range(ec, 'moisture', file, 'ecology')
+  if (moisture[0] < 0 || moisture[1] > 1) throw new SpeciesError(file, 'ecology.moisture', 'values outside 0..1')
+
+  const ecology: Ecology = {
+    mycorrhizal: listOf(ec, 'mycorrhizal', TREE_GENERA, file, 'ecology'),
+    substrate: oneOf(ec, 'substrate', SUBSTRATE, file, 'ecology'),
+    biomes: listOf(ec, 'biomes', BIOMES, file, 'ecology'),
+    season: season as number[],
+    moisture,
+    gregarious: oneOf(ec, 'gregarious', GREGARIOUS, file, 'ecology'),
+    frequency: oneOf(ec, 'frequency', FREQUENCY, file, 'ecology'),
+  }
+  if (ecology.biomes.length === 0) throw new SpeciesError(file, 'ecology.biomes', 'at least one biome is required')
+
+  const lookalikesRaw = get(raw, 'lookalikes', file, '')
+  if (!Array.isArray(lookalikesRaw) || lookalikesRaw.some((s) => typeof s !== 'string')) {
+    throw new SpeciesError(file, 'lookalikes', 'expected a list of species ids')
+  }
+
+  const mediaRaw = get(raw, 'media', file, '')
+  if (!Array.isArray(mediaRaw)) throw new SpeciesError(file, 'media', 'expected a list')
+  const media: MediaRef[] = mediaRaw.map((m, i) => ({
+    src: str(m, 'src', file, `media[${i}]`),
+    license: str(m, 'license', file, `media[${i}]`),
+    author: str(m, 'author', file, `media[${i}]`),
+    source: str(m, 'source', file, `media[${i}]`),
+  }))
+
+  const textObj = get(raw, 'text', file, '')
+  const text = { ru: str(textObj, 'ru', file, 'text'), en: str(textObj, 'en', file, 'text') }
+
+  return {
+    id,
+    gbifKey,
+    name,
+    edibility: oneOf(raw, 'edibility', EDIBILITY, file, ''),
+    lookalikes: lookalikesRaw as string[],
+    morphology,
+    ecology,
+    media,
+    text,
+  }
+}
