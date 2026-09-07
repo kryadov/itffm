@@ -1,98 +1,103 @@
 # itffm 🍄
 
-Тихая игра про сбор грибов от первого лица — и заодно энциклопедия грибов.
+A quiet first-person game about picking mushrooms — and a mushroom encyclopedia
+in the same breath.
 
-Ходишь по лесу, находишь гриб, берёшь его в руки, крутишь, заглядываешь под
-шляпку и читаешь, почему это именно он. Собранное навсегда остаётся в личной
-энциклопедии. Ни таймеров, ни врагов, ни проигрыша.
+You walk through a wood, find a mushroom, take it in your hands, turn it over,
+look underneath the cap and read why it is the one it is. Everything you pick
+stays in your own encyclopedia for good. No timers, no enemies, nothing to lose.
 
-Виды настоящие. Признаки, съедобность, сезон и экология — тоже. Грибы растут не
-где попало, а там, где им положено: подберёзовик под берёзой, маслёнок в молодых
-соснах на песке, вешенка на мёртвой древесине. Поэтому игрок, разобравшись, где
-искать, действительно начинает находить больше.
+The species are real. So are their field marks, their edibility, their season
+and their ecology. Mushrooms do not grow just anywhere — they grow where they
+belong: the birch bolete under a birch, the slippery jack among young pines on
+sand, the oyster mushroom on dead wood. Work out where to look and you really do
+start finding more.
 
-**▶ Играть: https://kryadov.github.io/itffm/**
+**▶ Play: https://kryadov.github.io/itffm/**
 
-> ⚠️ Игра не является определителем грибов. Не используйте её, чтобы решать, что
-> можно есть: реальный гриб определяют по совокупности признаков, а ошибка стоит
-> здоровья.
+> ⚠️ This game is not a field guide. Do not use it to decide what is safe to
+> eat: a real mushroom is identified from the whole set of its characters, and a
+> mistake costs your health.
 
 ---
 
-## Как это устроено
+## How it works
 
-Готовых 3D-моделей «по видам грибов» не существует нигде и ни за какие деньги, а
-рисовать вручную сотни видов невозможно. Поэтому моделей здесь нет: каждый гриб
-**собирается на лету** из параметров своего вида — формы шляпки, типа
-гименофора, наличия кольца и вольвы, цветов, диапазонов размеров.
+There is no such thing as a library of 3D models "by mushroom species" — not
+free, not for money — and hand-modelling hundreds of species is not possible.
+So there are no models here. Every mushroom is **generated on the spot** from
+its species parameters: cap shape, hymenium type, whether it has a ring or a
+volva, colours, size ranges.
 
-Один YAML-файл на вид кормит сразу три подсистемы:
+One YAML file per species feeds three subsystems at once:
 
 ```
 data/species/*.yaml
-  ├── morphology → 3D-модель гриба
-  ├── ecology    → где и когда он вырастет
-  └── name/text  → энциклопедия и карточка
+  ├── morphology → the 3D model
+  ├── ecology    → where and when it grows
+  └── name/text  → encyclopedia and inspection card
 ```
 
-Новый вид — это строка данных, а не работа 3D-художника. Ровно поэтому проект
-масштабируется до сотен видов.
+A new species is a line of data, not a job for a 3D artist. That is exactly why
+this scales to hundreds of them.
 
-Второе следствие того же подхода: экология не декорация, а генератор. Рельеф
-задаёт влажность — в ложбинах сыро, на буграх сухо. Деревья растут пятнами
-пород. Дальше для каждой точки известны биом, ближайшая порода-партнёр, субстрат
-и влажность, и вид отбирается по настоящим правилам.
+The same approach has a second consequence: ecology is a generator, not
+decoration. The terrain decides moisture — hollows are damp, rises are dry.
+Trees grow in stands of one genus. From there every point knows its biome, its
+nearest partner tree, its substrate and its moisture, and the species is chosen
+by real rules.
 
-## Запуск
+## Running it
 
-Нужен Node.js 22.
+Needs Node.js 22.
 
 ```bash
 npm install
 npm run dev
 ```
 
-| Команда | Что делает |
+| Command | What it does |
 |---|---|
-| `npm run dev` | Дев-сервер с горячей перезагрузкой |
-| `npm test` | Тесты |
-| `npm run build` | Сборка в `dist/` |
-| `npm run boot-check` | После сборки: стартует ли она в headless-Chrome |
+| `npm run dev` | Dev server with hot reload |
+| `npm test` | Tests |
+| `npm run build` | Build into `dist/` |
+| `npm run boot-check` | After a build: does it actually start, in headless Chrome |
 
-## Управление
+## Controls
 
-| Клавиши | Действие |
+| Keys | Action |
 |---|---|
-| `W` `A` `S` `D` | Идти |
-| `Shift` | Присесть — чтобы заглянуть под шляпку |
-| `E` | Рассмотреть гриб |
-| `Tab` | Энциклопедия |
-| `Q` | Разобрать корзину |
+| `W` `A` `S` `D` | Walk |
+| `Shift` | Crouch — to look under a cap |
+| `E` | Examine a mushroom |
+| `Tab` | Encyclopedia |
+| `Q` | Sort the basket |
 
-## Состояние
+## Where it stands
 
-Проект в работе. Сейчас готовы: генератор моделей грибов, база видов с
-валидацией, процедурный рельеф и лес. Впереди — ходьба от первого лица, режим
-осмотра, энциклопедия и сохранение.
+Work in progress. Done so far: the mushroom generator, the species database with
+validation, procedural terrain and wood, walking in first person, the
+inspection view, the encyclopedia and saving.
 
-Следующим этапом лес перестанет быть выдуманным: рельеф придёт из
-[AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/), а деревья,
-поляны, дюны, болота и входы в пещеры — из
-[OpenStreetMap](https://www.openstreetmap.org). Игрок сможет ввести реальное
-место — свой дачный лес, Куршскую косу, Альпы — и собирать грибы там, по
-экологии этого самого леса.
+Next the wood stops being invented. Elevation comes from
+[AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/), and the
+trees, clearings, dunes, wetlands and cave entrances come from
+[OpenStreetMap](https://www.openstreetmap.org). You will be able to name a real
+place — your own local wood, the Curonian Spit, the Alps — and pick mushrooms
+there, by the ecology of that particular wood.
 
-- Дизайн-документ: [`docs/superpowers/specs`](docs/superpowers/specs/)
-- План работ: [`docs/superpowers/plans`](docs/superpowers/plans/)
+Design documents and plans live in `docs/superpowers/` and are written in
+Russian. The backlog is `TODO.md`.
 
-## Технологии и данные
+## Technology and data
 
-TypeScript, [Three.js](https://threejs.org), Vite. Без бэкенда — всё считается в
-браузере, сохранение в IndexedDB.
+TypeScript, [Three.js](https://threejs.org), Vite. No backend — everything is
+computed in the browser, and progress is saved to IndexedDB.
 
-Данные о видах опираются на [GBIF](https://www.gbif.org) (таксономия, CC0) и
-[Wikidata](https://www.wikidata.org) (названия, CC0); фотографии — из
+Species data rests on [GBIF](https://www.gbif.org) (taxonomy, CC0) and
+[Wikidata](https://www.wikidata.org) (names, CC0); photographs come from
 [iNaturalist Open Data](https://github.com/inaturalist/inaturalist-open-data)
-под лицензиями Creative Commons, с указанием автора и лицензии в карточке вида.
-Морфология, экология и съедобность выверяются вручную: открытой структурированной
-базы этих признаков не существует, и это самая ценная часть проекта.
+under Creative Commons licences, with the author and licence shown on the
+species card. Morphology, ecology and edibility are curated by hand: no open
+structured database of those characters exists, and that curation is the most
+valuable part of the project.

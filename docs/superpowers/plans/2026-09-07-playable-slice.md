@@ -2,6 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Статус: выполнен.** Все 17 задач сделаны, выпущено как `v0.2.0`, живёт на
+https://kryadov.github.io/itffm/ . Отклонения от плана, найденные осмотром
+глазами, описаны в разделе 0 спеки и в сообщениях коммитов. Следующий план —
+`2026-09-08-real-geography.md`.
+
 **Goal:** Довести пустой репозиторий до играбельной сборки на GitHub Pages: игрок ходит от первого лица по процедурному лесу, находит грибы, выросшие по экологическим правилам, рассматривает их в руках и собирает в личную энциклопедию.
 
 **Architecture:** Чистые тестируемые модули (`util`, `mushroom`, `species`, `ecology`, `terrain`) не знают ни о сцене, ни о сети; `world`, `game` и `ui` собирают из них рантайм. Грибы — процедурные меши из параметров вида, лес — процедурный (реальные OSM+DEM данные придут во втором плане и заменят только `world/terrain`, не тронув остальное).

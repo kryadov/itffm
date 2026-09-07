@@ -2,92 +2,130 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Что это
+## What this is
 
-Браузерная 3D-игра от первого лица про сбор грибов, совмещённая с энциклопедией.
-Виды, их признаки и экология — настоящие. Модели грибов не рисуются вручную, а
-собираются процедурно из параметров вида, и те же параметры решают, где гриб
-вырастет в лесу.
+A browser first-person game about picking mushrooms, and a mushroom encyclopedia
+in the same breath. The species, their field marks and their ecology are real.
+Mushroom models are not drawn by hand — each one is generated from its species
+parameters, and those same parameters decide where in the wood it grows.
 
-Проект в начале пути: выполняется план 1 из 17 задач.
+Live: https://kryadov.github.io/itffm/
 
-- Дизайн-документ: `docs/superpowers/specs/2026-09-07-mushroom-game-design.md`
-- План реализации: `docs/superpowers/plans/2026-09-07-playable-slice.md`
+Current state: plan 1 done and released as `v0.2.0` (procedural wood, walking,
+inspection, encyclopedia, save, RU/EN). Plan 2 — real geography from OSM and
+elevation tiles — is in progress.
 
-**Читай оба перед работой.** План содержит готовый код и тесты для каждой задачи,
-а спека объясняет, почему решения именно такие.
+Documents are in Russian; the code is in English (see Conventions).
 
-## Команды
+- Design doc: `docs/superpowers/specs/2026-09-07-mushroom-game-design.md` —
+  section 0 lists where the implementation taught us better than the spec.
+- Plans: `docs/superpowers/plans/` — each carries ready-to-write code and tests
+  per task.
+- Backlog: `TODO.md`.
+
+**Read the spec and the current plan before working.** The plan says what to do;
+the spec says why it is that way.
+
+## Commands
 
 ```bash
-npm run dev            # dev-сервер с горячей перезагрузкой
-npm test               # тесты один раз
-npm run test:watch     # тесты в watch-режиме
-npm test -- profile    # только файлы, чей путь содержит "profile"
-npm run build          # tsc + сборка в dist/
-npm run boot-check     # после build: поднимает бандл в headless-Chrome
+npm run dev            # dev server with hot reload
+npm test               # tests, single run
+npm run test:watch     # tests in watch mode
+npm test -- profile    # only files whose path contains "profile"
+npm run build          # tsc + build into dist/
+npm run boot-check     # after build: does the bundle start in headless Chrome
 ```
 
-`npm test` и `npm run build` гоняются в CI на каждый пуш в `master`, и зелёная
-сборка публикуется на GitHub Pages (`.github/workflows/deploy.yml`).
+`npm test` and `npm run build` run in CI on every push to `master`, and a green
+build publishes to GitHub Pages (`.github/workflows/deploy.yml`). A release is
+cut by pushing a version tag (`git tag v0.3.0 && git push --tags`).
 
-`boot-check` существует потому, что юнит-тесты никогда не загружают `main.ts`:
-сборка может быть зелёной при чёрном экране. Если Chrome не найден, проверка
-молча пропускается.
+`boot-check` exists because unit tests never load `main.ts`: the build can be
+green while the screen is black. It has caught two real hangs already. If Chrome
+is not installed it skips silently.
 
-## Архитектура
+## Architecture
 
-Данные о видах — единственный источник правды, и у него три потребителя:
+The species data is the single source of truth, and it has three consumers:
 
 ```
 data/species/*.yaml
-  ├── morphology → src/mushroom/  → 3D-модель гриба
-  ├── ecology    → src/ecology/   → где и когда он вырастет
-  └── name/text  → src/ui/        → энциклопедия и карточка
+  ├── morphology → src/mushroom/  → the 3D model
+  ├── ecology    → src/ecology/   → where and when it grows
+  └── name/text  → src/ui/        → encyclopedia and inspection card
 ```
 
-Схема в `src/species/schema.ts` валидирует всё это вручную, без библиотек: данные
-пишутся людьми, и сообщение об ошибке обязано называть файл и поле.
+`src/species/schema.ts` validates all of it by hand, without a library: the data
+is written by people, so an error message has to name the file and the field.
 
-Слои и правило зависимостей:
+Layers and the dependency rule:
 
-| Слой | Модули | Правило |
+| Layer | Modules | Rule |
 |---|---|---|
-| Чистое ядро | `util`, `species`, `mushroom`, `ecology`, `terrain` | Не ходит в сеть, не читает глобальное состояние, не импортирует `game`/`ui`/`world`. Покрыто тестами полностью. |
-| Мир и рантайм | `world`, `game` | Собирает сцену из ядра. Тестируется точечно. |
-| Интерфейс | `ui`, `i18n`, `save` | DOM поверх canvas. |
+| Pure core | `util`, `species`, `mushroom`, `ecology`, `terrain` | No network, no global state, no imports from `game`/`ui`/`world`. Fully covered by tests. |
+| World and runtime | `world`, `game` | Assembles the scene from the core. Tested selectively. |
+| Interface | `ui`, `i18n`, `save` | DOM over the canvas. |
 
-`ElevationProvider` (`src/terrain/provider.ts`) — намеренно узкий интерфейс из
-одного метода `heightAt(x, z)`. Сейчас за ним процедурный рельеф; во втором плане
-он подменится на реальный DEM из AWS Terrain Tiles, и остальной код об этом не
-узнает. Не добавляй в него ничего, что процедурный рельеф не сможет дать.
+### Two things worth knowing before you touch the mushrooms
 
-Гео- и terrain-модули задуманы к переносу из соседнего проекта
-`kryadov/race-the-city` (Overpass с зеркалами и кэшем, Terrarium-тайлы, проекция
-гео→метры). Там же образец CI и `boot-check`.
+**A mushroom exists in two forms.** `buildMushroom()` returns a detailed group
+with named parts (`cap`, `stipe`, `hymenium`, `ring`, `volva`) — that is what
+the inspection view and the encyclopedia build, because there the parts matter.
+`toWorldMesh()` flattens it into one mesh with baked vertex colours, and that is
+what goes into the wood. The reason is arithmetic: a few hundred mushrooms at
+five meshes each is over a thousand draw calls, which stalls a real GPU and
+hangs a software one. Do not put the detailed group into the scene.
 
-## Соглашения
+**Specimen size comes from one factor.** Drawing each dimension independently
+produced a 25 cm cap on a 6 cm stalk. `buildMushroom` picks `size` once and every
+measurement follows it. Keep it that way when adding morphology fields.
 
-- **Язык.** Код — английский: идентификаторы, комментарии, сообщения об ошибках,
-  названия тестов. Документы, спеки и сообщения коммитов — русский. Строки,
-  видимые игроку, — данные: они живут в `src/i18n/` на обоих языках, RU и EN, и
-  не хардкодятся в модулях.
-- **Детерминизм.** Ни одного `Math.random` в `src/`. Всё генерируемое берёт числа
-  из `mulberry32` (`src/util/rng.ts`), и на каждую генерацию есть тест «один seed
-  — один результат». Лес обязан быть одинаковым у всех и переживать перезагрузку.
-- **Единицы.** Сцена в метрах, данные вида в миллиметрах. Перевод живёт только в
-  `src/mushroom/build.ts`.
-- **Зависимости.** Рантайм — только `three` и `yaml`. Третью не добавлять без
-  отдельного решения; отсюда и валидация схемы своими руками вместо zod, и своя
-  орбита камеры вместо OrbitControls.
-- **TDD.** План задаёт порядок: падающий тест → минимальная реализация →
-  зелёный тест → коммит. Коммит на задачу.
-- **Ветки.** Работа идёт в ветке, `master` — то, что деплоится. Вливать в
-  контрольных точках, где план предполагает пуш.
+### The seam for real geography
 
-## Ответственность
+`ElevationProvider` (`src/terrain/provider.ts`) is deliberately one method,
+`heightAt(x, z)`. Behind it today sits procedural terrain; plan 2 puts an AWS
+Terrain Tiles DEM there, and nothing else in the codebase learns about it. Do
+not add anything to that interface a procedural surface cannot answer.
 
-Игра не является определителем грибов. Дисклеймер обязателен при первом запуске и
-постоянно в энциклопедии. Поле `edibility` при курации сверяется по двум
-независимым источникам — это единственное место, где ошибка в данных стоит не
-багрепорта, а здоровья.
+`Tree` (`src/world/trees.ts`) is data, not meshes, for the same reason: the
+mushroom spawner reads tree genus and position without knowing anything about
+rendering, so OSM polygons can replace the procedural scatter.
+
+Geo and terrain modules are ported from the sibling project
+`kryadov/race-the-city` (Overpass with mirrors and an IndexedDB cache, Terrarium
+tiles, geo→metres projection). Its CI and `boot-check` are the model for ours.
+When something there solves our problem, port and adapt it rather than
+reinventing — but that project drives a car around a city, so everything about
+buildings, carriageways and lanes is dropped on the way.
+
+## Conventions
+
+- **Language.** Code is English: identifiers, comments, error messages, test
+  names. Documents, specs and commit messages are Russian. `README.md` and this
+  file are English. Player-facing strings are data: they live in `src/i18n/` in
+  both languages and are never hardcoded in modules.
+- **Determinism.** No `Math.random` anywhere in `src/`. Everything generated
+  draws from `mulberry32` (`src/util/rng.ts`), and every generator has a test
+  asserting one seed gives one result. The wood must look the same for everyone
+  and survive a reload.
+- **Units.** The scene is in metres, species data is in millimetres. The
+  conversion lives only in `src/mushroom/build.ts`.
+- **Dependencies.** Runtime is `three` and `yaml`, nothing else. A third one
+  needs its own decision — hence hand-rolled schema validation instead of zod,
+  and our own camera orbit instead of OrbitControls.
+- **TDD.** The plans set the order: failing test → minimal implementation →
+  green test → commit. One commit per task.
+- **Look at it.** Three real defects in v0.2.0 — chimeric proportions, the
+  oyster mushroom drawn as a pancake, black lids for conifer crowns — were
+  invisible to the tests and obvious on screen. Render a screenshot in headless
+  Chrome and actually look before calling visual work done.
+- **Branches.** Work happens on a branch; `master` is what deploys. Merge at the
+  checkpoints where the plan expects a push.
+
+## Responsibility
+
+This game is not a field guide. The disclaimer is mandatory on first run and
+permanently in the encyclopedia. The `edibility` field is checked against two
+independent sources during curation — it is the one place where an error in the
+data costs health rather than a bug report.
