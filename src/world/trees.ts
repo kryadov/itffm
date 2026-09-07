@@ -31,9 +31,9 @@ interface GenusLook {
 
 /** The genera the first plan needs. The rest arrive with the other biomes. */
 const LOOK: Partial<Record<TreeGenus, GenusLook>> = {
-  betula: { trunk: 0.16, crown: 2.2, height: [14, 22], crownColor: 0x74963f, trunkColor: 0xe8e4d8, conifer: false },
-  picea: { trunk: 0.22, crown: 2.0, height: [16, 28], crownColor: 0x2f4a33, trunkColor: 0x4a3b2c, conifer: true },
-  pinus: { trunk: 0.26, crown: 2.6, height: [18, 30], crownColor: 0x44603a, trunkColor: 0x8a5a3b, conifer: true },
+  betula: { trunk: 0.16, crown: 2.4, height: [14, 22], crownColor: 0x74963f, trunkColor: 0xe8e4d8, conifer: false },
+  picea: { trunk: 0.22, crown: 1.7, height: [16, 28], crownColor: 0x2f4a33, trunkColor: 0x4a3b2c, conifer: true },
+  pinus: { trunk: 0.26, crown: 2.1, height: [18, 30], crownColor: 0x44603a, trunkColor: 0x8a5a3b, conifer: true },
   quercus: { trunk: 0.34, crown: 3.4, height: [15, 24], crownColor: 0x556b2f, trunkColor: 0x5a4632, conifer: false },
   populus: { trunk: 0.24, crown: 2.4, height: [16, 26], crownColor: 0x7a9a4a, trunkColor: 0x6b6154, conifer: false },
 }
@@ -149,9 +149,18 @@ export function buildTreeMeshes(trees: Tree[]): THREE.Group {
       dummy.updateMatrix()
       trunks.setMatrixAt(i, dummy.matrix)
 
-      const crownH = t.height * (look.conifer ? 0.7 : 0.45)
-      dummy.position.set(t.x, t.y + t.height * (look.conifer ? 0.6 : 0.8), t.z)
-      dummy.scale.set(1, look.conifer ? crownH : 1, 1)
+      // Crowns sit high and stay narrow enough to walk under. A wide cone
+      // starting low reads from below as a black lid over the whole wood,
+      // which is exactly what it looked like before.
+      const spread = 0.75 + (t.height - look.height[0]) / (look.height[1] - look.height[0]) * 0.5
+      if (look.conifer) {
+        const crownH = t.height * 0.55
+        dummy.position.set(t.x, t.y + t.height - crownH / 2, t.z)
+        dummy.scale.set(spread, crownH, spread)
+      } else {
+        dummy.position.set(t.x, t.y + t.height * 0.82, t.z)
+        dummy.scale.set(spread, spread * 0.8, spread)
+      }
       dummy.updateMatrix()
       crowns.setMatrixAt(i, dummy.matrix)
     })

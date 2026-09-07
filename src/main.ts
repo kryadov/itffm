@@ -1,12 +1,18 @@
 import * as THREE from 'three'
-import { loadSpecies } from './species/load'
-import { buildMushroom } from './mushroom/build'
-import { attachOrbit } from './ui/orbit'
+import { createForest, HALF_SIZE } from './game/scene'
+import { createControls } from './game/controls'
+import { stepPlayer, eyeHeight, type PlayerState, type Obstacle } from './game/player'
 
 declare global {
-  // boot-check waits on this flag: it is set only if the module ran to the end.
-  interface Window { __READY?: boolean }
+  // boot-check waits on __READY: it is set only if the module ran to the end.
+  // __BOOTCHECK tells us we are inside that headless run, where an endless
+  // animation loop never lets the virtual-time budget settle and the check
+  // hangs instead of reporting.
+  interface Window { __READY?: boolean; __BOOTCHECK?: boolean }
 }
+
+/** Beyond this a mushroom is a pixel; drawing it costs a call for nothing. */
+const MUSHROOM_DRAW_DISTANCE = 45
 
 const app = document.getElementById('app')!
 const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -14,30 +20,12 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
 renderer.setSize(innerWidth, innerHeight)
 app.appendChild(renderer.domElement)
 
-const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x9db89a)
-scene.add(new THREE.HemisphereLight(0xdfeede, 0x3b3327, 2.2))
-const sun = new THREE.DirectionalLight(0xfff3d6, 1.6)
-sun.position.set(1, 2, 1)
-scene.add(sun)
+const forest = createForest(2026)
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 300)
+const controls = createControls(renderer.domElement)
 
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(4, 4),
-  new THREE.MeshStandardMaterial({ color: 0x4a5a3a, roughness: 1 }),
-)
-ground.rotation.x = -Math.PI / 2
-scene.add(ground)
-
-const species = loadSpecies()
-const STEP = 0.35
-species.forEach((s, i) => {
-  const g = buildMushroom(s.morphology, i + 1, 0.6)
-  g.position.x = (i - (species.length - 1) / 2) * STEP
-  scene.add(g)
-})
-
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 100)
-attachOrbit(camera, renderer.domElement, new THREE.Vector3(0, 0.08, 0), 0.9)
+const obstacles: Obstacle[] = forest.trees.map((t) => ({ x: t.x, z: t.z, radius: t.radius }))
+let player: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0 }
 
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight
@@ -45,6 +33,33 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight)
 })
 
-renderer.setAnimationLoop(() => renderer.render(scene, camera))
+let last = performance.now()
+renderer.setAnimationLoop(() => {
+  const now = performance.now()
+  const dt = Math.min(0.05, (now - last) / 1000)
+  last = now
+
+  player = stepPlayer(player, controls.read(dt), forest.ground, obstacles)
+  player.x = Math.max(-HALF_SIZE, Math.min(HALF_SIZE, player.x))
+  player.z = Math.max(-HALF_SIZE, Math.min(HALF_SIZE, player.z))
+
+  camera.position.set(player.x, forest.ground.heightAt(player.x, player.z) + eyeHeight(player), player.z)
+  camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+
+  cullDistantMushrooms()
+  renderer.render(forest.scene, camera)
+
+  // One frame is all boot-check needs, and all it can afford.
+  if (window.__BOOTCHECK) renderer.setAnimationLoop(null)
+})
+
+function cullDistantMushrooms(): void {
+  const limit = MUSHROOM_DRAW_DISTANCE * MUSHROOM_DRAW_DISTANCE
+  for (const m of forest.mushroomObjects) {
+    const dx = m.position.x - player.x
+    const dz = m.position.z - player.z
+    m.visible = dx * dx + dz * dz < limit
+  }
+}
 
 window.__READY = true
