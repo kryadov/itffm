@@ -1,0 +1,50 @@
+id: boletus-edulis
+gbifKey: 5327573
+name:
+  la: Boletus edulis
+  ru: Белый гриб
+  en: Penny bun
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [70, 250]
+    color: "#8b5a2b"
+    surface: smooth
+    surfaceColor: "#8b5a2b"
+  hymenium:
+    type: pores
+    attachment: adnate
+    color: "#f2ead6"
+  stipe:
+    height: [60, 200]
+    width: [25, 70]
+    color: "#e8dcc0"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fffdf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [picea, pinus, betula, quercus, fagus]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed, forest-broadleaved]
+  season: [6, 7, 8, 9, 10]
+  moisture: [0.35, 0.75]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Плотная бурая шляпка, толстая бочонковидная ножка со светлой сеточкой, белый
+    трубчатый слой, не синеющий на срезе. Съедобен и безоговорочно хорош. Ищут в
+    мшистых ельниках и по краю сосняков, чаще на приподнятых сухих местах, а не
+    в мокрых низинах.
+  en: >-
+    A firm brown cap, a thick barrel-shaped stipe with a pale net, and white
+    tubes that do not blue when cut. Edible and prized. Look on mossy ground in
+    spruce and pine woods, on the drier rises rather than the wet hollows.
