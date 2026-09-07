@@ -22,6 +22,7 @@ morphology:
     height: [60, 200]
     width: [25, 70]
     color: "#e8dcc0"
+    position: central
     ring: none
     volva: none
   flesh:

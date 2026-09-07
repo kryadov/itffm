@@ -6,6 +6,7 @@ export const HYMENIUM = ['gills', 'pores', 'teeth', 'smooth', 'maze'] as const
 export const ATTACHMENT = ['free', 'adnate', 'adnexed', 'decurrent'] as const
 export const SURFACE = ['smooth', 'warty', 'scaly', 'fibrous', 'viscid', 'velvety'] as const
 export const RING = ['none', 'pendant', 'ascending', 'fugacious'] as const
+export const STIPE_POSITION = ['central', 'lateral', 'absent'] as const
 export const VOLVA = ['none', 'sheathing', 'bulbous-rings', 'marginate'] as const
 export const BRUISING = ['none', 'blue', 'red', 'brown', 'black'] as const
 export const LATEX = ['none', 'white', 'orange', 'red'] as const
@@ -27,6 +28,7 @@ export type Attachment = (typeof ATTACHMENT)[number]
 export type Surface = (typeof SURFACE)[number]
 export type RingType = (typeof RING)[number]
 export type VolvaType = (typeof VOLVA)[number]
+export type StipePosition = (typeof STIPE_POSITION)[number]
 export type Substrate = (typeof SUBSTRATE)[number]
 export type Biome = (typeof BIOMES)[number]
 export type TreeGenus = (typeof TREE_GENERA)[number]
@@ -38,7 +40,7 @@ export type Range = [number, number]
 export interface Morphology {
   cap: { shape: CapShape; ageShape: CapShape; diameter: Range; color: string; surface: Surface; surfaceColor: string }
   hymenium: { type: HymeniumType; attachment: Attachment; color: string }
-  stipe: { height: Range; width: Range; color: string; ring: RingType; volva: VolvaType }
+  stipe: { height: Range; width: Range; color: string; position: StipePosition; ring: RingType; volva: VolvaType }
   flesh: { color: string; bruising: (typeof BRUISING)[number] }
   latex: (typeof LATEX)[number]
 }
@@ -184,6 +186,7 @@ export function validateSpecies(raw: unknown, file: string): Species {
       height: range(stObj, 'height', file, 'morphology.stipe'),
       width: range(stObj, 'width', file, 'morphology.stipe'),
       color: color(stObj, 'color', file, 'morphology.stipe'),
+      position: oneOf(stObj, 'position', STIPE_POSITION, file, 'morphology.stipe'),
       ring: oneOf(stObj, 'ring', RING, file, 'morphology.stipe'),
       volva: oneOf(stObj, 'volva', VOLVA, file, 'morphology.stipe'),
     },

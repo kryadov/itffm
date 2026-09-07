@@ -22,6 +22,7 @@ morphology:
     height: [80, 200]
     width: [10, 25]
     color: "#fffdf0"
+    position: central
     ring: pendant
     volva: bulbous-rings
   flesh:

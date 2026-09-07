@@ -9,7 +9,7 @@ const valid = {
   morphology: {
     cap: { shape: 'convex', ageShape: 'flat', diameter: [80, 200], color: '#d0201a', surface: 'warty', surfaceColor: '#fffdf0' },
     hymenium: { type: 'gills', attachment: 'free', color: '#fffdf0' },
-    stipe: { height: [80, 200], width: [10, 20], color: '#fffdf0', ring: 'pendant', volva: 'bulbous-rings' },
+    stipe: { height: [80, 200], width: [10, 20], color: '#fffdf0', position: 'central', ring: 'pendant', volva: 'bulbous-rings' },
     flesh: { color: '#fffdf0', bruising: 'none' },
     latex: 'none',
   },

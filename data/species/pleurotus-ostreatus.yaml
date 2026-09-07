@@ -9,7 +9,7 @@ lookalikes: []
 morphology:
   cap:
     shape: convex
-    ageShape: depressed
+    ageShape: flat
     diameter: [50, 150]
     color: "#8c8578"
     surface: smooth
@@ -22,6 +22,7 @@ morphology:
     height: [10, 30]
     width: [10, 25]
     color: "#f0ebe0"
+    position: lateral
     ring: none
     volva: none
   flesh:
