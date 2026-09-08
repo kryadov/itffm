@@ -6,6 +6,7 @@ import { parseWorld, type OverpassResponse } from '../geo/parse'
 import { loadTerrarium } from '../terrain/terrarium'
 import { griddedProvider } from '../terrain/gridded'
 import { withDetail } from '../terrain/detail'
+import { withPits } from '../terrain/pits'
 import { proceduralTerrain } from '../terrain/procedural'
 import { demoForest } from '../world/demoForest'
 import { placeOsmTrees } from '../world/osmTrees'
@@ -40,7 +41,7 @@ export function chooseFallback(world: WorldData): 'demo' | null {
 }
 
 function proceduralGround(seed: number): ElevationProvider {
-  return griddedProvider(proceduralTerrain(seed), HALF_SIZE, GROUND_SEGMENTS)
+  return griddedProvider(withPits(proceduralTerrain(seed), seed + 3), HALF_SIZE, GROUND_SEGMENTS)
 }
 
 /**
@@ -51,7 +52,7 @@ function proceduralGround(seed: number): ElevationProvider {
 async function realGround(bbox: BBox, projector: Projector, seed: number): Promise<ElevationProvider> {
   try {
     const dem = await loadTerrarium(bbox, projector)
-    return griddedProvider(withDetail(dem, seed), HALF_SIZE, GROUND_SEGMENTS)
+    return griddedProvider(withPits(withDetail(dem, seed), seed + 3), HALF_SIZE, GROUND_SEGMENTS)
   } catch {
     return proceduralGround(seed)
   }
