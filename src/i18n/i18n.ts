@@ -50,6 +50,16 @@ export const RU = {
   sand: 'песке',
   burnt: 'гарях',
   mm: 'мм',
+  placeIntro:
+    'Назовите настоящий лес — свой дачный, заповедник, национальный парк — и почва, деревья и грибы будут расти по его настоящей экологии.',
+  placePlaceholder: 'Лосиный Остров',
+  placeGo: 'В лес',
+  placeDemo: 'Просто показать лес',
+  stageGeocode: 'Ищем место…',
+  stageOsm: 'Читаем карту леса…',
+  stageTerrain: 'Строим рельеф…',
+  stageBuild: 'Выращиваем лес…',
+  fellBackNotice: 'Не удалось построить лес по этому месту — показываю запасной лес.',
   lang: 'EN',
 } as const
 
@@ -97,6 +107,16 @@ export const EN: Record<keyof typeof RU, string> = {
   sand: 'sand',
   burnt: 'burnt ground',
   mm: 'mm',
+  placeIntro:
+    'Name a real wood — your own local one, a nature reserve, a national park — and the ground, the trees and the mushrooms will follow its actual ecology.',
+  placePlaceholder: 'Losiny Ostrov',
+  placeGo: 'Into the wood',
+  placeDemo: 'Just show me a wood',
+  stageGeocode: 'Looking for the place…',
+  stageOsm: 'Reading the map of the wood…',
+  stageTerrain: 'Shaping the terrain…',
+  stageBuild: 'Growing the wood…',
+  fellBackNotice: 'Could not build a wood from that place — showing the demo wood instead.',
   lang: 'RU',
 }
 

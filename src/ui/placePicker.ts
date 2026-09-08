@@ -1,11 +1,13 @@
-const EXAMPLES = ['Лосиный Остров', 'Куршская коса', '55.87, 37.77']
+import { t } from '../i18n/i18n'
 
 /**
  * The place-picker screen: name a real wood, or walk into the baked demo one.
  *
  * OpenStreetMap and AWS Terrain Tiles attribution sits here, visible before the
  * player ever presses a key — their licences require it, and it should not be
- * something to go hunting for in an "about" screen nobody opens.
+ * something to go hunting for in an "about" screen nobody opens. Attribution
+ * text itself stays in English regardless of interface language, matching how
+ * most software credits its data sources.
  */
 export function openPlacePicker(onPick: (query: string | null) => void): void {
   const overlay = document.createElement('div')
@@ -17,16 +19,12 @@ export function openPlacePicker(onPick: (query: string | null) => void): void {
 
   overlay.innerHTML = `
     <h1 style="margin:0;font-size:28px">itffm</h1>
-    <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">
-      Name a real wood — your own local one, a nature reserve, a national park —
-      and the ground, the trees and the mushrooms will follow its actual ecology.
-    </p>
-    <input id="place-input" type="text" placeholder="${EXAMPLES[0]}"
+    <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">${t('placeIntro')}</p>
+    <input id="place-input" type="text" placeholder="${t('placePlaceholder')}"
       style="width:min(420px,90vw);padding:11px 14px;font-size:16px;border-radius:8px;border:1px solid #444;background:#1a201a;color:#eee" />
-    <div style="opacity:.5;font-size:13px">${EXAMPLES.map((e) => `“${e}”`).join(' · ')}</div>
     <div style="display:flex;gap:12px;margin-top:4px">
-      <button id="place-go" style="padding:11px 22px;border:0;border-radius:8px;background:#7ec46b;color:#12160f;font-weight:600;font-size:15px;cursor:pointer">Into the wood</button>
-      <button id="place-demo" style="padding:11px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:15px;cursor:pointer">Just show me a wood</button>
+      <button id="place-go" style="padding:11px 22px;border:0;border-radius:8px;background:#7ec46b;color:#12160f;font-weight:600;font-size:15px;cursor:pointer">${t('placeGo')}</button>
+      <button id="place-demo" style="padding:11px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:15px;cursor:pointer">${t('placeDemo')}</button>
     </div>
     <p style="position:fixed;bottom:10px;opacity:.4;font-size:11px;text-align:center;max-width:600px">
       Terrain © <a href="https://registry.opendata.aws/terrain-tiles/" style="color:inherit">AWS Terrain Tiles</a>.
