@@ -107,23 +107,23 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), handleMat)
   handle.position.set(0.24, -0.05, 0.05)
   doorGroup.add(handle)
-  // Clearance has to beat the log-course bump's own reach (up to 0.05, see
-  // above) at every height, or the wall bulges out past the door and hides
-  // it — which is exactly what a too-thin 0.01 clearance did here once the
-  // courses stopped being flat.
   doorGroup.position.set(0, 0.625, -depth / 2 - 0.08)
   group.add(doorGroup)
 
   // Two windows, one per side wall — a pale, faintly blue "glass" pane on a
   // darker wooden frame, so it reads as a window by day (not just a same-
   // colour patch on the wall) and glows amber once setNight() says it is
-  // dark outside.
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a1f14, roughness: 1 })
+  // dark outside. DoubleSide on both: a PlaneGeometry only has one true
+  // front face, and getting each window's own rotation to point that face
+  // outward by hand is exactly the kind of sign error that had a window
+  // invisible from outside the hut and fine from in.
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a1f14, roughness: 1, side: THREE.DoubleSide })
   const glassMat = new THREE.MeshStandardMaterial({
     color: 0x8fa8ac,
     roughness: 0.3,
     emissive: 0xffcf8a,
     emissiveIntensity: 0,
+    side: THREE.DoubleSide,
   })
   const frameGeo = new THREE.PlaneGeometry(0.5, 0.5)
   const glassGeo = new THREE.PlaneGeometry(0.38, 0.38)
@@ -131,10 +131,17 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
     const win = new THREE.Group()
     const frame = new THREE.Mesh(frameGeo, frameMat)
     win.add(frame)
-    const glass = new THREE.Mesh(glassGeo, glassMat)
-    glass.name = 'glass'
-    glass.position.z = 0.005
-    win.add(glass)
+    // Two glass panes, one just in front of the frame each way (+Z and -Z),
+    // not one — a single pane offset only toward +Z sat behind the frame
+    // (which is bigger than the glass, so fully covers it) as seen from
+    // whichever side turned out to be -Z, which is exactly what made a
+    // window look like solid wall from outside and fine from in.
+    for (const dz of [0.006, -0.006]) {
+      const glass = new THREE.Mesh(glassGeo, glassMat)
+      glass.name = 'glass'
+      glass.position.z = dz
+      win.add(glass)
+    }
     win.position.set(x, wallHeight * 0.58, 0)
     win.rotation.y = faceOut
     return win
