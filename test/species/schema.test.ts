@@ -60,4 +60,33 @@ describe('validateSpecies', () => {
     const bad = { ...valid, text: { ru: 'Есть.' } }
     expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/text\.en/)
   })
+
+  it('defaults kind to mushroom when the field is absent', () => {
+    expect(validateSpecies(valid, 'x.yaml').kind).toBe('mushroom')
+  })
+
+  it('accepts an explicit kind', () => {
+    expect(validateSpecies({ ...valid, kind: 'berry' }, 'x.yaml').kind).toBe('berry')
+  })
+
+  it('rejects an unknown kind and names the file', () => {
+    expect(() => validateSpecies({ ...valid, kind: 'vegetable' }, 'x.yaml')).toThrow(/x\.yaml.*kind/s)
+  })
+
+  it('still requires edibility for a mushroom', () => {
+    const { edibility, ...withoutEdibility } = valid
+    void edibility
+    expect(() => validateSpecies(withoutEdibility, 'x.yaml')).toThrow(/edibility/)
+  })
+
+  it('lets a find go without edibility', () => {
+    const { edibility, ...withoutEdibility } = valid
+    void edibility
+    const s = validateSpecies({ ...withoutEdibility, kind: 'find' }, 'x.yaml')
+    expect(s.edibility).toBeUndefined()
+  })
+
+  it('still validates edibility for a find when it is given', () => {
+    expect(() => validateSpecies({ ...valid, kind: 'find', edibility: 'tasty' }, 'x.yaml')).toThrow(/edibility/)
+  })
 })

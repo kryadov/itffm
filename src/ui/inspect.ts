@@ -47,13 +47,17 @@ export function openInspect(
   const label = (k: string) => t(k as Parameters<typeof t>[0])
   const ringText = m.stipe.ring !== 'none' ? t('withRing') : t('noRing')
   const volvaText = m.stipe.volva !== 'none' ? `, ${t('withVolva')}` : ''
+  // Absent only for a non-food find (kind: 'find') — nothing to badge.
+  const edibilityBadge = species.edibility
+    ? `<div style="display:inline-block;padding:4px 12px;border-radius:14px;margin-bottom:20px;color:#12160f;font-weight:600;background:${EDIBILITY_COLOR[species.edibility]}">
+        ${t(species.edibility)}
+      </div>`
+    : ''
 
   card.innerHTML = `
     <h1 style="margin:0 0 2px;font-size:26px">${speciesName(species)}</h1>
     <div style="opacity:.6;font-style:italic;margin-bottom:14px">${species.name.la}</div>
-    <div style="display:inline-block;padding:4px 12px;border-radius:14px;margin-bottom:20px;color:#12160f;font-weight:600;background:${EDIBILITY_COLOR[species.edibility]}">
-      ${t(species.edibility)}
-    </div>
+    ${edibilityBadge}
     <p style="line-height:1.55;opacity:.9;margin:0">${speciesText(species)}</p>
     <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.09em;opacity:.5;margin:26px 0 8px">${t('traits')}</h2>
     <ul style="line-height:1.75;padding-left:20px;margin:0">

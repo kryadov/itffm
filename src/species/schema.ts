@@ -21,6 +21,15 @@ export const TREE_GENERA = [
 ] as const
 export const GREGARIOUS = ['solitary', 'scattered', 'clustered', 'troops', 'rings'] as const
 export const FREQUENCY = ['common', 'occasional', 'rare'] as const
+/**
+ * What kind of thing a species is — a mushroom for now, with berries, herbs,
+ * nuts and non-food finds to follow (see
+ * docs/superpowers/specs/2026-09-08-forest-finds-design.md). Each kind gets
+ * its own morphology and its own generator (mushroom/build.ts today; berry/,
+ * herb/, nut/, find/ as they land) — this field is what a dispatcher and the
+ * encyclopedia's kind filter key off.
+ */
+export const KINDS = ['mushroom', 'berry', 'herb', 'nut', 'find'] as const
 
 export type Edibility = (typeof EDIBILITY)[number]
 export type HymeniumType = (typeof HYMENIUM)[number]
@@ -34,6 +43,7 @@ export type Biome = (typeof BIOMES)[number]
 export type TreeGenus = (typeof TREE_GENERA)[number]
 export type Gregarious = (typeof GREGARIOUS)[number]
 export type Frequency = (typeof FREQUENCY)[number]
+export type Kind = (typeof KINDS)[number]
 export type Range = [number, number]
 
 /** Everything the mesh generator needs to build this species. */
@@ -68,7 +78,11 @@ export interface Species {
   id: string
   gbifKey: number
   name: { la: string; ru: string; en: string }
-  edibility: Edibility
+  kind: Kind
+  /** Absent only for a non-food find (kind: 'find') — the question of
+   *  edibility does not apply to a feather or a stone, and leaving the field
+   *  required there would force a lie into the data rather than an "n/a". */
+  edibility?: Edibility
   lookalikes: string[]
   morphology: Morphology
   ecology: Ecology
@@ -84,6 +98,10 @@ class SpeciesError extends Error {
 
 function path(prefix: string, field: string): string {
   return prefix ? `${prefix}.${field}` : field
+}
+
+function hasField(obj: unknown, field: string): boolean {
+  return typeof obj === 'object' && obj !== null && (obj as Record<string, unknown>)[field] !== undefined
 }
 
 function get(obj: unknown, field: string, file: string, prefix: string): unknown {
@@ -233,11 +251,26 @@ export function validateSpecies(raw: unknown, file: string): Species {
   const textObj = get(raw, 'text', file, '')
   const text = { ru: str(textObj, 'ru', file, 'text'), en: str(textObj, 'en', file, 'text') }
 
+  // Absent defaults to 'mushroom': the 31 species curated before this field
+  // existed name no kind at all, and re-touching every one of them just to
+  // spell out what they already are would be busywork, not data.
+  const kind: Kind = hasField(raw, 'kind') ? oneOf(raw, 'kind', KINDS, file, '') : 'mushroom'
+  // Edibility is required for anything a forager could put in a basket to
+  // eat; a non-food find (kind: 'find') is the one place the question does
+  // not apply, so it alone is allowed to leave the field out entirely.
+  const edibility: Edibility | undefined =
+    kind === 'find'
+      ? hasField(raw, 'edibility')
+        ? oneOf(raw, 'edibility', EDIBILITY, file, '')
+        : undefined
+      : oneOf(raw, 'edibility', EDIBILITY, file, '')
+
   return {
     id,
     gbifKey,
     name,
-    edibility: oneOf(raw, 'edibility', EDIBILITY, file, ''),
+    kind,
+    edibility,
     lookalikes: lookalikesRaw as string[],
     morphology,
     ecology,
