@@ -1,6 +1,10 @@
+import * as THREE from 'three'
 import { t, getLang } from '../i18n/i18n'
 import { POPULAR_PLACES } from './popularPlaces'
 import { WORLD_SIZES, DEFAULT_WORLD_SIZE } from './worldSize'
+import { buildCollectible } from '../collectible/build'
+import { speciesById } from '../species/load'
+import { hashString } from '../util/rng'
 
 /**
  * The place-picker screen: name a real wood, or walk into the baked demo one.
@@ -82,25 +86,76 @@ export function openPlacePicker(onPick: (query: string | null, halfSize: number)
   }
 }
 
-/** A loading screen with a stage message that can be updated as we go. */
-export function showLoading(message: string): { update(m: string): void; close(): void } {
+/**
+ * A loading screen with a stage message, a slowly turning mushroom and a
+ * progress bar advancing by stage number — the same generator as the
+ * encyclopedia and inspection views, so the thing spinning here is a real
+ * mushroom from the database, not a placeholder icon.
+ *
+ * @param fraction how far along the four load stages we are, 0..1
+ */
+export function showLoading(message: string, fraction: number): { update(m: string, fraction: number): void; close(): void } {
   const overlay = document.createElement('div')
   overlay.id = 'loading'
   overlay.dataset.modal = 'true'
   overlay.style.cssText =
-    'position:fixed;inset:0;background:#0f130e;pointer-events:auto;display:flex;' +
-    'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee'
+    'position:fixed;inset:0;background:#0f130e;pointer-events:auto;display:flex;flex-direction:column;' +
+    'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee;gap:16px'
+
+  const canvasWrap = document.createElement('div')
+  canvasWrap.style.cssText = 'width:140px;height:140px'
   const text = document.createElement('p')
-  text.style.cssText = 'opacity:.8;font-size:15px'
+  text.style.cssText = 'opacity:.8;font-size:15px;margin:0'
   text.textContent = message
-  overlay.appendChild(text)
+  const barTrack = document.createElement('div')
+  barTrack.style.cssText = 'width:220px;height:4px;border-radius:2px;background:#2a332a;overflow:hidden'
+  const bar = document.createElement('div')
+  bar.style.cssText = 'height:100%;background:#7ec46b;border-radius:2px;transition:width .3s ease'
+  barTrack.appendChild(bar)
+  overlay.append(canvasWrap, text, barTrack)
   document.getElementById('ui')!.appendChild(overlay)
 
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer.setSize(140, 140)
+  canvasWrap.appendChild(renderer.domElement)
+
+  const scene = new THREE.Scene()
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x555555, 2.4))
+  const key = new THREE.DirectionalLight(0xffffff, 1.3)
+  key.position.set(1, 2, 1.5)
+  scene.add(key)
+
+  // Fly agaric: the one mushroom silhouette everyone already recognises,
+  // which is exactly what a loading mascot needs to be legible at a glance.
+  const species = speciesById('amanita-muscaria')!
+  const model = buildCollectible(species, hashString(species.id), 0.7)
+  const box = new THREE.Box3().setFromObject(model)
+  model.position.sub(box.getCenter(new THREE.Vector3()))
+  scene.add(model)
+
+  const extent = Math.max(...box.getSize(new THREE.Vector3()).toArray())
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.001, 10)
+  camera.position.set(extent * 1.6, extent * 1.1, extent * 1.6)
+  camera.lookAt(0, 0, 0)
+
+  const setBar = (f: number) => {
+    bar.style.width = `${Math.round(Math.max(0, Math.min(1, f)) * 100)}%`
+  }
+  setBar(fraction)
+
+  renderer.setAnimationLoop(() => {
+    model.rotation.y += 0.02
+    renderer.render(scene, camera)
+  })
+
   return {
-    update(m: string) {
+    update(m: string, f: number) {
       text.textContent = m
+      setBar(f)
     },
     close() {
+      renderer.setAnimationLoop(null)
+      renderer.dispose()
       overlay.remove()
     },
   }

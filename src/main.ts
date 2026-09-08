@@ -38,6 +38,8 @@ const STAGE_KEY: Record<LoadStage, 'stageGeocode' | 'stageOsm' | 'stageTerrain' 
   terrain: 'stageTerrain',
   build: 'stageBuild',
 }
+const STAGE_ORDER: LoadStage[] = ['geocode', 'osm', 'terrain', 'build']
+const stageFraction = (stage: LoadStage): number => (STAGE_ORDER.indexOf(stage) + 1) / STAGE_ORDER.length
 
 async function main(): Promise<void> {
   const ui = document.getElementById('ui')!
@@ -67,11 +69,11 @@ async function main(): Promise<void> {
         openPlacePicker((q, hs) => resolve([q, hs])),
       )
 
-  const loading = showLoading(t(STAGE_KEY.geocode))
+  const loading = showLoading(t(STAGE_KEY.geocode), stageFraction('geocode'))
   const { source, fellBackTo, seed } = await loadForestData(
     query,
     (stage) => {
-      loading.update(t(STAGE_KEY[stage]))
+      loading.update(t(STAGE_KEY[stage]), stageFraction(stage))
     },
     halfSize,
   )
