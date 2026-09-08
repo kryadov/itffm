@@ -284,6 +284,22 @@ async function main(): Promise<void> {
     })
   }
 
+  // The disclaimer shows the same control list once, on first run only —
+  // after that there is nowhere to be reminded what opens the basket or the
+  // encyclopedia. H reopens it any time, and the always-visible corner hint
+  // (ui/hud.ts) is what tells a player the key exists at all.
+  function showHelp(): void {
+    overlay(
+      'help',
+      `<div style="max-width:480px;padding:34px">
+         <h1 style="margin:0 0 18px;font-size:22px">${t('helpTitle')}</h1>
+         <p style="line-height:1.7;margin:0">${t('controls')}</p>
+         <p style="opacity:.5;font-size:14px;margin-top:26px">${t('helpClose')}</p>
+       </div>`,
+      ['Escape', 'KeyH'],
+    )
+  }
+
   // Each specimen rendered as itself — its own seed and age, not a grouped
   // count — because the point of a 3D basket is seeing the actual mushrooms
   // (or berries, or whatever else the basket holds) laid out side by side,
@@ -347,6 +363,7 @@ async function main(): Promise<void> {
     }
     if (e.code === 'KeyQ') showTally()
     if (e.code === 'KeyM') openSettings()
+    if (e.code === 'KeyH') showHelp()
     if (e.code === 'Escape') openExitConfirm()
     if (e.code === 'KeyF') {
       flashlightOn = !flashlightOn

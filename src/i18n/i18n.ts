@@ -30,6 +30,9 @@ export const RU = {
   understood: 'Понятно',
   controls:
     'WASD — идти, Shift — присесть, E — рассмотреть, Tab — энциклопедия, Q — разобрать корзину, M — настройки',
+  helpTitle: 'Управление',
+  helpHint: 'H — управление',
+  helpClose: 'Esc или H — закрыть',
   capSize: 'Шляпка',
   berrySize: 'Ягода',
   clusterSize: 'Кисть',
@@ -131,6 +134,9 @@ export const EN: Record<keyof typeof RU, string> = {
   understood: 'Understood',
   controls:
     'WASD to walk, Shift to crouch, E to examine, Tab for the encyclopedia, Q to sort the basket, M for settings',
+  helpTitle: 'Controls',
+  helpHint: 'H for controls',
+  helpClose: 'Esc or H to close',
   capSize: 'Cap',
   berrySize: 'Berry',
   clusterSize: 'Cluster',
