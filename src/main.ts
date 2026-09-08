@@ -244,6 +244,22 @@ async function main(): Promise<void> {
     )
   }
 
+  function openExitConfirm(): void {
+    const el = overlay(
+      'exitConfirm',
+      `<div style="max-width:380px;padding:30px;text-align:center">
+         <p style="margin:0 0 22px;line-height:1.5">${t('exitConfirm')}</p>
+         <div style="display:flex;gap:12px;justify-content:center">
+           <button id="exit-yes" style="padding:10px 22px;border:0;border-radius:8px;background:#c4514f;color:#fff;font-weight:600;cursor:pointer">${t('exitYes')}</button>
+           <button id="exit-no" style="padding:10px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;cursor:pointer">${t('exitNo')}</button>
+         </div>
+       </div>`,
+      ['Escape'],
+    )
+    el.querySelector('#exit-yes')!.addEventListener('click', () => location.reload())
+    el.querySelector('#exit-no')!.addEventListener('click', () => el.remove())
+  }
+
   addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight
     camera.updateProjectionMatrix()
@@ -259,6 +275,7 @@ async function main(): Promise<void> {
     }
     if (e.code === 'KeyQ') showTally()
     if (e.code === 'KeyM') openSettings()
+    if (e.code === 'Escape') openExitConfirm()
   })
 
   if (!save.disclaimerSeen) showDisclaimer()

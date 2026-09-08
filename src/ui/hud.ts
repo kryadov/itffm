@@ -1,3 +1,5 @@
+declare const __APP_VERSION__: string
+
 /**
  * Crosshair, prompt and basket counter.
  *
@@ -12,7 +14,8 @@ export function createHud(root: HTMLElement): {
     'beforeend',
     `<div id="crosshair" style="position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;opacity:.55"></div>
      <div id="hint" style="position:fixed;left:50%;top:calc(50% + 26px);transform:translateX(-50%);font-size:15px;white-space:nowrap;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .12s"></div>
-     <div id="basket" style="position:fixed;right:16px;bottom:14px;font-size:14px;text-shadow:0 1px 3px #000;opacity:.85"></div>`,
+     <div id="basket" style="position:fixed;right:16px;bottom:14px;font-size:14px;text-shadow:0 1px 3px #000;opacity:.85"></div>
+     <div id="version" style="position:fixed;right:8px;bottom:2px;font-size:10px;text-shadow:0 1px 2px #000;opacity:.35;pointer-events:none">v${__APP_VERSION__}</div>`,
   )
   const hint = root.querySelector<HTMLElement>('#hint')!
   const basket = root.querySelector<HTMLElement>('#basket')!
