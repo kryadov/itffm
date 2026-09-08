@@ -61,6 +61,10 @@ export interface Forest {
   extraObstacles: { x: number; z: number; radius: number }[]
   /** The wood's one hut — game/main.ts starts the player beside it. */
   shelter: { x: number; z: number }
+  /** Grass and undergrowth: not pickable, but game/pick.ts casts against them
+   *  too, so a mushroom genuinely hidden behind a tuft or a bush is hidden
+   *  from the aim ray, not just from the eye. */
+  occluders: THREE.Object3D[]
 }
 
 /**
@@ -98,13 +102,16 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   extraObstacles.push(...boulders.map(boulderObstacle))
 
   const bushes = placeBushes(source.ground, halfSize, seed + 8)
-  scene.add(buildBushMeshes(bushes))
+  const bushMeshes = buildBushMeshes(bushes)
+  scene.add(bushMeshes)
   extraObstacles.push(...bushes.map(bushObstacle))
 
   // Pure decoration: no substrate, no collision, nothing ecology.ts needs to
   // know about. Its only job is to give the eye something to search through.
   scene.add(buildFloraMeshes(placeFlora(source.ground, halfSize, seed + 9)))
-  scene.add(buildGrassMesh(placeGrass(source.ground, halfSize, seed + 11)))
+  const grassMesh = buildGrassMesh(placeGrass(source.ground, halfSize, seed + 11))
+  scene.add(grassMesh)
+  const occluders = [grassMesh, bushMeshes]
 
   // One hut per wood, sited clear of everything already standing.
   const treeCircles = source.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
@@ -139,6 +146,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
-    shelter: { x: shelter.x, z: shelter.z },
+    shelter: { x: shelter.x, z: shelter.z }, occluders,
   }
 }
