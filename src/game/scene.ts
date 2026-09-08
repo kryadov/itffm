@@ -9,6 +9,7 @@ import { placeGrass, buildGrassMesh } from '../world/grass'
 import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
 import { buildSky } from '../world/sky'
 import { buildClouds } from '../world/clouds'
+import { buildPathMeshes } from '../world/paths'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -16,6 +17,7 @@ import { loadSpecies, speciesById } from '../species/load'
 import { buildMushroom, toWorldMesh } from '../mushroom/build'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
+import type { Vec2 } from '../geo/types'
 
 /** Default half the plot's side, metres. Ninety is about a quarter-hour's
  *  slow walk across — the player can ask for a bigger or smaller wood on the
@@ -48,6 +50,8 @@ export interface ForestSource {
   ground: ElevationProvider
   trees: Tree[]
   biomeAt: (x: number, z: number) => Biome
+  /** Trails, in local metres — empty for a source that has none. */
+  paths?: Vec2[][]
 }
 
 export interface Forest {
@@ -114,6 +118,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   }
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize)))
+  scene.add(buildPathMeshes(source.paths ?? [], source.ground))
   scene.add(buildTreeMeshes(source.trees))
 
   const logs = placeLogs(source.ground, halfSize, seed + 5)

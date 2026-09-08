@@ -1,4 +1,4 @@
-import { pointInPolygon, boundsOf } from '../../src/util/geometry'
+import { pointInPolygon, boundsOf, densify } from '../../src/util/geometry'
 
 const square = [
   { x: -10, z: -10 }, { x: 10, z: -10 },
@@ -39,5 +39,28 @@ describe('boundsOf', () => {
 
   it('returns null for an empty ring', () => {
     expect(boundsOf([])).toBeNull()
+  })
+})
+
+describe('densify', () => {
+  it('leaves a short segment alone', () => {
+    const line = [{ x: 0, z: 0 }, { x: 1, z: 0 }]
+    expect(densify(line, 5)).toEqual(line)
+  })
+
+  it('adds vertices along a segment longer than the step', () => {
+    const line = [{ x: 0, z: 0 }, { x: 10, z: 0 }]
+    const out = densify(line, 4)
+    expect(out[0]).toEqual({ x: 0, z: 0 })
+    expect(out[out.length - 1]).toEqual({ x: 10, z: 0 })
+    expect(out.length).toBeGreaterThan(2)
+    for (let i = 1; i < out.length; i++) {
+      expect(Math.hypot(out[i].x - out[i - 1].x, out[i].z - out[i - 1].z)).toBeLessThanOrEqual(4 + 1e-9)
+    }
+  })
+
+  it('returns a degenerate line unchanged rather than throwing', () => {
+    expect(densify([], 5)).toEqual([])
+    expect(densify([{ x: 1, z: 2 }], 5)).toEqual([{ x: 1, z: 2 }])
   })
 })
