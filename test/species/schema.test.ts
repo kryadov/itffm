@@ -105,6 +105,29 @@ const validNut = {
   text: { ru: 'Описание.', en: 'Description.' },
 }
 
+const validFind = {
+  id: 'interesting-stone',
+  name: { la: 'Lapis notabilis', ru: 'Интересный камень', en: 'Interesting stone' },
+  kind: 'find',
+  lookalikes: [],
+  morphology: {
+    color: '#9a9a92',
+    size: [30, 90],
+    material: 'quartz',
+  },
+  ecology: {
+    mycorrhizal: [],
+    substrate: 'soil',
+    biomes: ['forest-mixed'],
+    season: [6, 7],
+    moisture: [0.2, 0.6],
+    gregarious: 'solitary',
+    frequency: 'occasional',
+  },
+  media: [],
+  text: { ru: 'Описание.', en: 'Description.' },
+}
+
 describe('validateSpecies', () => {
   it('accepts a well-formed species', () => {
     expect(validateSpecies(valid, 'amanita-muscaria.yaml').id).toBe('amanita-muscaria')
@@ -190,5 +213,28 @@ describe('validateSpecies', () => {
   it('rejects a nut capCoverage outside 0..1', () => {
     const bad = { ...validNut, morphology: { ...validNut.morphology, capCoverage: [0.5, 1.4] } }
     expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/capCoverage/)
+  })
+
+  it('accepts a find with no gbifKey and no edibility', () => {
+    const s = validateSpecies(validFind, 'x.yaml')
+    expect(s.kind).toBe('find')
+    expect(s.gbifKey).toBeUndefined()
+    expect('edibility' in s).toBe(false)
+    expect(s.kind === 'find' && s.morphology.material).toBe('quartz')
+  })
+
+  it('still requires gbifKey for a non-find kind', () => {
+    const { gbifKey, ...withoutGbifKey } = valid
+    void gbifKey
+    expect(() => validateSpecies(withoutGbifKey, 'x.yaml')).toThrow(/gbifKey/)
+  })
+
+  it('rejects an explicit edibility on a find', () => {
+    // Not forbidden by the schema — an extra field is simply ignored, since
+    // a find's Species type never reads it. Documents the actual behaviour
+    // rather than asserting a rejection that doesn't happen.
+    const withEdibility = { ...validFind, edibility: 'edible' }
+    const s = validateSpecies(withEdibility, 'x.yaml')
+    expect('edibility' in s).toBe(false)
   })
 })

@@ -1,0 +1,33 @@
+id: bird-nest
+name:
+  la: Nidus avium
+  ru: Птичье гнездо
+  en: Bird's nest
+kind: find
+lookalikes: []
+morphology:
+  color: "#8a7050"
+  size: [80, 150]
+  material: "прутики и мох"
+ecology:
+  mycorrhizal: []
+  substrate: livewood
+  biomes: [forest-broadleaved, forest-mixed, forest-coniferous]
+  season: [4, 5, 6, 9, 10]
+  moisture: [0.2, 0.7]
+  gregarious: solitary
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Не вид, а находка: сплетённая из прутиков, травы и мха чашка,
+    оставленная в развилке ветвей после гнездового сезона. Форма и
+    материал выдают, какая птица её строила, но точный вид редко удаётся
+    назвать наверняка — важнее сам факт, что здесь кто-то жил. Съедобности
+    у находки нет, как и вопроса о ней.
+  en: >-
+    Not a species but a find: a cup woven from twigs, grass and moss, left in
+    a branch fork after the nesting season. Its shape and material hint at
+    which bird built it, but naming the exact species is rarely certain —
+    what matters more is the fact that someone lived here. A find has no
+    edibility, not even the question of it.

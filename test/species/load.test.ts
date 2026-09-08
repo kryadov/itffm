@@ -16,7 +16,10 @@ describe('loadSpecies', () => {
   })
 
   it('keeps GBIF keys unique', () => {
-    expect(new Set(all.map((s) => s.gbifKey)).size).toBe(all.length)
+    // A find has no gbifKey at all (see FindMorphology) — only species that
+    // have one need to be distinct from each other.
+    const keys = all.map((s) => s.gbifKey).filter((k): k is number => k !== undefined)
+    expect(new Set(keys).size).toBe(keys.length)
   })
 
   it('points every lookalike at a species that exists', () => {

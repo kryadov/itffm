@@ -66,16 +66,22 @@ export function openInspect(
     traitsHtml = `
       <li>${t('herbHeight')}: ${m.height[0]}–${m.height[1]} ${t('mm')}</li>
       <li>${t('leafSize')}: ${m.leafSize[0]}–${m.leafSize[1]} ${t('mm')}</li>`
-  } else {
+  } else if (species.kind === 'nut') {
     const m = species.morphology
     traitsHtml = `<li>${t('nutSize')}: ${m.size[0]}–${m.size[1]} ${t('mm')}</li>`
+  } else {
+    const m = species.morphology
+    traitsHtml = `
+      <li>${t('findMaterial')}: ${m.material}</li>
+      <li>${t('nutSize')}: ${m.size[0]}–${m.size[1]} ${t('mm')}</li>`
   }
   // Absent only for a non-food find (kind: 'find') — nothing to badge.
-  const edibilityBadge = species.edibility
-    ? `<div style="display:inline-block;padding:4px 12px;border-radius:14px;margin-bottom:20px;color:#12160f;font-weight:600;background:${EDIBILITY_COLOR[species.edibility]}">
+  const edibilityBadge =
+    species.kind !== 'find'
+      ? `<div style="display:inline-block;padding:4px 12px;border-radius:14px;margin-bottom:20px;color:#12160f;font-weight:600;background:${EDIBILITY_COLOR[species.edibility]}">
         ${t(species.edibility)}
       </div>`
-    : ''
+      : ''
 
   card.innerHTML = `
     <h1 style="margin:0 0 2px;font-size:26px">${speciesName(species)}</h1>

@@ -27,7 +27,7 @@ export interface EncyclopediaFilters {
 export function matchesFilters(species: Species, filters: EncyclopediaFilters): boolean {
   if (filters.kind && species.kind !== filters.kind) return false
   if (filters.biome && !species.ecology.biomes.includes(filters.biome)) return false
-  if (filters.edibility && species.edibility !== filters.edibility) return false
+  if (filters.edibility && (species.kind === 'find' || species.edibility !== filters.edibility)) return false
   if (filters.hymenium && (species.kind !== 'mushroom' || species.morphology.hymenium.type !== filters.hymenium)) {
     return false
   }

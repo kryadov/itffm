@@ -1,0 +1,33 @@
+id: shed-antler
+name:
+  la: Cornu deciduum
+  ru: Сброшенный рог
+  en: Shed antler
+kind: find
+lookalikes: []
+morphology:
+  color: "#6a5230"
+  size: [200, 450]
+  material: "кость"
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed, meadow-scrub]
+  season: [2, 3, 4]
+  moisture: [0.2, 0.6]
+  gregarious: solitary
+  frequency: rare
+media: []
+text:
+  ru: >-
+    Косуля или олень сбрасывают рога сами, ежегодно, ранней весной, а
+    к следующей осени отращивают новые, — находка на земле не значит, что
+    животному был причинён вред. Поверхность шероховатая у основания,
+    гладкая к отросткам, цвет от белесого до тёмно-коричневого в
+    зависимости от того, сколько пролежала на земле.
+  en: >-
+    Roe deer and red deer shed their antlers themselves, every year in early
+    spring, and grow new ones by the following autumn — finding one on the
+    ground means no harm came to the animal. Rough near the base, smooth
+    toward the tines, colour ranging from pale to dark brown depending on
+    how long it has lain on the ground.

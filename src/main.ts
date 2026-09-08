@@ -242,7 +242,7 @@ async function main(): Promise<void> {
     const rows = [...counts.entries()]
       .map(([id, n]) => {
         const s = speciesById(id)!
-        const edibility = s.edibility ? ` <span style="opacity:.6">(${t(s.edibility)})</span>` : ''
+        const edibility = s.kind !== 'find' ? ` <span style="opacity:.6">(${t(s.edibility)})</span>` : ''
         return `<li style="line-height:1.85">${speciesName(s)} — ${n}${edibility}</li>`
       })
       .join('')

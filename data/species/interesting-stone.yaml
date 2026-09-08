@@ -1,0 +1,31 @@
+id: interesting-stone
+name:
+  la: Lapis notabilis
+  ru: Интересный камень
+  en: Interesting stone
+kind: find
+lookalikes: []
+morphology:
+  color: "#9a9a92"
+  size: [30, 90]
+  material: "кварц или кремень"
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, dunes-coast, meadow-scrub]
+  season: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+  moisture: [0.0, 1.0]
+  gregarious: solitary
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Ничего конкретного — просто камень, который стоило поднять: необычная
+    прожилка кварца, след окаменелости, форма, слишком правильная для
+    случайности. Такие находки не определяются видом, как гриб или ягода,
+    но ровно так же вознаграждают внимательный взгляд под ноги.
+  en: >-
+    Nothing specific — just a stone worth picking up: an odd quartz vein, a
+    fossil trace, a shape too regular for chance. Finds like this aren't
+    identified by species the way a mushroom or a berry is, but they reward
+    an attentive look at the ground just the same.
