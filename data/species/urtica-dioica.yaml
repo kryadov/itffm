@@ -1,0 +1,39 @@
+id: urtica-dioica
+gbifKey: 3033970
+name:
+  la: Urtica dioica
+  ru: Крапива двудомная
+  en: Common nettle
+kind: herb
+edibility: edible
+lookalikes: []
+morphology:
+  stemColor: "#4a6b3a"
+  leafColor: "#3f6b2c"
+  height: [400, 1500]
+  leafSize: [60, 150]
+  leafCount: [8, 20]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed, meadow-scrub, park-urban]
+  season: [5, 6, 7, 8, 9]
+  moisture: [0.4, 0.9]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Опушённые стебли и супротивные зубчатые листья, покрытые жгучими
+    волосками — узнаётся раньше на ощупь, чем на глаз, и это узнавание
+    стоит запомнить. Молодые верхушечные листья, собранные до цветения,
+    идут в суп и на щи — старые, огрубевшие, уже не годятся. Растёт
+    сплошными зарослями там, где почва богата азотом: у жилья, на
+    вырубках, по опушкам.
+  en: >-
+    Downy stems and toothed opposite leaves covered in stinging hairs —
+    recognised by touch before sight, and that recognition is worth
+    remembering the hard way. Young top leaves, picked before flowering, go
+    into soup — older, coarsened ones no longer do. Grows in dense stands
+    wherever the soil is nitrogen-rich: near dwellings, on clearings, along
+    edges.

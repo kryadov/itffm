@@ -56,11 +56,16 @@ export function openInspect(
       <li>${t('capSize')}: ${m.cap.diameter[0]}–${m.cap.diameter[1]} ${t('mm')}</li>
       <li>${t('underside')}: ${label(m.hymenium.type)}</li>
       <li>${t('stipe')}: ${m.stipe.height[0]}–${m.stipe.height[1]} ${t('mm')}, ${ringText}${volvaText}</li>`
-  } else {
+  } else if (species.kind === 'berry') {
     const m = species.morphology
     traitsHtml = `
       <li>${t('berrySize')}: ${m.diameter[0]}–${m.diameter[1]} ${t('mm')}</li>
       <li>${t('clusterSize')}: ${m.clusterSize[0]}–${m.clusterSize[1]}</li>`
+  } else {
+    const m = species.morphology
+    traitsHtml = `
+      <li>${t('herbHeight')}: ${m.height[0]}–${m.height[1]} ${t('mm')}</li>
+      <li>${t('leafSize')}: ${m.leafSize[0]}–${m.leafSize[1]} ${t('mm')}</li>`
   }
   // Absent only for a non-food find (kind: 'find') — nothing to badge.
   const edibilityBadge = species.edibility

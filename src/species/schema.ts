@@ -24,13 +24,13 @@ export const FREQUENCY = ['common', 'occasional', 'rare'] as const
 /**
  * What kind of thing a species is (see
  * docs/superpowers/specs/2026-09-08-forest-finds-design.md). Each kind gets
- * its own morphology and its own generator (mushroom/build.ts, berry/build.ts)
- * — this field is what the `Species` union, the collectible dispatcher and
- * the encyclopedia's kind filter all key off. Grows by one entry — and one
- * union member below — each time a new kind is actually implemented; herbs,
- * nuts and non-food finds are designed but not yet here.
+ * its own morphology and its own generator (mushroom/build.ts, berry/build.ts,
+ * herb/build.ts) — this field is what the `Species` union, the collectible
+ * dispatcher and the encyclopedia's kind filter all key off. Grows by one
+ * entry — and one union member below — each time a new kind is actually
+ * implemented; nuts and non-food finds are designed but not yet here.
  */
-export const KINDS = ['mushroom', 'berry'] as const
+export const KINDS = ['mushroom', 'berry', 'herb'] as const
 
 export type Edibility = (typeof EDIBILITY)[number]
 export type HymeniumType = (typeof HYMENIUM)[number]
@@ -66,6 +66,18 @@ export interface BerryMorphology {
   clusterSize: Range
   /** The small tuft of foliage under the cluster. */
   leafColor: string
+}
+
+/** Everything the mesh generator needs to build one herb plant. */
+export interface HerbMorphology {
+  stemColor: string
+  leafColor: string
+  /** Whole plant height, mm. */
+  height: Range
+  /** One leaf's length, mm. */
+  leafSize: Range
+  /** Leaves on one plant. */
+  leafCount: Range
 }
 
 /** Everything the world generator needs to decide where this species grows. */
@@ -110,6 +122,7 @@ interface SpeciesCommon {
 export type Species =
   | (SpeciesCommon & { kind: 'mushroom'; morphology: MushroomMorphology })
   | (SpeciesCommon & { kind: 'berry'; morphology: BerryMorphology })
+  | (SpeciesCommon & { kind: 'herb'; morphology: HerbMorphology })
 
 class SpeciesError extends Error {
   constructor(file: string, field: string, why: string) {
@@ -227,6 +240,17 @@ function parseBerryMorphology(raw: unknown, file: string): BerryMorphology {
   }
 }
 
+function parseHerbMorphology(raw: unknown, file: string): HerbMorphology {
+  const mo = get(raw, 'morphology', file, '')
+  return {
+    stemColor: color(mo, 'stemColor', file, 'morphology'),
+    leafColor: color(mo, 'leafColor', file, 'morphology'),
+    height: range(mo, 'height', file, 'morphology'),
+    leafSize: range(mo, 'leafSize', file, 'morphology'),
+    leafCount: range(mo, 'leafCount', file, 'morphology'),
+  }
+}
+
 /**
  * Parses and checks one species. Throws a SpeciesError naming the file and the
  * field: these errors are the guard rail on hand-curated data, so they have to
@@ -302,5 +326,6 @@ export function validateSpecies(raw: unknown, file: string): Species {
   }
 
   if (kind === 'berry') return { ...common, kind, morphology: parseBerryMorphology(raw, file) }
+  if (kind === 'herb') return { ...common, kind, morphology: parseHerbMorphology(raw, file) }
   return { ...common, kind: 'mushroom', morphology: parseMushroomMorphology(raw, file) }
 }

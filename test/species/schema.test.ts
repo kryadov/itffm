@@ -52,6 +52,33 @@ const validBerry = {
   text: { ru: 'Описание.', en: 'Description.' },
 }
 
+const validHerb = {
+  id: 'urtica-dioica',
+  gbifKey: 3033970,
+  name: { la: 'Urtica dioica', ru: 'Крапива двудомная', en: 'Common nettle' },
+  kind: 'herb',
+  edibility: 'edible',
+  lookalikes: [],
+  morphology: {
+    stemColor: '#4a6b3a',
+    leafColor: '#3f6b2c',
+    height: [400, 1500],
+    leafSize: [60, 150],
+    leafCount: [8, 20],
+  },
+  ecology: {
+    mycorrhizal: [],
+    substrate: 'soil',
+    biomes: ['meadow-scrub'],
+    season: [5, 6, 7, 8],
+    moisture: [0.4, 0.9],
+    gregarious: 'clustered',
+    frequency: 'common',
+  },
+  media: [],
+  text: { ru: 'Описание.', en: 'Description.' },
+}
+
 describe('validateSpecies', () => {
   it('accepts a well-formed species', () => {
     expect(validateSpecies(valid, 'amanita-muscaria.yaml').id).toBe('amanita-muscaria')
@@ -115,5 +142,16 @@ describe('validateSpecies', () => {
   it('rejects a berry cluster range that is inverted', () => {
     const bad = { ...validBerry, morphology: { ...validBerry.morphology, clusterSize: [8, 3] } }
     expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/clusterSize/)
+  })
+
+  it('accepts a well-formed herb', () => {
+    const s = validateSpecies(validHerb, 'x.yaml')
+    expect(s.kind).toBe('herb')
+    expect(s.kind === 'herb' && s.morphology.leafCount).toEqual([8, 20])
+  })
+
+  it('rejects a herb with berry-shaped morphology', () => {
+    const bad = { ...validHerb, morphology: validBerry.morphology }
+    expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/x\.yaml.*morphology/s)
   })
 })

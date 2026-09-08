@@ -1,0 +1,39 @@
+id: allium-ursinum
+gbifKey: 2799885
+name:
+  la: Allium ursinum
+  ru: Черемша
+  en: Wild garlic
+kind: herb
+edibility: edible
+lookalikes: []
+morphology:
+  stemColor: "#5a7a3c"
+  leafColor: "#3d6b2a"
+  height: [150, 350]
+  leafSize: [100, 250]
+  leafCount: [2, 3]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved]
+  season: [4, 5]
+  moisture: [0.5, 0.9]
+  gregarious: troops
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Два-три широких ланцетных листа на длинном черешке, поднимающиеся
+    прямо из земли без видимого стебля, — а над сплошным ковром такой
+    поросли уже за десять шагов бьёт резкий чесночный запах, самый
+    надёжный признак вида. Собирают листья до цветения, пока не загрубели.
+    Растёт большими колониями в тенистом широколиственном лесу, часто по
+    сырым лощинам, ранней весной — до того как сомкнётся полог листвы.
+  en: >-
+    Two or three broad lance-shaped leaves on a long stalk, rising straight
+    from the ground with no visible stem — and a sharp garlic smell reaches
+    you ten paces from a dense stand of it, the surest field mark there is.
+    Leaves are picked before flowering, while still tender. Grows in large
+    colonies in shaded broadleaf woods, often in damp hollows, in early
+    spring before the canopy closes overhead.

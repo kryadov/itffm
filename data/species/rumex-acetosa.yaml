@@ -1,0 +1,38 @@
+id: rumex-acetosa
+gbifKey: 3084923
+name:
+  la: Rumex acetosa
+  ru: Щавель кислый
+  en: Common sorrel
+kind: herb
+edibility: edible
+lookalikes: []
+morphology:
+  stemColor: "#7a8a4a"
+  leafColor: "#5a7a3a"
+  height: [300, 900]
+  leafSize: [50, 150]
+  leafCount: [4, 10]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [meadow-scrub, forest-broadleaved]
+  season: [5, 6, 7, 8]
+  moisture: [0.35, 0.75]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Стреловидные листья с оттянутыми вниз лопастями у основания черешка —
+    форма, по которой его узнают ещё до вкуса. На вкус же он кислый сразу,
+    без подготовки: щавелевая кислота в листьях чувствуется на языке в
+    первую секунду. Растёт на лугах и опушках отдельными кустами, не
+    сплошным ковром, — цветёт узкой красноватой метёлкой во второй
+    половине лета.
+  en: >-
+    Arrow-shaped leaves with two backward-pointing lobes at the stalk base —
+    a silhouette that gives it away before taste does. And taste it does,
+    sour from the first second: oxalic acid in the leaves registers on the
+    tongue immediately. Grows on meadows and edges as separate tufts, not a
+    solid carpet, flowering in a narrow reddish spike later in summer.
