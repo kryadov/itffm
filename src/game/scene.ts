@@ -1,6 +1,8 @@
 import * as THREE from 'three'
 import { buildGround } from '../world/ground'
-import { buildTreeMeshes, type Tree } from '../world/trees'
+import { buildTreeMeshes, treePerches, type Tree } from '../world/trees'
+import { createBirds } from '../world/birds'
+import { mulberry32 } from '../util/rng'
 import {
   placeLogs,
   placeStumps,
@@ -106,6 +108,8 @@ export interface Forest {
   updateFlashlight: (camPos: THREE.Vector3, camDir: THREE.Vector3) => void
   /** Drifts the shelter's chimney smoke — call every frame. */
   updateShelter: (dt: number) => void
+  /** Drifts the flock — call every frame with the player's own position. */
+  updateBirds: (dt: number, playerX: number, playerZ: number) => void
 }
 
 /**
@@ -239,6 +243,9 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   extraObstacles.push(shelterObstacle(shelter))
   const updateShelter = (dt: number): void => shelterFx!.update(dt)
 
+  const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))
+  const updateBirds = (dt: number, playerX: number, playerZ: number): void => birds.update(dt, playerX, playerZ)
+
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
   const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
@@ -276,6 +283,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, smallObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter,
+    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateBirds,
   }
 }
