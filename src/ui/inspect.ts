@@ -26,6 +26,7 @@ export function openInspect(
   age: number,
   onCollect: () => void,
   onLeave: () => void,
+  onCut: () => void,
 ): void {
   document.exitPointerLock()
 
@@ -77,6 +78,7 @@ export function openInspect(
     }
     <div style="margin-top:32px;display:flex;gap:12px">
       <button id="collect" style="padding:11px 22px;border:0;border-radius:8px;background:#7ec46b;color:#12160f;font-size:15px;font-weight:600;cursor:pointer">${t('collect')}</button>
+      <button id="cut" style="padding:11px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:15px;cursor:pointer">${t('cut')}</button>
       <button id="leave" style="padding:11px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:15px;cursor:pointer">${t('leave')}</button>
     </div>`
 
@@ -136,6 +138,10 @@ export function openInspect(
   card.querySelector('#collect')!.addEventListener('click', () => {
     close()
     onCollect()
+  })
+  card.querySelector('#cut')!.addEventListener('click', () => {
+    close()
+    onCut()
   })
   card.querySelector('#leave')!.addEventListener('click', () => {
     close()

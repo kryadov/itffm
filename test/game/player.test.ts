@@ -1,4 +1,4 @@
-import { stepPlayer, eyeHeight, type PlayerState, type PlayerInput } from '../../src/game/player'
+import { stepPlayer, eyeHeight, biomeSpeedFactor, type PlayerState, type PlayerInput } from '../../src/game/player'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
@@ -6,6 +6,18 @@ const start: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop
 const idle: PlayerInput = {
   forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 60,
 }
+
+describe('biomeSpeedFactor', () => {
+  it('slows walking on wetland', () => {
+    expect(biomeSpeedFactor('wetland')).toBeLessThan(1)
+  })
+
+  it('leaves every other biome at full speed', () => {
+    expect(biomeSpeedFactor('forest-mixed')).toBe(1)
+    expect(biomeSpeedFactor('dunes-coast')).toBe(1)
+    expect(biomeSpeedFactor('meadow-scrub')).toBe(1)
+  })
+})
 
 describe('stepPlayer', () => {
   it('stands still without input', () => {

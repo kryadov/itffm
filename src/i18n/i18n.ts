@@ -9,6 +9,7 @@ export type Lang = 'ru' | 'en'
 export const RU = {
   collect: 'В корзину',
   leave: 'Оставить расти',
+  cut: 'Срезать',
   traits: 'Признаки',
   lookalikes: 'Двойники',
   ecology: 'Где растёт',
@@ -92,6 +93,7 @@ export const RU = {
 export const EN: Record<keyof typeof RU, string> = {
   collect: 'Into the basket',
   leave: 'Leave it growing',
+  cut: 'Cut it',
   traits: 'Field marks',
   lookalikes: 'Look-alikes',
   ecology: 'Where it grows',

@@ -143,7 +143,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     clouds.update(camPos, dt, source.ground.heightAt(camPos.x, camPos.z))
   }
 
-  scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize)))
+  scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground))
   scene.add(buildWaterMeshes(source.water ?? [], source.ground))
   scene.add(buildTreeMeshes(source.trees))

@@ -23,6 +23,12 @@ export const POPULAR_PLACES: PopularPlace[] = [
     query: 'Приокско-Террасный заповедник',
   },
   { id: 'kurshskaya-kosa', ru: 'Куршская коса', en: 'Curonian Spit', query: 'Куршская коса' },
+  {
+    id: 'polistovsky',
+    ru: 'Полистовский заповедник',
+    en: 'Polistovsky Nature Reserve',
+    query: 'Полистовский заповедник',
+  },
   { id: 'bialowieza', ru: 'Беловежская пуща', en: 'Białowieża Forest', query: 'Białowieża Forest' },
   { id: 'black-forest', ru: 'Шварцвальд', en: 'Black Forest', query: 'Schwarzwald, Germany' },
   { id: 'epping-forest', ru: 'Эппинг-Форест', en: 'Epping Forest', query: 'Epping Forest, England' },

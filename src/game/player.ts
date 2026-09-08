@@ -1,4 +1,5 @@
 import type { ElevationProvider } from '../terrain/provider'
+import type { Biome } from '../species/schema'
 
 export interface PlayerState {
   x: number
@@ -56,6 +57,17 @@ const SLOPE_BLOCK = 1.4
 
 const JUMP_SPEED = 3.4
 const GRAVITY = 9.8
+
+/** How much wetland ground costs, as a fraction of normal walking speed —
+ *  the same "grounds you" idea as a steep slope (`slopeFactor`), applied to
+ *  mud instead of a grade. */
+const WETLAND_SPEED = 0.55
+
+/** Walking-speed multiplier for the biome underfoot — 1 everywhere but the
+ *  one substrate that is genuinely harder to cross on foot. */
+export function biomeSpeedFactor(biome: Biome): number {
+  return biome === 'wetland' ? WETLAND_SPEED : 1
+}
 
 /** Eye height above the ground, accounting for the crouch. */
 export function eyeHeight(s: PlayerState): number {

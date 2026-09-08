@@ -3,7 +3,7 @@ import { createForest } from './game/scene'
 import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
-import { stepPlayer, eyeHeight, type PlayerState, type Obstacle } from './game/player'
+import { stepPlayer, eyeHeight, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView } from './game/pick'
 import { createHud } from './ui/hud'
@@ -163,6 +163,16 @@ async function main(): Promise<void> {
         void persistSave(save)
       },
       () => {},
+      () => {
+        // Cut but not carried: it stays a mushroom, just a felled one — off
+        // the aim list (game/pick.ts) so it can't be re-examined, but still a
+        // real mesh lying where it grew, not vanished like a picked one.
+        forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
+        const fallAxis = new THREE.Vector3(Math.cos(placement.rotationY), 0, Math.sin(placement.rotationY))
+        target.rotateOnWorldAxis(fallAxis, Math.PI / 2)
+        const box = new THREE.Box3().setFromObject(target)
+        target.position.y += forest.ground.heightAt(placement.x, placement.z) - box.min.y
+      },
     )
     aimed = null
     hud.setTarget(null)
@@ -293,7 +303,8 @@ async function main(): Promise<void> {
 
     // While an overlay is up the player stands still: the mouse belongs to it.
     if (!modalOpen()) {
-      player = stepPlayer(player, controls.read(dt), forest.ground, obstacles, save.prefs.walkSpeedMultiplier)
+      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(source.biomeAt(player.x, player.z))
+      player = stepPlayer(player, controls.read(dt), forest.ground, obstacles, speed)
       player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
       player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
     }
