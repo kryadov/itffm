@@ -7,6 +7,7 @@ import { loadTerrarium } from '../terrain/terrarium'
 import { griddedProvider } from '../terrain/gridded'
 import { withDetail } from '../terrain/detail'
 import { withPits } from '../terrain/pits'
+import { withBiomeRelief } from '../terrain/relief'
 import { proceduralTerrain } from '../terrain/procedural'
 import { demoForest } from '../world/demoForest'
 import { placeOsmTrees } from '../world/osmTrees'
@@ -81,7 +82,7 @@ async function fetchWithCache(bbox: BBox): Promise<OverpassResponse> {
 
 function buildSource(
   world: WorldData,
-  ground: ElevationProvider,
+  baseGround: ElevationProvider,
   lat: number,
   seed: number,
   halfSize: number,
@@ -90,14 +91,19 @@ function buildSource(
   // and its patch of meadow-scrub ecology are the same hole in the ground,
   // not two noise fields that happen to disagree.
   const treeSeed = seed + 1
-  const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize)
-  const biomeMap = buildBiomeMap(world, ground, lat)
+  const biomeMap = buildBiomeMap(world, baseGround, lat)
   const biomeAt = (x: number, z: number): Biome => {
     const biome = biomeMap.at(x, z)
     // Only a break in the canopy turns into meadow-scrub; a clearing inside a
     // dune or a cave mouth would not mean anything.
     return FOREST_BIOMES.has(biome) && isClearing(x, z, treeSeed) ? 'meadow-scrub' : biome
   }
+  // Relief is layered on after biome is known — a dune or a wetland is an
+  // OSM-polygon lookup with no idea about elevation — but before anything
+  // reads a height from this ground, so a tree planted at the edge of a
+  // dune stands on the same bump the player later walks over.
+  const ground = withBiomeRelief(baseGround, biomeAt, seed + 4)
+  const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize)
   return { ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water }
 }
 
