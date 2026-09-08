@@ -8,12 +8,26 @@ export interface Find {
   at: number
 }
 
+export interface Prefs {
+  /** Multiplier on the base mouse sensitivity — 1 is the default feel. */
+  mouseSensitivity: number
+  /** Multiplier on walking (and crouch) speed — 1 is the default pace. */
+  walkSpeedMultiplier: number
+  /** How far away a mushroom still draws, metres. */
+  drawDistance: number
+}
+
 export interface SaveData {
   /** Species opened in the encyclopedia, in the order they were first found. */
   discovered: string[]
   finds: Find[]
   lang: Lang
   disclaimerSeen: boolean
+  prefs: Prefs
+}
+
+export function defaultPrefs(): Prefs {
+  return { mouseSensitivity: 1, walkSpeedMultiplier: 1, drawDistance: 45 }
 }
 
 const DB_NAME = 'itffm'
@@ -21,7 +35,7 @@ const STORE = 'save'
 const KEY = 'current'
 
 export function emptySave(): SaveData {
-  return { discovered: [], finds: [], lang: 'ru', disclaimerSeen: false }
+  return { discovered: [], finds: [], lang: 'ru', disclaimerSeen: false, prefs: defaultPrefs() }
 }
 
 /** Applies a find. Returns a new object and leaves the old one untouched. */

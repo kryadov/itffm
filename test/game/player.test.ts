@@ -19,6 +19,12 @@ describe('stepPlayer', () => {
     expect(Math.hypot(s.x, s.z)).toBeGreaterThan(0.5)
   })
 
+  it('scales speed by the given multiplier', () => {
+    const normal = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+    const half = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [], 0.5)
+    expect(Math.hypot(half.x, half.z)).toBeCloseTo(Math.hypot(normal.x, normal.z) / 2, 5)
+  })
+
   it('turns the walking direction with the view', () => {
     const turned = { ...start, yaw: Math.PI / 2 }
     const a = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])

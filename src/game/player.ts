@@ -93,6 +93,7 @@ export function stepPlayer(
   i: PlayerInput,
   ground: ElevationProvider,
   obstacles: Obstacle[],
+  speedMultiplier = 1,
 ): PlayerState {
   const yaw = s.yaw + i.dYaw
   const pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, s.pitch + i.dPitch))
@@ -122,7 +123,7 @@ export function stepPlayer(
   // they end it in: reading the new crouch let someone straightening up jump to
   // full speed within the same frame.
   const slope = slopeFactor(ground, s.x, s.z, dirX, dirZ)
-  const speed = (WALK_SPEED + (CROUCH_SPEED - WALK_SPEED) * s.crouch) * i.dt * slope
+  const speed = (WALK_SPEED + (CROUCH_SPEED - WALK_SPEED) * s.crouch) * i.dt * slope * speedMultiplier
   let x = s.x + rawX * speed
   let z = s.z + rawZ * speed
 

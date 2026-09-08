@@ -11,6 +11,7 @@ import { createCompass } from './ui/compass'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
+import { openSettingsMenu } from './ui/settingsMenu'
 import { speciesById } from './species/load'
 import { emptySave, loadSave, persistSave, applyFind, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
@@ -24,8 +25,6 @@ declare global {
   interface Window { __READY?: boolean; __BOOTCHECK?: boolean }
 }
 
-/** Beyond this a mushroom is a pixel; drawing it costs a call for nothing. */
-const MUSHROOM_DRAW_DISTANCE = 45
 /** How far you can reach to pick, metres. */
 const REACH = 3
 const BASKET_CAPACITY = 24
@@ -82,7 +81,10 @@ async function main(): Promise<void> {
   // clipped away — the fog (scene.ts) still hides the forest floor at 140m
   // regardless, so this only decides whether the sky above it is visible.
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 2000)
-  const controls = createControls(renderer.domElement)
+  // Whatever `save` holds right now — likely the real loaded save by this
+  // point, same trade-off `setLang` above already accepts: a real user's
+  // place-picker interaction takes far longer than the IndexedDB round trip.
+  const controls = createControls(renderer.domElement, save.prefs.mouseSensitivity)
   const basket = createBasket(BASKET_CAPACITY)
   const hud = createHud(ui)
   hud.setBasket(0, BASKET_CAPACITY)
@@ -114,7 +116,7 @@ async function main(): Promise<void> {
   }
 
   function cullDistantMushrooms(): void {
-    const limit = MUSHROOM_DRAW_DISTANCE * MUSHROOM_DRAW_DISTANCE
+    const limit = save.prefs.drawDistance * save.prefs.drawDistance
     for (const m of forest.mushroomObjects) {
       const dx = m.position.x - player.x
       const dz = m.position.z - player.z
@@ -161,6 +163,20 @@ async function main(): Promise<void> {
     )
     aimed = null
     hud.setTarget(null)
+  }
+
+  function openSettings(): void {
+    openSettingsMenu(save.prefs, {
+      onLangChange: (lang) => {
+        save = { ...save, lang }
+        void persistSave(save)
+      },
+      onPrefsChange: (prefs) => {
+        save = { ...save, prefs }
+        controls.setSensitivity(prefs.mouseSensitivity)
+        void persistSave(save)
+      },
+    })
   }
 
   /** A plain overlay with a heading, some body html and a close key. */
@@ -239,6 +255,7 @@ async function main(): Promise<void> {
       openEncyclopedia(save, getLang())
     }
     if (e.code === 'KeyQ') showTally()
+    if (e.code === 'KeyM') openSettings()
   })
 
   if (!save.disclaimerSeen) showDisclaimer()
@@ -252,7 +269,7 @@ async function main(): Promise<void> {
 
     // While an overlay is up the player stands still: the mouse belongs to it.
     if (!modalOpen()) {
-      player = stepPlayer(player, controls.read(dt), forest.ground, obstacles)
+      player = stepPlayer(player, controls.read(dt), forest.ground, obstacles, save.prefs.walkSpeedMultiplier)
       player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
       player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
     }
