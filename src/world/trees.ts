@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { mulberry32, pickWeighted } from '../util/rng'
+import { mulberry32, pickWeighted, hashString } from '../util/rng'
 import { fbm2 } from '../util/noise'
 import type { ElevationProvider } from '../terrain/provider'
 import type { TreeGenus } from '../species/schema'
@@ -125,9 +125,64 @@ export function placeTrees(
   return trees
 }
 
+/** How many distinct broadleaf crown shapes exist. */
+const BROADLEAF_VARIANT_COUNT = 3
+
 /**
- * Tree meshes, instanced per genus: a thousand trees would otherwise cost a
- * thousand draw calls and the frame with them.
+ * Which crown shape a tree at this position gets. Pure and deterministic —
+ * the same spot always grows the same silhouette — so it needs no seed of its
+ * own; the tree's own position is enough entropy.
+ */
+export function crownVariantIndex(x: number, z: number, count = BROADLEAF_VARIANT_COUNT): number {
+  return hashString(`${x.toFixed(2)}:${z.toFixed(2)}`) % count
+}
+
+interface CrownShape {
+  geometry: THREE.BufferGeometry
+  /** Vertical squash relative to the trunk-driven spread — under 1 is flatter. */
+  yScale: number
+  /** Horizontal spread relative to the same base — over 1 is wider. */
+  xzScale: number
+  /** Where the crown centres, as a fraction of the tree's total height. */
+  heightFrac: number
+}
+
+/**
+ * A crown as a bumpy sphere rather than a perfect one: an icosahedron with
+ * each vertex pushed out along its own direction by a bit of noise, so the
+ * outline is ragged the way a real canopy is, not a drafting-compass circle.
+ * Built once per variant and shared by every instance of it — the raggedness
+ * costs nothing per tree.
+ */
+function buildRaggedCrown(seed: number): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(1, 1)
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i)
+    const y = pos.getY(i)
+    const z = pos.getZ(i)
+    const bump = 1 + fbm2(x * 1.6 + seed, z * 1.6 + seed, seed, 2) * 0.22
+    pos.setXYZ(i, x * bump, y * bump, z * bump)
+  }
+  geo.computeVertexNormals()
+  return geo
+}
+
+/**
+ * Oak-wide, birch-round, poplar-tall: three silhouettes are enough to break
+ * up the "rows of identical balloons" a single sphere gives every broadleaf
+ * genus, without paying for a unique crown per tree.
+ */
+const BROADLEAF_CROWNS: CrownShape[] = [
+  { geometry: buildRaggedCrown(1), yScale: 0.8, xzScale: 1.0, heightFrac: 0.82 },
+  { geometry: buildRaggedCrown(2), yScale: 0.55, xzScale: 1.25, heightFrac: 0.78 },
+  { geometry: buildRaggedCrown(3), yScale: 1.35, xzScale: 0.7, heightFrac: 0.88 },
+]
+
+/**
+ * Tree meshes, instanced per genus (and, for broadleaf crowns, per shape
+ * variant too): a thousand trees would otherwise cost a thousand draw calls
+ * and the frame with them.
  */
 export function buildTreeMeshes(trees: Tree[]): THREE.Group {
   const group = new THREE.Group()
@@ -148,36 +203,55 @@ export function buildTreeMeshes(trees: Tree[]): THREE.Group {
       new THREE.MeshStandardMaterial({ color: look.trunkColor, roughness: 1 }),
       list.length,
     )
-    const crowns = new THREE.InstancedMesh(
-      look.conifer ? new THREE.ConeGeometry(look.crown, 1, 8) : new THREE.SphereGeometry(look.crown, 8, 6),
-      new THREE.MeshStandardMaterial({ color: look.crownColor, roughness: 1 }),
-      list.length,
-    )
-
     list.forEach((t, i) => {
       dummy.rotation.set(0, 0, 0)
       dummy.position.set(t.x, t.y + t.height / 2, t.z)
       dummy.scale.set(1, t.height, 1)
       dummy.updateMatrix()
       trunks.setMatrixAt(i, dummy.matrix)
+    })
+    group.add(trunks)
 
+    const crownMat = new THREE.MeshStandardMaterial({ color: look.crownColor, roughness: 1 })
+
+    if (look.conifer) {
       // Crowns sit high and stay narrow enough to walk under. A wide cone
       // starting low reads from below as a black lid over the whole wood,
       // which is exactly what it looked like before.
-      const spread = 0.75 + (t.height - look.height[0]) / (look.height[1] - look.height[0]) * 0.5
-      if (look.conifer) {
+      const crowns = new THREE.InstancedMesh(new THREE.ConeGeometry(look.crown, 1, 8), crownMat, list.length)
+      list.forEach((t, i) => {
+        const spread = 0.75 + ((t.height - look.height[0]) / (look.height[1] - look.height[0])) * 0.5
         const crownH = t.height * 0.55
+        dummy.rotation.set(0, 0, 0)
         dummy.position.set(t.x, t.y + t.height - crownH / 2, t.z)
         dummy.scale.set(spread, crownH, spread)
-      } else {
-        dummy.position.set(t.x, t.y + t.height * 0.82, t.z)
-        dummy.scale.set(spread, spread * 0.8, spread)
-      }
-      dummy.updateMatrix()
-      crowns.setMatrixAt(i, dummy.matrix)
-    })
+        dummy.updateMatrix()
+        crowns.setMatrixAt(i, dummy.matrix)
+      })
+      group.add(crowns)
+      continue
+    }
 
-    group.add(trunks, crowns)
+    // Broadleaf: split by crown shape so each variant gets its own instanced
+    // batch. Still just as many draw calls as genera in the wood, times the
+    // fixed variant count — not one per tree.
+    const byVariant: Tree[][] = Array.from({ length: BROADLEAF_CROWNS.length }, () => [])
+    for (const t of list) byVariant[crownVariantIndex(t.x, t.z)].push(t)
+
+    byVariant.forEach((variantTrees, vi) => {
+      if (variantTrees.length === 0) return
+      const shape = BROADLEAF_CROWNS[vi]
+      const crowns = new THREE.InstancedMesh(shape.geometry, crownMat, variantTrees.length)
+      variantTrees.forEach((t, i) => {
+        const spread = 0.75 + ((t.height - look.height[0]) / (look.height[1] - look.height[0])) * 0.5
+        dummy.rotation.set(0, 0, 0)
+        dummy.position.set(t.x, t.y + t.height * shape.heightFrac, t.z)
+        dummy.scale.set(spread * shape.xzScale, spread * shape.yScale, spread * shape.xzScale)
+        dummy.updateMatrix()
+        crowns.setMatrixAt(i, dummy.matrix)
+      })
+      group.add(crowns)
+    })
   }
   return group
 }
