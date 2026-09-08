@@ -5,6 +5,7 @@ import { placeLogs, placeStumps, logObstacles, logSpawnPoints, buildDeadwoodMesh
 import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } from '../world/boulders'
 import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth'
 import { placeFlora, buildFloraMeshes } from '../world/flora'
+import { placeGrass, buildGrassMesh } from '../world/grass'
 import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
@@ -103,6 +104,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // Pure decoration: no substrate, no collision, nothing ecology.ts needs to
   // know about. Its only job is to give the eye something to search through.
   scene.add(buildFloraMeshes(placeFlora(source.ground, halfSize, seed + 9)))
+  scene.add(buildGrassMesh(placeGrass(source.ground, halfSize, seed + 11)))
 
   // One hut per wood, sited clear of everything already standing.
   const treeCircles = source.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
