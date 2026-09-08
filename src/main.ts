@@ -76,7 +76,10 @@ async function main(): Promise<void> {
   hud.setBasket(0, BASKET_CAPACITY)
   const compass = createCompass(ui)
 
-  const obstacles: Obstacle[] = forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
+  const obstacles: Obstacle[] = [
+    ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
+    ...forest.deadwoodObstacles,
+  ]
   const startPose = chooseStartPose(obstacles, HALF_SIZE)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false,

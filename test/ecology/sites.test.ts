@@ -57,10 +57,20 @@ describe('buildSites', () => {
     expect(withHosts.length).toBeGreaterThan(0)
   })
 
-  it('offers both soil and dead wood to grow on', () => {
+  it('offers soil to grow on', () => {
     const sites = buildSites(terrain, trees, 60, 11, () => 'forest-mixed', 400)
-    expect(sites.some((s) => s.substrate === 'deadwood')).toBe(true)
     expect(sites.some((s) => s.substrate === 'soil')).toBe(true)
+  })
+
+  it('grows dead wood only where a real log or stump was given, not near any trunk', () => {
+    const withoutWood = buildSites(terrain, trees, 60, 11, () => 'forest-mixed', 400)
+    expect(withoutWood.some((s) => s.substrate === 'deadwood')).toBe(false)
+
+    const deadwoodPoints = [{ x: 5, z: 5 }, { x: -5, z: -5 }]
+    const withWood = buildSites(terrain, trees, 60, 11, () => 'forest-mixed', 400, deadwoodPoints)
+    const wood = withWood.filter((s) => s.substrate === 'deadwood')
+    expect(wood.length).toBe(deadwoodPoints.length)
+    expect(wood.map((s) => [s.x, s.z]).sort()).toEqual(deadwoodPoints.map((p) => [p.x, p.z]).sort())
   })
 
   it('lets the biome vary from point to point', () => {
