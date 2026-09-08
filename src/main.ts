@@ -11,6 +11,7 @@ import { createCompass } from './ui/compass'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
+import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, DAY_TIME } from './world/daynight'
 import { speciesById } from './species/load'
@@ -237,23 +238,32 @@ async function main(): Promise<void> {
     })
   }
 
+  // Each specimen rendered as itself — its own seed and age, not a grouped
+  // count — because the point of a 3D basket is seeing the actual mushrooms
+  // (or berries, or whatever else the basket holds) laid out side by side,
+  // most useful for a species the player doesn't already know by name.
   function showTally(): void {
-    const counts = new Map<string, number>()
-    for (const item of basket.items) counts.set(item.speciesId, (counts.get(item.speciesId) ?? 0) + 1)
-
-    const rows = [...counts.entries()]
-      .map(([id, n]) => {
-        const s = speciesById(id)!
+    const cards = basket.items
+      .map((item) => {
+        const s = speciesById(item.speciesId)!
+        const preview = renderCollectiblePreview(s, item.seed, item.age, 120, false)
         const edibility = s.kind !== 'find' ? ` <span style="opacity:.6">(${t(s.edibility)})</span>` : ''
-        return `<li style="line-height:1.85">${speciesName(s)} — ${n}${edibility}</li>`
+        return `<div style="background:#171d15;border-radius:10px;padding:10px;text-align:center">
+          <img src="${preview}" width="120" height="120" alt="" style="display:block;margin:0 auto 6px" />
+          <div style="font-size:13px">${speciesName(s)}${edibility}</div>
+        </div>`
       })
       .join('')
 
     overlay(
       'tally',
-      `<div style="max-width:460px;padding:34px">
-         <h1 style="margin:0 0 18px;font-size:24px">${t('tally')}</h1>
-         ${rows ? `<ul style="padding-left:20px;margin:0">${rows}</ul>` : `<p style="opacity:.8;margin:0">${t('tallyEmpty')}</p>`}
+      `<div style="max-width:640px;max-height:80vh;overflow:auto;padding:34px">
+         <h1 style="margin:0 0 18px;font-size:24px">${t('tally')} — ${basket.items.length}</h1>
+         ${
+           cards
+             ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px">${cards}</div>`
+             : `<p style="opacity:.8;margin:0">${t('tallyEmpty')}</p>`
+         }
          <p style="opacity:.5;font-size:14px;margin-top:26px">${t('closeHint')}</p>
        </div>`,
       ['Escape', 'KeyQ', 'Tab'],

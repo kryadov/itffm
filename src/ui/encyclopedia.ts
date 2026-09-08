@@ -1,12 +1,11 @@
-import * as THREE from 'three'
 import { loadSpecies } from '../species/load'
-import { buildCollectible } from '../collectible/build'
 import { hashString } from '../util/rng'
 import { t, speciesName } from '../i18n/i18n'
+import { renderCollectiblePreview } from './preview'
 import { matchesFilters, type EncyclopediaFilters, type Season } from './encyclopediaFilters'
 import { EDIBILITY, HYMENIUM, BIOMES, KINDS } from '../species/schema'
 import type { SaveData } from '../save/store'
-import type { Species, Biome, Edibility, HymeniumType, Kind } from '../species/schema'
+import type { Biome, Edibility, HymeniumType, Kind } from '../species/schema'
 
 const KIND_LABEL: Record<Kind, 'kindMushroom' | 'kindBerry' | 'kindHerb' | 'kindNut' | 'kindFind'> = {
   mushroom: 'kindMushroom',
@@ -26,44 +25,6 @@ const BIOME_LABEL: Record<Biome, { ru: string; en: string }> = {
   'cave-adit': { ru: 'штольни и пещеры', en: 'adits and caves' },
   'park-urban': { ru: 'парки', en: 'parks' },
   alpine: { ru: 'высокогорье', en: 'high mountains' },
-}
-
-/**
- * A preview of one species: the same generator as in the wood, rendered once to
- * an image.
- *
- * A live renderer per card would sink the browser, but a snapshot will not —
- * and the mushroom on the card is exactly the one the player will meet.
- */
-function renderPreview(species: Species, size: number, silhouette: boolean): string {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
-  renderer.setSize(size, size)
-  const scene = new THREE.Scene()
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x666666, 2.2))
-  const key = new THREE.DirectionalLight(0xffffff, 1.2)
-  key.position.set(1, 2, 1.5)
-  scene.add(key)
-
-  const model = buildCollectible(species, hashString(species.id), 0.7)
-  if (silhouette) {
-    model.traverse((o) => {
-      const mesh = o as THREE.Mesh
-      if (mesh.isMesh) mesh.material = new THREE.MeshBasicMaterial({ color: 0x252c21 })
-    })
-  }
-  const box = new THREE.Box3().setFromObject(model)
-  model.position.sub(box.getCenter(new THREE.Vector3()))
-  scene.add(model)
-
-  const extent = Math.max(...box.getSize(new THREE.Vector3()).toArray())
-  const camera = new THREE.PerspectiveCamera(40, 1, 0.001, 10)
-  camera.position.set(extent * 1.5, extent * 0.85, extent * 1.5)
-  camera.lookAt(0, 0, 0)
-
-  renderer.render(scene, camera)
-  const url = renderer.domElement.toDataURL()
-  renderer.dispose()
-  return url
 }
 
 /** The encyclopedia: what has been found, and what is still out there. */
@@ -88,7 +49,7 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
   const cardHtml = new Map<string, string>()
   for (const s of all) {
     const known = found.has(s.id)
-    const preview = renderPreview(s, 180, !known)
+    const preview = renderCollectiblePreview(s, hashString(s.id), 0.7, 180, !known)
     const where = s.ecology.biomes.map((b) => BIOME_LABEL[b][lang]).join(', ')
     cardHtml.set(
       s.id,
