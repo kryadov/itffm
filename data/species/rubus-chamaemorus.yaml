@@ -1,0 +1,36 @@
+id: rubus-chamaemorus
+gbifKey: 3033598
+name:
+  la: Rubus chamaemorus
+  ru: Морошка
+  en: Cloudberry
+kind: berry
+edibility: edible
+lookalikes: []
+morphology:
+  color: "#e8a53d"
+  diameter: [12, 18]
+  clusterSize: [1, 1]
+  leafColor: "#5a6b3a"
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [wetland]
+  season: [7, 8]
+  moisture: [0.7, 1.0]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Одна ягода на стебле — не кисть, как у черники или брусники, а сложная
+    костянка размером с наперсток. Незрелая твёрдая и красная, спелая —
+    мягкая, янтарно-жёлтая, почти прозрачная. Растёт только на верховом
+    болоте, среди мха и пушицы, — вне этой почвы не встречается вовсе, и
+    это самый надёжный признак, надёжнее самой ягоды.
+  en: >-
+    One berry per stem, not a cluster like bilberry or lingonberry — a
+    compound drupe the size of a thimble. Firm and red unripe, soft amber and
+    almost translucent when ripe. Grows only on raised sphagnum bog, among
+    moss and cottongrass — absent from any other ground, which is the surer
+    field mark than the berry itself.
