@@ -1,4 +1,5 @@
-import { placeShelter, shelterObstacle } from '../../src/world/shelter'
+import * as THREE from 'three'
+import { placeShelter, shelterObstacle, buildShelterMesh } from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import type { Circle } from '../../src/util/openSpot'
 
@@ -38,5 +39,32 @@ describe('shelterObstacle', () => {
     expect(o.x).toBe(4)
     expect(o.z).toBe(-2)
     expect(o.radius).toBeGreaterThan(1)
+  })
+})
+
+describe('buildShelterMesh', () => {
+  const s = { x: 4, z: -2, y: 0, rotationY: 0.5 }
+
+  it('places the group at the shelter position', () => {
+    const { group } = buildShelterMesh(s)
+    expect(group.position.x).toBe(4)
+    expect(group.position.z).toBe(-2)
+  })
+
+  it('stays dark by day and glows at full night', () => {
+    const { group, setNight } = buildShelterMesh(s)
+    const window = group.children.find((c) => (c as THREE.Mesh).geometry?.type === 'PlaneGeometry') as THREE.Mesh
+    const mat = window.material as THREE.MeshStandardMaterial
+    setNight(0)
+    expect(mat.emissiveIntensity).toBe(0)
+    setNight(1)
+    expect(mat.emissiveIntensity).toBeGreaterThan(0)
+  })
+
+  it('lets the smoke drift without throwing', () => {
+    const { update } = buildShelterMesh(s)
+    expect(() => {
+      for (let i = 0; i < 30; i++) update(1 / 30)
+    }).not.toThrow()
   })
 })

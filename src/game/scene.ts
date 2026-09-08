@@ -15,7 +15,7 @@ import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } f
 import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth'
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
-import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
+import { placeShelter, shelterObstacle, buildShelterMesh, type ShelterFx } from '../world/shelter'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
@@ -100,6 +100,8 @@ export interface Forest {
   /** Aims the flashlight from the camera along its view direction — call
    *  every frame while it is on. */
   updateFlashlight: (camPos: THREE.Vector3, camDir: THREE.Vector3) => void
+  /** Drifts the shelter's chimney smoke — call every frame. */
+  updateShelter: (dt: number) => void
 }
 
 /**
@@ -131,6 +133,9 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   /** Sun position on a circle whose radius sets how high overhead it swings
    *  — matches the old fixed light's rough distance from the origin. */
   const SUN_DISTANCE = 90
+  // Set once the shelter exists, further down — updateDayNight runs once at
+  // noon before that, when there is nothing to light anyway.
+  let shelterFx: ShelterFx | null = null
   const updateDayNight = (t: number, camPos: THREE.Vector3): void => {
     const sample = sampleDayNight(t)
     const elevation = sunElevation(t)
@@ -151,6 +156,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     const sunVis = Math.max(0, elevation)
     const night = Math.max(0, Math.min(1, -elevation * 1.5))
     sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night)
+    shelterFx?.setNight(night)
   }
   updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look
 
@@ -224,8 +230,10 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // One hut per wood, sited clear of everything already standing.
   const treeCircles = source.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
   const shelter = placeShelter(source.ground, halfSize, seed + 10, [...treeCircles, ...extraObstacles])
-  scene.add(buildShelterMesh(shelter))
+  shelterFx = buildShelterMesh(shelter)
+  scene.add(shelterFx.group)
   extraObstacles.push(shelterObstacle(shelter))
+  const updateShelter = (dt: number): void => shelterFx!.update(dt)
 
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
@@ -256,6 +264,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather, setFlashlight, updateFlashlight,
+    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter,
   }
 }

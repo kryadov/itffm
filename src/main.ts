@@ -363,6 +363,7 @@ async function main(): Promise<void> {
     forest.updateDayNight(timeFor(save.prefs.timeMode, cycleT), camera.position)
     forest.updateClouds(camera.position, dt)
     forest.updateWeather(camera.position, dt)
+    forest.updateShelter(dt)
     if (flashlightOn) forest.updateFlashlight(camera.position, camera.getWorldDirection(camDir))
 
     cullDistantMushrooms()
