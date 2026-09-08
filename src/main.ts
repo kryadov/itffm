@@ -80,6 +80,7 @@ async function main(): Promise<void> {
   if (fellBackTo && query) toast(t('fellBackNotice'))
 
   const forest = createForest(source, seed, halfSize)
+  forest.setWeather(save.prefs.weather)
   // Far enough that the sky dome (radius 1500, see world/sky.ts) is not
   // clipped away — the fog (scene.ts) still hides the forest floor at 140m
   // regardless, so this only decides whether the sky above it is visible.
@@ -187,6 +188,7 @@ async function main(): Promise<void> {
       onPrefsChange: (prefs) => {
         save = { ...save, prefs }
         controls.setSensitivity(prefs.mouseSensitivity)
+        forest.setWeather(prefs.weather)
         void persistSave(save)
       },
     })
@@ -319,6 +321,7 @@ async function main(): Promise<void> {
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
     forest.updateDayNight(timeFor(save.prefs.timeMode, cycleT), camera.position)
     forest.updateClouds(camera.position, dt)
+    forest.updateWeather(camera.position, dt)
 
     cullDistantMushrooms()
     updateAim()

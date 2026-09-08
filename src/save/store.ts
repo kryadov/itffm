@@ -1,5 +1,6 @@
 import type { Lang } from '../i18n/i18n'
 import type { TimeMode } from '../world/daynight'
+import type { Weather } from '../world/weather'
 
 export interface Find {
   speciesId: string
@@ -18,6 +19,8 @@ export interface Prefs {
   drawDistance: number
   /** 'cycle' runs a full day/night loop; 'day'/'night' lock the clock. */
   timeMode: TimeMode
+  /** A fixed weather — there is no forecast, only what the player picks. */
+  weather: Weather
 }
 
 export interface SaveData {
@@ -32,7 +35,7 @@ export interface SaveData {
 export function defaultPrefs(): Prefs {
   // 'day' keeps the wood exactly as it always looked before day/night
   // existed — a player has to opt into the cycle, not be surprised by it.
-  return { mouseSensitivity: 1, walkSpeedMultiplier: 1, drawDistance: 45, timeMode: 'day' }
+  return { mouseSensitivity: 1, walkSpeedMultiplier: 1, drawDistance: 45, timeMode: 'day', weather: 'clear' }
 }
 
 const DB_NAME = 'itffm'

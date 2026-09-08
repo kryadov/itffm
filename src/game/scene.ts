@@ -10,6 +10,7 @@ import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelte
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
+import { buildWeather, type Weather } from '../world/weather'
 import { buildPathMeshes } from '../world/paths'
 import { buildWaterMeshes } from '../world/water'
 import { buildSites } from '../ecology/sites'
@@ -81,6 +82,10 @@ export interface Forest {
   updateDayNight: (t: number, camPos: THREE.Vector3) => void
   /** Drifts the cloud layer with the camera — call every frame. */
   updateClouds: (camPos: THREE.Vector3, dt: number) => void
+  /** Switches between clear/rain/snow/fog — cheap, call only on change. */
+  setWeather: (w: Weather) => void
+  /** Animates rain/snow and keeps them centred on the camera — call every frame. */
+  updateWeather: (camPos: THREE.Vector3, dt: number) => void
 }
 
 /**
@@ -135,12 +140,21 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   }
   updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look
 
-  // A clear sky by default — setCover(1) is there for weather.ts to reach
-  // for once it exists (see TODO.md), not called from anywhere yet.
+  // A clear sky by default — the settings menu (M) reaches setCover/setWeather.
   const clouds = buildClouds(seed + 12)
   scene.add(clouds.mesh)
   const updateClouds = (camPos: THREE.Vector3, dt: number): void => {
     clouds.update(camPos, dt, source.ground.heightAt(camPos.x, camPos.z))
+  }
+
+  const weather = buildWeather(seed + 13, scene.fog as THREE.Fog)
+  scene.add(weather.group)
+  const setWeather = (w: Weather): void => {
+    weather.setWeather(w)
+    clouds.setCover(w === 'clear' ? 0 : w === 'fog' ? 0.4 : 1)
+  }
+  const updateWeather = (camPos: THREE.Vector3, dt: number): void => {
+    weather.update(camPos, dt)
   }
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt))
@@ -207,5 +221,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
+    setWeather, updateWeather,
   }
 }

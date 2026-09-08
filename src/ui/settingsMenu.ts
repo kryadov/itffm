@@ -1,11 +1,19 @@
 import { t, getLang, setLang, type Lang } from '../i18n/i18n'
 import { TIME_MODES, type TimeMode } from '../world/daynight'
+import { WEATHERS, type Weather } from '../world/weather'
 import type { Prefs } from '../save/store'
 
 const TIME_MODE_KEY: Record<TimeMode, 'timeCycle' | 'timeDay' | 'timeNight'> = {
   cycle: 'timeCycle',
   day: 'timeDay',
   night: 'timeNight',
+}
+
+const WEATHER_KEY: Record<Weather, 'weatherClear' | 'weatherRain' | 'weatherSnow' | 'weatherFog'> = {
+  clear: 'weatherClear',
+  rain: 'weatherRain',
+  snow: 'weatherSnow',
+  fog: 'weatherFog',
 }
 
 export interface SettingsCallbacks {
@@ -18,9 +26,7 @@ const LABEL_STYLE = 'font-size:13px;opacity:.85;display:flex;justify-content:spa
 
 /**
  * The settings menu: language, walking speed, mouse sensitivity, mushroom
- * draw distance — the handful the design calls out as first (see TODO.md).
- * Time of day and weather are not here yet because neither system exists —
- * a slider with nothing to drive would be worse than no slider.
+ * draw distance, time of day and weather.
  *
  * Every change fires immediately (no Apply button) and is hers to persist:
  * `onPrefsChange`/`onLangChange` both get the caller's own save-and-continue.
@@ -161,6 +167,31 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   paintTime()
   timeRow.append(timeLabel, timeButtons)
   panel.appendChild(timeRow)
+
+  const weatherRow = document.createElement('div')
+  weatherRow.style.cssText = LABEL_STYLE
+  const weatherLabel = document.createElement('span')
+  label(weatherLabel, 'settingsWeather')
+  const weatherButtons = document.createElement('div')
+  weatherButtons.style.cssText = 'display:flex;gap:8px'
+  const weatherBtns = new Map<Weather, HTMLButtonElement>()
+  const paintWeather = (): void => {
+    for (const [w, btn] of weatherBtns) btn.style.cssText = btnStyle(w === live.weather)
+  }
+  for (const w of WEATHERS) {
+    const btn = document.createElement('button')
+    label(btn, WEATHER_KEY[w])
+    btn.addEventListener('click', () => {
+      live = { ...live, weather: w }
+      cb.onPrefsChange(live)
+      paintWeather()
+    })
+    weatherBtns.set(w, btn)
+    weatherButtons.appendChild(btn)
+  }
+  paintWeather()
+  weatherRow.append(weatherLabel, weatherButtons)
+  panel.appendChild(weatherRow)
 
   document.getElementById('ui')!.appendChild(overlay)
 
