@@ -1,4 +1,5 @@
 import type { Lang } from '../i18n/i18n'
+import type { TimeMode } from '../world/daynight'
 
 export interface Find {
   speciesId: string
@@ -15,6 +16,8 @@ export interface Prefs {
   walkSpeedMultiplier: number
   /** How far away a mushroom still draws, metres. */
   drawDistance: number
+  /** 'cycle' runs a full day/night loop; 'day'/'night' lock the clock. */
+  timeMode: TimeMode
 }
 
 export interface SaveData {
@@ -27,7 +30,9 @@ export interface SaveData {
 }
 
 export function defaultPrefs(): Prefs {
-  return { mouseSensitivity: 1, walkSpeedMultiplier: 1, drawDistance: 45 }
+  // 'day' keeps the wood exactly as it always looked before day/night
+  // existed — a player has to opt into the cycle, not be surprised by it.
+  return { mouseSensitivity: 1, walkSpeedMultiplier: 1, drawDistance: 45, timeMode: 'day' }
 }
 
 const DB_NAME = 'itffm'

@@ -1,5 +1,12 @@
 import { t, getLang, setLang, type Lang } from '../i18n/i18n'
+import { TIME_MODES, type TimeMode } from '../world/daynight'
 import type { Prefs } from '../save/store'
+
+const TIME_MODE_KEY: Record<TimeMode, 'timeCycle' | 'timeDay' | 'timeNight'> = {
+  cycle: 'timeCycle',
+  day: 'timeDay',
+  night: 'timeNight',
+}
 
 export interface SettingsCallbacks {
   onLangChange: (lang: Lang) => void
@@ -129,6 +136,31 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   slider('walkSpeedMultiplier', 'settingsWalkSpeed', 0.6, 1.6, 0.05, (v) => `×${v.toFixed(2)}`)
   slider('mouseSensitivity', 'settingsSensitivity', 0.3, 2.5, 0.05, (v) => `×${v.toFixed(2)}`)
   slider('drawDistance', 'settingsDrawDistance', 20, 80, 5, (v) => `${v} m`)
+
+  const timeRow = document.createElement('div')
+  timeRow.style.cssText = LABEL_STYLE
+  const timeLabel = document.createElement('span')
+  label(timeLabel, 'settingsTimeMode')
+  const timeButtons = document.createElement('div')
+  timeButtons.style.cssText = 'display:flex;gap:8px'
+  const timeBtns = new Map<TimeMode, HTMLButtonElement>()
+  const paintTime = (): void => {
+    for (const [mode, btn] of timeBtns) btn.style.cssText = btnStyle(mode === live.timeMode)
+  }
+  for (const mode of TIME_MODES) {
+    const btn = document.createElement('button')
+    label(btn, TIME_MODE_KEY[mode])
+    btn.addEventListener('click', () => {
+      live = { ...live, timeMode: mode }
+      cb.onPrefsChange(live)
+      paintTime()
+    })
+    timeBtns.set(mode, btn)
+    timeButtons.appendChild(btn)
+  }
+  paintTime()
+  timeRow.append(timeLabel, timeButtons)
+  panel.appendChild(timeRow)
 
   document.getElementById('ui')!.appendChild(overlay)
 

@@ -12,6 +12,7 @@ import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
 import { openSettingsMenu } from './ui/settingsMenu'
+import { timeFor, DAY_TIME } from './world/daynight'
 import { speciesById } from './species/load'
 import { emptySave, loadSave, persistSave, applyFind, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
@@ -28,6 +29,8 @@ declare global {
 /** How far you can reach to pick, metres. */
 const REACH = 3
 const BASKET_CAPACITY = 24
+/** Real seconds for one full day/night loop in 'cycle' mode. */
+const DAY_LENGTH_SECONDS = 600
 
 const STAGE_KEY: Record<LoadStage, 'stageGeocode' | 'stageOsm' | 'stageTerrain' | 'stageBuild'> = {
   geocode: 'stageGeocode',
@@ -262,6 +265,10 @@ async function main(): Promise<void> {
 
   let last = performance.now()
   let bootFrames = 0
+  // Only read in 'cycle' mode — 'day' and 'night' hold their own fixed time
+  // (see world/daynight.ts's timeFor), starting at noon so a first frame
+  // rendered before this ever advances still matches the old fixed look.
+  let cycleT = DAY_TIME
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.05, (now - last) / 1000)
@@ -281,7 +288,8 @@ async function main(): Promise<void> {
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
     compass.update(player.yaw)
-    forest.updateSky(camera.position)
+    if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
+    forest.updateDayNight(timeFor(save.prefs.timeMode, cycleT), camera.position)
     forest.updateClouds(camera.position, dt)
 
     cullDistantMushrooms()

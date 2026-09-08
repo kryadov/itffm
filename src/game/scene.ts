@@ -8,6 +8,7 @@ import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
 import { buildSky } from '../world/sky'
+import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
 import { buildPathMeshes } from '../world/paths'
 import { buildWaterMeshes } from '../world/water'
@@ -74,9 +75,10 @@ export interface Forest {
    *  too, so a mushroom genuinely hidden behind a tuft or a bush is hidden
    *  from the aim ray, not just from the eye. */
   occluders: THREE.Object3D[]
-  /** Keeps the sky dome centred on the camera — call every frame with the
-   *  camera's world position. */
-  updateSky: (camPos: THREE.Vector3) => void
+  /** Keeps the sky dome centred on the camera and applies the time of day to
+   *  the sun, ambient light, fog and sky — call every frame with the current
+   *  clock (see world/daynight.ts's `timeFor`) and the camera's position. */
+  updateDayNight: (t: number, camPos: THREE.Vector3) => void
   /** Drifts the cloud layer with the camera — call every frame. */
   updateClouds: (camPos: THREE.Vector3, dt: number) => void
 }
@@ -93,8 +95,10 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   // Under a closed canopy almost all the light is bounced, not direct. A
   // strong sky term with a lit ground colour is what keeps the undersides of
-  // the crowns from reading as black lids.
-  scene.add(new THREE.HemisphereLight(0xe6f2e0, 0x6b6a4a, 2.6))
+  // the crowns from reading as black lids. Its intensity, like the sun's,
+  // now follows the time of day (see below) — 2.6 was simply noon's value.
+  const hemi = new THREE.HemisphereLight(0xe6f2e0, 0x6b6a4a, 2.6)
+  scene.add(hemi)
   const sunPosition = new THREE.Vector3(40, 80, 20)
   const sun = new THREE.DirectionalLight(0xfff1cf, 1.1)
   sun.position.copy(sunPosition)
@@ -102,15 +106,34 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   // Replaces the old flat background colour: a dome the fog never quite
   // hides above the treeline, rather than a solid fill with a visible seam
-  // at the horizon. `night` stays 0 — there is no calendar yet (see
-  // TODO.md) — but the sky already takes it, so daynight.ts has nothing of
-  // this module left to touch when that lands.
+  // at the horizon.
   const sky = buildSky()
   scene.add(sky.mesh)
-  sky.update(new THREE.Vector3(), 0xa8c0a2, 0xfff1cf, sunPosition, 1, 0)
-  const updateSky = (camPos: THREE.Vector3): void => {
-    sky.update(camPos, 0xa8c0a2, 0xfff1cf, sunPosition, 1, 0)
+  /** Sun position on a circle whose radius sets how high overhead it swings
+   *  — matches the old fixed light's rough distance from the origin. */
+  const SUN_DISTANCE = 90
+  const updateDayNight = (t: number, camPos: THREE.Vector3): void => {
+    const sample = sampleDayNight(t)
+    const elevation = sunElevation(t)
+    const az = t * Math.PI * 2
+    sunPosition.set(
+      Math.cos(az) * SUN_DISTANCE * 0.6,
+      Math.max(-30, elevation * SUN_DISTANCE),
+      Math.sin(az) * SUN_DISTANCE * 0.6,
+    )
+    sun.position.copy(sunPosition)
+    sun.color.setHex(sample.sun)
+    sun.intensity = sample.sunI
+    hemi.intensity = sample.ambI
+    if (scene.fog) (scene.fog as THREE.Fog).color.setHex(sample.sky)
+    // The disc fades out the instant the sun dips below the horizon; the
+    // star field and moon fade in over the same stretch, not instantly —
+    // dusk should read as a gradient, not a light switch.
+    const sunVis = Math.max(0, elevation)
+    const night = Math.max(0, Math.min(1, -elevation * 1.5))
+    sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night)
   }
+  updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look
 
   // A clear sky by default — setCover(1) is there for weather.ts to reach
   // for once it exists (see TODO.md), not called from anywhere yet.
@@ -183,6 +206,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
-    shelter: { x: shelter.x, z: shelter.z }, occluders, updateSky, updateClouds,
+    shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
   }
 }
