@@ -78,9 +78,9 @@ async function main(): Promise<void> {
 
   const obstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
-    ...forest.deadwoodObstacles,
+    ...forest.extraObstacles,
   ]
-  const startPose = chooseStartPose(obstacles, HALF_SIZE)
+  const startPose = chooseStartPose(obstacles, HALF_SIZE, forest.shelter)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false,
   }

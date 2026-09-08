@@ -35,7 +35,7 @@ ecology:
   biomes: [meadow-scrub, park-urban]
   season: [6, 7, 8, 9, 10]
   moisture: [0.3, 0.6]
-  gregarious: troops
+  gregarious: rings
   frequency: common
 media: []
 text:
@@ -43,9 +43,10 @@ text:
     Белая шляпка, пластинки от розовых до тёмно-коричневых — но никогда не
     белые, как у бледной поганки. У основания ножки нет мешковидной вольвы:
     это главная проверка перед тем, как взять любой белый гриб, найденный в
-    траве. Растёт группами на пастбищах, лугах и газонах, не под деревьями.
+    траве. Растёт группами на пастбищах, лугах и газонах, не под деревьями,
+    нередко — ведьминым кольцом.
   en: >-
     A white cap over gills that run pink to dark brown but never stay white,
     the way a death cap's do. No sac at the base of the stem — the first check
-    to make on any white mushroom picked from grass. Grows in troops in
-    pastures, meadows and lawns, not under trees.
+    to make on any white mushroom picked from grass. Grows in groups in
+    pastures, meadows and lawns, not under trees — often in a fairy ring.

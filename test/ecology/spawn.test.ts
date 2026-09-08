@@ -1,4 +1,4 @@
-import { speciesScore, spawnMushrooms, type SpawnContext } from '../../src/ecology/spawn'
+import { speciesScore, spawnMushrooms, fairyRingMarkers, type SpawnContext } from '../../src/ecology/spawn'
 import { loadSpecies, speciesById } from '../../src/species/load'
 import type { Site } from '../../src/ecology/sites'
 
@@ -100,5 +100,30 @@ describe('spawnMushrooms', () => {
   it('gives each fruiting body its own seed', () => {
     const seeds = spawnMushrooms(loadSpecies(), sites, ctx).map((p) => p.seed)
     expect(new Set(seeds).size).toBeGreaterThan(seeds.length * 0.5)
+  })
+
+  it('tags fairy-ring fruiting bodies with their shared circle', () => {
+    const champignon = speciesById('agaricus-campestris')!
+    expect(champignon.ecology.gregarious).toBe('rings')
+    const grass = Array.from({ length: 40 }, (_, i) =>
+      site({ x: i, z: 0, biome: 'meadow-scrub', substrate: 'soil', hosts: [], moisture: 0.4 }),
+    )
+    const placements = spawnMushrooms([champignon], grass, { ...ctx, month: 8 })
+    expect(placements.length).toBeGreaterThan(0)
+    for (const p of placements) {
+      expect(p.ring).toBeDefined()
+      expect(Math.hypot(p.x - p.ring!.cx, p.z - p.ring!.cz)).toBeLessThanOrEqual(p.ring!.radius * 1.2)
+    }
+  })
+})
+
+describe('fairyRingMarkers', () => {
+  it('collapses a ring colony down to one marker per centre', () => {
+    const placements = [
+      { speciesId: 'a', x: 1, z: 0, y: 0, rotationY: 0, age: 0.5, seed: 1, ring: { cx: 0, cz: 0, radius: 2 } },
+      { speciesId: 'a', x: -1, z: 0, y: 0, rotationY: 0, age: 0.5, seed: 2, ring: { cx: 0, cz: 0, radius: 2 } },
+      { speciesId: 'a', x: 10, z: 10, y: 0, rotationY: 0, age: 0.5, seed: 3 },
+    ]
+    expect(fairyRingMarkers(placements)).toEqual([{ x: 0, z: 0, radius: 2 }])
   })
 })

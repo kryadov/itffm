@@ -3,8 +3,12 @@ import { buildGround } from '../world/ground'
 import { buildTreeMeshes, type Tree } from '../world/trees'
 import { placeLogs, placeStumps, logObstacles, logSpawnPoints, buildDeadwoodMeshes } from '../world/deadwood'
 import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } from '../world/boulders'
+import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth'
+import { placeFlora, buildFloraMeshes } from '../world/flora'
+import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
 import { buildSites } from '../ecology/sites'
-import { spawnMushrooms, type Placement } from '../ecology/spawn'
+import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
+import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies, speciesById } from '../species/load'
 import { buildMushroom, toWorldMesh } from '../mushroom/build'
 import type { ElevationProvider } from '../terrain/provider'
@@ -36,9 +40,12 @@ export interface Forest {
   placements: Placement[]
   /** One object per mushroom, in the same order as placements. */
   mushroomObjects: THREE.Object3D[]
-  /** Fallen logs, stumps and boulders as collision circles, for the same
-   *  obstacle list that already keeps the player out of standing trunks. */
-  deadwoodObstacles: { x: number; z: number; radius: number }[]
+  /** Everything besides standing trees that blocks the player — fallen logs,
+   *  stumps, boulders, bushes — as collision circles for the same obstacle
+   *  list `stepPlayer` and `chooseStartPose` already use for tree trunks. */
+  extraObstacles: { x: number; z: number; radius: number }[]
+  /** The wood's one hut — game/main.ts starts the player beside it. */
+  shelter: { x: number; z: number }
 }
 
 /**
@@ -66,14 +73,28 @@ export function createForest(source: ForestSource, seed: number): Forest {
   const logs = placeLogs(source.ground, HALF_SIZE, seed + 5)
   const stumps = placeStumps(source.ground, HALF_SIZE, seed + 6)
   scene.add(buildDeadwoodMeshes(logs, stumps))
-  const deadwoodObstacles = [
+  const extraObstacles = [
     ...logs.flatMap((l) => logObstacles(l)),
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius })),
   ]
 
   const boulders = placeBoulders(source.ground, HALF_SIZE, seed + 7)
   scene.add(buildBoulderMeshes(boulders))
-  deadwoodObstacles.push(...boulders.map(boulderObstacle))
+  extraObstacles.push(...boulders.map(boulderObstacle))
+
+  const bushes = placeBushes(source.ground, HALF_SIZE, seed + 8)
+  scene.add(buildBushMeshes(bushes))
+  extraObstacles.push(...bushes.map(bushObstacle))
+
+  // Pure decoration: no substrate, no collision, nothing ecology.ts needs to
+  // know about. Its only job is to give the eye something to search through.
+  scene.add(buildFloraMeshes(placeFlora(source.ground, HALF_SIZE, seed + 9)))
+
+  // One hut per wood, sited clear of everything already standing.
+  const treeCircles = source.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
+  const shelter = placeShelter(source.ground, HALF_SIZE, seed + 10, [...treeCircles, ...extraObstacles])
+  scene.add(buildShelterMesh(shelter))
+  extraObstacles.push(shelterObstacle(shelter))
 
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
@@ -82,6 +103,10 @@ export function createForest(source: ForestSource, seed: number): Forest {
   )
   const month = new Date().getMonth() + 1
   const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })
+
+  for (const marker of fairyRingMarkers(placements)) {
+    scene.add(buildFairyRingMesh(marker, source.ground))
+  }
 
   const mushroomObjects: THREE.Object3D[] = []
   for (const p of placements) {
@@ -95,5 +120,8 @@ export function createForest(source: ForestSource, seed: number): Forest {
     mushroomObjects.push(mesh)
   }
 
-  return { scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, deadwoodObstacles }
+  return {
+    scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
+    shelter: { x: shelter.x, z: shelter.z },
+  }
 }

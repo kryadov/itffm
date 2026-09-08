@@ -12,6 +12,10 @@ export interface Placement {
   age: number
   /** This specimen's own seed: its shape, size and lean. */
   seed: number
+  /** Set only for a `gregarious: rings` colony: the circle its fruiting
+   *  bodies share, so the wood can mark the ring itself, not just draw the
+   *  mushrooms sitting on it. */
+  ring?: { cx: number; cz: number; radius: number }
 }
 
 export interface SpawnContext {
@@ -115,9 +119,25 @@ export function spawnMushrooms(species: Species[], sites: Site[], ctx: SpawnCont
         rotationY: rng() * Math.PI * 2,
         age: 0.25 + rng() * 0.75,
         seed: Math.floor(rng() * 0xffffff),
+        ring: chosen.ecology.gregarious === 'rings' ? { cx: site.x, cz: site.z, radius: spread } : undefined,
       })
     }
   }
 
   return out
+}
+
+/**
+ * One marker per fairy-ring colony, deduplicated from its fruiting bodies —
+ * the ground decal (world/fairyRing.ts) draws one circle per colony, not one
+ * per mushroom sitting on it.
+ */
+export function fairyRingMarkers(placements: Placement[]): { x: number; z: number; radius: number }[] {
+  const seen = new Map<string, { x: number; z: number; radius: number }>()
+  for (const p of placements) {
+    if (!p.ring) continue
+    const key = `${p.ring.cx},${p.ring.cz}`
+    if (!seen.has(key)) seen.set(key, { x: p.ring.cx, z: p.ring.cz, radius: p.ring.radius })
+  }
+  return [...seen.values()]
 }
