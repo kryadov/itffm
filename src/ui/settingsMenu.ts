@@ -193,6 +193,38 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   weatherRow.append(weatherLabel, weatherButtons)
   panel.appendChild(weatherRow)
 
+  // Off by default (see ui/compass.ts) — a map that shows where you are
+  // kills half the point of a walk in the woods. This is the one place a
+  // player can opt into it.
+  const minimapRow = document.createElement('div')
+  minimapRow.style.cssText = LABEL_STYLE
+  const minimapLabel = document.createElement('span')
+  label(minimapLabel, 'settingsMinimap')
+  const minimapButtons = document.createElement('div')
+  minimapButtons.style.cssText = 'display:flex;gap:8px'
+  const onBtn = document.createElement('button')
+  const offBtn = document.createElement('button')
+  const paintMinimap = (): void => {
+    onBtn.style.cssText = btnStyle(live.minimap)
+    offBtn.style.cssText = btnStyle(!live.minimap)
+  }
+  label(onBtn, 'settingsOn')
+  label(offBtn, 'settingsOff')
+  onBtn.addEventListener('click', () => {
+    live = { ...live, minimap: true }
+    cb.onPrefsChange(live)
+    paintMinimap()
+  })
+  offBtn.addEventListener('click', () => {
+    live = { ...live, minimap: false }
+    cb.onPrefsChange(live)
+    paintMinimap()
+  })
+  paintMinimap()
+  minimapButtons.append(onBtn, offBtn)
+  minimapRow.append(minimapLabel, minimapButtons)
+  panel.appendChild(minimapRow)
+
   document.getElementById('ui')!.appendChild(overlay)
 
   const close = (e: KeyboardEvent) => {

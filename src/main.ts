@@ -8,6 +8,7 @@ import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView } from './game/pick'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
+import { createMinimap, headingFromYaw } from './ui/minimap'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
@@ -98,6 +99,9 @@ async function main(): Promise<void> {
   })
   hud.setBasket(0, BASKET_CAPACITY)
   const compass = createCompass(ui)
+  const minimap = createMinimap(ui)
+  minimap.setWorld(source.paths ?? [], source.water ?? [], forest.shelter, halfSize)
+  minimap.setVisible(save.prefs.minimap)
 
   const obstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
@@ -240,6 +244,7 @@ async function main(): Promise<void> {
         save = { ...save, prefs }
         controls.setSensitivity(prefs.mouseSensitivity)
         forest.setWeather(prefs.weather)
+        minimap.setVisible(prefs.minimap)
         void persistSave(save)
       },
     })
@@ -404,6 +409,9 @@ async function main(): Promise<void> {
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
     compass.update(player.yaw)
+    if (save.prefs.minimap) {
+      minimap.update({ x: player.x, z: player.z, heading: headingFromYaw(player.yaw) })
+    }
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
     forest.updateDayNight(timeFor(save.prefs.timeMode, cycleT), camera.position)
     forest.updateClouds(camera.position, dt)

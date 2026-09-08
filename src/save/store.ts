@@ -21,6 +21,8 @@ export interface Prefs {
   timeMode: TimeMode
   /** A fixed weather — there is no forecast, only what the player picks. */
   weather: Weather
+  /** Off by default — see ui/compass.ts and ui/minimap.ts for why. */
+  minimap: boolean
 }
 
 export interface SaveData {
@@ -35,7 +37,14 @@ export interface SaveData {
 export function defaultPrefs(): Prefs {
   // 'day' keeps the wood exactly as it always looked before day/night
   // existed — a player has to opt into the cycle, not be surprised by it.
-  return { mouseSensitivity: 1, walkSpeedMultiplier: 1, drawDistance: 45, timeMode: 'day', weather: 'clear' }
+  return {
+    mouseSensitivity: 1,
+    walkSpeedMultiplier: 1,
+    drawDistance: 45,
+    timeMode: 'day',
+    weather: 'clear',
+    minimap: false,
+  }
 }
 
 const DB_NAME = 'itffm'
