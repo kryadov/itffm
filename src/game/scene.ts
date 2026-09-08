@@ -4,6 +4,7 @@ import { buildTreeMeshes, type Tree } from '../world/trees'
 import { placeLogs, placeStumps, logObstacles, logSpawnPoints, buildDeadwoodMeshes } from '../world/deadwood'
 import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } from '../world/boulders'
 import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth'
+import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
 import { loadSpecies, speciesById } from '../species/load'
@@ -80,6 +81,10 @@ export function createForest(source: ForestSource, seed: number): Forest {
   const bushes = placeBushes(source.ground, HALF_SIZE, seed + 8)
   scene.add(buildBushMeshes(bushes))
   extraObstacles.push(...bushes.map(bushObstacle))
+
+  // Pure decoration: no substrate, no collision, nothing ecology.ts needs to
+  // know about. Its only job is to give the eye something to search through.
+  scene.add(buildFloraMeshes(placeFlora(source.ground, HALF_SIZE, seed + 9)))
 
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
