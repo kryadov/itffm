@@ -195,7 +195,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   }
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt))
-  scene.add(buildPathMeshes(source.paths ?? [], source.ground))
+  scene.add(buildPathMeshes(source.paths ?? [], source.ground, halfSize))
   scene.add(buildWaterMeshes(source.water ?? [], source.ground))
   scene.add(buildTreeMeshes(source.trees))
 

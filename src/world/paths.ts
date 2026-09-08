@@ -68,23 +68,45 @@ function offsetsForPolyline(points: Vec2[], halfWidth: number): { left: Vec2; ri
  * width and one surface, not a hierarchy of motorway down to service road.
  * A trail is not decoration: it is how the player enters the wood and how
  * they find their way back out of it (see TODO.md).
+ *
+ * @param halfSize the plot's own half-extent — an OSM trail routinely
+ *   continues past this wood's square, and a ribbon reaching a point out
+ *   there sits far beyond the ground mesh, at whatever height the elevation
+ *   provider clamps to at its edge: a thin ribbon floating in empty space,
+ *   not on the ground anyone can see. Runs are cut wherever they leave the
+ *   square instead.
  */
-export function buildPathMeshes(paths: Vec2[][], ground: ElevationProvider): THREE.Object3D {
+export function buildPathMeshes(paths: Vec2[][], ground: ElevationProvider, halfSize: number): THREE.Object3D {
   const group = new THREE.Group()
   group.name = 'paths'
+
+  const inside = (p: Vec2): boolean => Math.abs(p.x) <= halfSize && Math.abs(p.z) <= halfSize
 
   const positions: number[] = []
   for (const path of paths) {
     const dense = densify(path, RIBBON_STEP)
-    const sides = offsetsForPolyline(dense, HALF_WIDTH)
-    for (let j = 0; j < sides.length - 1; j++) {
-      const l0 = sides[j].left
-      const r0 = sides[j].right
-      const l1 = sides[j + 1].left
-      const r1 = sides[j + 1].right
-      const y = (p: Vec2): number => ground.heightAt(p.x, p.z) + LIFT
-      positions.push(l0.x, y(l0), l0.z, l1.x, y(l1), l1.z, r1.x, y(r1), r1.z)
-      positions.push(l0.x, y(l0), l0.z, r1.x, y(r1), r1.z, r0.x, y(r0), r0.z)
+    const runs: Vec2[][] = []
+    let current: Vec2[] = []
+    for (const p of dense) {
+      if (inside(p)) current.push(p)
+      else if (current.length > 0) {
+        runs.push(current)
+        current = []
+      }
+    }
+    if (current.length > 0) runs.push(current)
+
+    for (const run of runs) {
+      const sides = offsetsForPolyline(run, HALF_WIDTH)
+      for (let j = 0; j < sides.length - 1; j++) {
+        const l0 = sides[j].left
+        const r0 = sides[j].right
+        const l1 = sides[j + 1].left
+        const r1 = sides[j + 1].right
+        const y = (p: Vec2): number => ground.heightAt(p.x, p.z) + LIFT
+        positions.push(l0.x, y(l0), l0.z, l1.x, y(l1), l1.z, r1.x, y(r1), r1.z)
+        positions.push(l0.x, y(l0), l0.z, r1.x, y(r1), r1.z, r0.x, y(r0), r0.z)
+      }
     }
   }
   if (positions.length === 0) return group
