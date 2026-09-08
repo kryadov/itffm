@@ -1,4 +1,5 @@
 import { regionalMix, placeOsmTrees } from '../../src/world/osmTrees'
+import { isClearing } from '../../src/world/clearings'
 import type { WorldData } from '../../src/geo/types'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
@@ -100,6 +101,14 @@ describe('placeOsmTrees', () => {
     for (const t of placeOsmTrees(huge, flat, 55, 3, 90)) {
       expect(Math.abs(t.x)).toBeLessThanOrEqual(90)
       expect(Math.abs(t.z)).toBeLessThanOrEqual(90)
+    }
+  })
+
+  it('leaves gaps in the canopy for the noise-driven clearings', () => {
+    const big: WorldData = { ...empty, woods: [{ ring: square(0, 0, 150), leafType: 'mixed' }] }
+    const seed = 9
+    for (const t of placeOsmTrees(big, flat, 55, seed, 200)) {
+      expect(isClearing(t.x, t.z, seed)).toBe(false)
     }
   })
 

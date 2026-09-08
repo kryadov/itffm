@@ -6,14 +6,19 @@ import { parseWorld, type OverpassResponse } from '../geo/parse'
 import { loadTerrarium } from '../terrain/terrarium'
 import { griddedProvider } from '../terrain/gridded'
 import { withDetail } from '../terrain/detail'
+import { withPits } from '../terrain/pits'
 import { proceduralTerrain } from '../terrain/procedural'
 import { demoForest } from '../world/demoForest'
 import { placeOsmTrees } from '../world/osmTrees'
 import { buildBiomeMap } from '../world/biome'
+import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
 import { HALF_SIZE, GROUND_SEGMENTS, type ForestSource } from './scene'
 import type { WorldData, BBox } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
+import type { Biome } from '../species/schema'
+
+const FOREST_BIOMES: Set<Biome> = new Set(['forest-coniferous', 'forest-broadleaved', 'forest-mixed'])
 
 export type LoadStage = 'geocode' | 'osm' | 'terrain' | 'build'
 
@@ -36,7 +41,7 @@ export function chooseFallback(world: WorldData): 'demo' | null {
 }
 
 function proceduralGround(seed: number): ElevationProvider {
-  return griddedProvider(proceduralTerrain(seed), HALF_SIZE, GROUND_SEGMENTS)
+  return griddedProvider(withPits(proceduralTerrain(seed), seed + 3), HALF_SIZE, GROUND_SEGMENTS)
 }
 
 /**
@@ -47,7 +52,7 @@ function proceduralGround(seed: number): ElevationProvider {
 async function realGround(bbox: BBox, projector: Projector, seed: number): Promise<ElevationProvider> {
   try {
     const dem = await loadTerrarium(bbox, projector)
-    return griddedProvider(withDetail(dem, seed), HALF_SIZE, GROUND_SEGMENTS)
+    return griddedProvider(withPits(withDetail(dem, seed), seed + 3), HALF_SIZE, GROUND_SEGMENTS)
   } catch {
     return proceduralGround(seed)
   }
@@ -70,9 +75,19 @@ async function fetchWithCache(bbox: BBox): Promise<OverpassResponse> {
 }
 
 function buildSource(world: WorldData, ground: ElevationProvider, lat: number, seed: number): ForestSource {
-  const trees = placeOsmTrees(world, ground, lat, seed + 1, HALF_SIZE)
+  // Trees and biome share this seed for isClearing() so a gap in the canopy
+  // and its patch of meadow-scrub ecology are the same hole in the ground,
+  // not two noise fields that happen to disagree.
+  const treeSeed = seed + 1
+  const trees = placeOsmTrees(world, ground, lat, treeSeed, HALF_SIZE)
   const biomeMap = buildBiomeMap(world, ground, lat)
-  return { ground, trees, biomeAt: (x, z) => biomeMap.at(x, z) }
+  const biomeAt = (x: number, z: number): Biome => {
+    const biome = biomeMap.at(x, z)
+    // Only a break in the canopy turns into meadow-scrub; a clearing inside a
+    // dune or a cave mouth would not mean anything.
+    return FOREST_BIOMES.has(biome) && isClearing(x, z, treeSeed) ? 'meadow-scrub' : biome
+  }
+  return { ground, trees, biomeAt }
 }
 
 export interface LoadResult {
