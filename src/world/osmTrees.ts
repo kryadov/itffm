@@ -1,6 +1,7 @@
 import { mulberry32 } from '../util/rng'
 import { fbm2 } from '../util/noise'
 import { pointInPolygon, boundsOf } from '../util/geometry'
+import { isClearing } from './clearings'
 import { LOOK, type Tree } from './trees'
 import type { WorldData, LeafType, WoodArea } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
@@ -141,6 +142,7 @@ export function placeOsmTrees(
         const jz = z + (rng() - 0.5) * GRID * 0.8
         if (Math.abs(jx) > halfSize || Math.abs(jz) > halfSize) continue
         if (!pointInPolygon(jx, jz, wood.ring)) continue
+        if (isClearing(jx, jz, seed)) continue
         if (tooClose(jx, jz)) continue
 
         // Argmax over one noise field per genus, not a proportional draw: a
