@@ -3,8 +3,10 @@ import { createForest, HALF_SIZE } from './game/scene'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
 import { stepPlayer, eyeHeight, type PlayerState, type Obstacle } from './game/player'
+import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView } from './game/pick'
 import { createHud } from './ui/hud'
+import { createCompass } from './ui/compass'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
@@ -72,9 +74,16 @@ async function main(): Promise<void> {
   const basket = createBasket(BASKET_CAPACITY)
   const hud = createHud(ui)
   hud.setBasket(0, BASKET_CAPACITY)
+  const compass = createCompass(ui)
 
-  const obstacles: Obstacle[] = forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
-  let player: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0 }
+  const obstacles: Obstacle[] = [
+    ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
+    ...forest.deadwoodObstacles,
+  ]
+  const startPose = chooseStartPose(obstacles, HALF_SIZE)
+  let player: PlayerState = {
+    x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false,
+  }
   let aimed: THREE.Object3D | null = null
 
   function toast(text: string): void {
@@ -236,8 +245,13 @@ async function main(): Promise<void> {
       player.z = Math.max(-HALF_SIZE, Math.min(HALF_SIZE, player.z))
     }
 
-    camera.position.set(player.x, forest.ground.heightAt(player.x, player.z) + eyeHeight(player), player.z)
+    camera.position.set(
+      player.x,
+      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop,
+      player.z,
+    )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+    compass.update(player.yaw)
 
     cullDistantMushrooms()
     updateAim()

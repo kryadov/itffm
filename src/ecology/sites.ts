@@ -56,6 +56,15 @@ export function moistureAt(provider: ElevationProvider, x: number, z: number): n
  * @param biomeAt biome at a given point — a plain constant for a procedural
  *   wood, or a real map built from OpenStreetMap tags. Sites need not all
  *   share one biome: a real plot can cross from wood into a clearing.
+ * @param deadwoodPoints where a real fallen log or stump stands (see
+ *   world/deadwood.ts). Each becomes exactly one site with `substrate:
+ *   'deadwood'` — a guess at "probably rotting, it's near a tree" used to
+ *   grow deadwood mushrooms on bare ground with nothing under them; now they
+ *   grow only where there is an actual log to grow on.
+ * @param mossPoints where moss grows around a real boulder (see
+ *   world/boulders.ts). Each becomes one site with `substrate: 'moss'`; the
+ *   site's own measured moisture still decides whether anything moss-loving
+ *   actually wants to grow there.
  */
 export function buildSites(
   provider: ElevationProvider,
@@ -64,37 +73,40 @@ export function buildSites(
   seed: number,
   biomeAt: (x: number, z: number) => Biome,
   count = 1200,
+  deadwoodPoints: { x: number; z: number }[] = [],
+  mossPoints: { x: number; z: number }[] = [],
 ): Site[] {
   const rng = mulberry32(seed)
   const sites: Site[] = []
 
-  for (let i = 0; i < count; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
-
+  const hostsNear = (x: number, z: number): HostRef[] => {
     const hosts: HostRef[] = []
     for (const t of trees) {
       const d = Math.hypot(t.x - x, t.z - z)
       if (d <= HOST_RADIUS) hosts.push({ genus: t.genus, distance: d })
     }
     hosts.sort((a, b) => a.distance - b.distance)
-
-    // Dead wood turns up where the trees are: stumps and fallen trunks. Close
-    // to a bole, a share of the sites count as wood rather than soil.
-    const nearTrunk = hosts.length > 0 && hosts[0].distance < 1.2
-    const roll = rng()
-    const substrate: Substrate = nearTrunk && roll < 0.35 ? 'deadwood' : roll < 0.5 ? 'litter' : 'soil'
-
-    sites.push({
-      x,
-      z,
-      y: provider.heightAt(x, z),
-      biome: biomeAt(x, z),
-      hosts,
-      substrate,
-      moisture: moistureAt(provider, x, z),
-    })
+    return hosts
   }
+
+  const siteAt = (x: number, z: number, substrate: Substrate): Site => ({
+    x,
+    z,
+    y: provider.heightAt(x, z),
+    biome: biomeAt(x, z),
+    hosts: hostsNear(x, z),
+    substrate,
+    moisture: moistureAt(provider, x, z),
+  })
+
+  for (let i = 0; i < count; i++) {
+    const x = (rng() * 2 - 1) * halfSize
+    const z = (rng() * 2 - 1) * halfSize
+    sites.push(siteAt(x, z, rng() < 0.3 ? 'litter' : 'soil'))
+  }
+
+  for (const p of deadwoodPoints) sites.push(siteAt(p.x, p.z, 'deadwood'))
+  for (const p of mossPoints) sites.push(siteAt(p.x, p.z, 'moss'))
 
   return sites
 }
