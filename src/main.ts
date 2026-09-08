@@ -105,7 +105,7 @@ async function main(): Promise<void> {
   ]
   const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
   let player: PlayerState = {
-    x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false,
+    x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
   }
   let aimed: THREE.Object3D | null = null
 
@@ -354,7 +354,7 @@ async function main(): Promise<void> {
 
     camera.position.set(
       player.x,
-      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop,
+      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand,
       player.z,
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')

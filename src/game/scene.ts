@@ -69,7 +69,7 @@ export interface Forest {
   /** Everything besides standing trees that blocks the player — fallen logs,
    *  stumps, boulders, bushes — as collision circles for the same obstacle
    *  list `stepPlayer` and `chooseStartPose` already use for tree trunks. */
-  extraObstacles: { x: number; z: number; radius: number }[]
+  extraObstacles: { x: number; z: number; radius: number; topHeight?: number }[]
   /** The wood's one hut — game/main.ts starts the player beside it. */
   shelter: { x: number; z: number }
   /** Grass and undergrowth: not pickable, but game/pick.ts casts against them
@@ -189,7 +189,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   scene.add(buildDeadwoodMeshes(logs, stumps))
   const extraObstacles = [
     ...logs.flatMap((l) => logObstacles(l)),
-    ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius })),
+    ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius, topHeight: s.height })),
   ]
 
   const boulders = placeBoulders(source.ground, halfSize, seed + 7)

@@ -31,7 +31,7 @@ describe('placeBoulders', () => {
 describe('boulderObstacle', () => {
   it('matches the boulder position and radius', () => {
     const b = { x: 3, z: -4, y: 0, radius: 0.6 }
-    expect(boulderObstacle(b)).toEqual({ x: 3, z: -4, radius: 0.6 })
+    expect(boulderObstacle(b)).toEqual({ x: 3, z: -4, radius: 0.6, topHeight: 0.78 })
   })
 })
 

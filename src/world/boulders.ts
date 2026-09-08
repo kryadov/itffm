@@ -16,6 +16,7 @@ interface CircleObstacle {
   x: number
   z: number
   radius: number
+  topHeight?: number
 }
 
 const MIN_GAP = 4
@@ -45,9 +46,16 @@ export function placeBoulders(
   return boulders
 }
 
-/** A boulder's collision shape: one circle is enough for something this round. */
+/**
+ * A boulder's collision shape: one circle is enough for something this round.
+ *
+ * `topHeight` mirrors how `buildBoulderMeshes` actually draws it (centred at
+ * `radius * 0.55` above the ground, rising another `radius * 0.75`) — a small
+ * boulder is low enough to climb; a big one keeps acting as a wall, exactly
+ * the "if the height allows it" the player already expects from a real rock.
+ */
 export function boulderObstacle(b: Boulder): CircleObstacle {
-  return { x: b.x, z: b.z, radius: b.radius }
+  return { x: b.x, z: b.z, radius: b.radius, topHeight: b.radius * 1.3 }
 }
 
 /**

@@ -2,7 +2,7 @@ import { stepPlayer, eyeHeight, biomeSpeedFactor, type PlayerState, type PlayerI
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
-const start: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false }
+const start: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0 }
 const idle: PlayerInput = {
   forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 60,
 }
@@ -172,6 +172,35 @@ describe('stepPlayer', () => {
       const crouched: PlayerState = { ...start, crouch: 1 }
       const s = stepPlayer(crouched, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
       expect(s.airborne).toBe(false)
+    })
+  })
+
+  describe('climbing', () => {
+    it('stands on top of a low obstacle instead of sliding around it', () => {
+      // One step at this dt covers exactly WALK_SPEED * dt = 1m — right onto
+      // the stump's centre, not past it.
+      const stump = { x: 0, z: -1, radius: 0.3, topHeight: 0.4 }
+      const s = stepPlayer(start, { ...idle, forward: 1, dt: 1 / 2.4 }, flat, [stump])
+      expect(Math.hypot(s.x - stump.x, s.z - stump.z)).toBeLessThan(stump.radius)
+      expect(s.stand).toBe(0.4)
+    })
+
+    it('still blocks an obstacle too tall to step up onto', () => {
+      const boulder = { x: 0, z: -1, radius: 0.5, topHeight: 1.2 }
+      let s = start
+      for (let i = 0; i < 90; i++) {
+        s = stepPlayer(s, { ...idle, forward: 1, dt: 1 / 30 }, flat, [boulder])
+      }
+      expect(Math.hypot(s.x - boulder.x, s.z - boulder.z)).toBeGreaterThanOrEqual(boulder.radius + 0.29)
+      expect(s.stand).toBe(0)
+    })
+
+    it('comes back down to stand: 0 after stepping off', () => {
+      const stump = { x: 0, z: -1, radius: 0.3, topHeight: 0.4 }
+      let s = stepPlayer(start, { ...idle, forward: 1, dt: 1 / 2.4 }, flat, [stump])
+      expect(s.stand).toBe(0.4)
+      s = stepPlayer(s, { ...idle, forward: -1, dt: 1 }, flat, [stump])
+      expect(s.stand).toBe(0)
     })
   })
 })

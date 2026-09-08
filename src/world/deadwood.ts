@@ -8,6 +8,7 @@ interface CircleObstacle {
   x: number
   z: number
   radius: number
+  topHeight?: number
 }
 
 export interface Log {
@@ -99,6 +100,10 @@ export function placeStumps(
  * stand-in for a capsule that reuses the same point-and-radius `Obstacle`
  * `stepPlayer` already knows how to slide around, so a fat trunk on the
  * ground blocks the way exactly like a standing tree does.
+ *
+ * `topHeight` is the trunk's diameter — the highest point a lying cylinder
+ * offers is straight over its centreline — so only a slim log is low enough
+ * to step up onto; a thick one keeps blocking the way.
  */
 export function logObstacles(log: Log, beadSpacing = 1): CircleObstacle[] {
   const beads: CircleObstacle[] = []
@@ -107,7 +112,7 @@ export function logObstacles(log: Log, beadSpacing = 1): CircleObstacle[] {
   const dz = Math.sin(log.angle)
   for (let i = 0; i <= count; i++) {
     const t = (i / count - 0.5) * log.length
-    beads.push({ x: log.x + dx * t, z: log.z + dz * t, radius: log.radius })
+    beads.push({ x: log.x + dx * t, z: log.z + dz * t, radius: log.radius, topHeight: log.radius * 2 })
   }
   return beads
 }

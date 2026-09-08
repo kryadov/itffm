@@ -16,6 +16,11 @@ export interface PlayerState {
   hop: number
   /** Whether the feet are off the ground — true exactly when hop > 0. */
   airborne: boolean
+  /** Extra height the feet stand at above the terrain surface, metres — set
+   *  by standing over a climbable obstacle's footprint (a boulder, a log, a
+   *  stump), 0 on bare ground. Added to `hop`, not replacing it: jumping
+   *  while already standing on a stump still leaves the ground beneath it. */
+  stand: number
 }
 
 export interface PlayerInput {
@@ -35,7 +40,16 @@ export interface Obstacle {
   x: number
   z: number
   radius: number
+  /** Height of this obstacle's top above the ground beneath it, metres — set
+   *  only on a boulder, a log or a stump, the obstacles worth climbing.
+   *  Left unset for anything else (a tree, a bush, the shelter), which keeps
+   *  blocking the way outright regardless of MAX_STEP_HEIGHT. */
+  topHeight?: number
 }
+
+/** Tallest obstacle top a step can climb onto outright, metres — above this,
+ *  even a "climbable" obstacle still acts as a wall. */
+const MAX_STEP_HEIGHT = 0.55
 
 const WALK_SPEED = 2.4
 const CROUCH_SPEED = 1.1
@@ -140,6 +154,8 @@ export function stepPlayer(
   let z = s.z + rawZ * speed
 
   for (const o of obstacles) {
+    const climbable = o.topHeight !== undefined && o.topHeight <= MAX_STEP_HEIGHT
+    if (climbable) continue
     const dx = x - o.x
     const dz = z - o.z
     const d = Math.hypot(dx, dz)
@@ -148,6 +164,15 @@ export function stepPlayer(
       x = o.x + (dx / d) * min
       z = o.z + (dz / d) * min
     }
+  }
+
+  // Standing on top follows from where the feet ended up this step, not from
+  // dodging the obstacle above — a boulder low enough to climb is simply never
+  // pushed out of, so walking onto it is all it takes.
+  let stand = 0
+  for (const o of obstacles) {
+    if (o.topHeight === undefined || o.topHeight > MAX_STEP_HEIGHT) continue
+    if (Math.hypot(x - o.x, z - o.z) <= o.radius) stand = Math.max(stand, o.topHeight)
   }
 
   // Jumping does not carry you forward faster or farther — it only leaves the
@@ -164,5 +189,5 @@ export function stepPlayer(
     vy = 0
   }
 
-  return { x, z, yaw, pitch, crouch, vy, hop, airborne: hop > 0 }
+  return { x, z, yaw, pitch, crouch, vy, hop, airborne: hop > 0, stand }
 }
