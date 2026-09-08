@@ -32,11 +32,18 @@ const camPos = new THREE.Vector3()
 const forward = new THREE.Vector3()
 const toObj = new THREE.Vector3()
 
-/** Half-angle of the aim-forgiveness cone for a small object, radians —
- *  generous enough that a berry cluster a couple of metres out no longer
- *  needs pixel-precise aim, tight enough that it never grabs something
- *  merely nearby in the view. */
-const SMALL_OBJECT_CONE_COS = Math.cos((2.5 * Math.PI) / 180)
+/**
+ * Half-angle of the aim-forgiveness cone for a small object, radians.
+ *
+ * A `clustered` colony (ecology/spawn.ts's COLONY_SPREAD) scatters its
+ * fruiting bodies up to ~0.35m from the site centre — at the roughly 1m the
+ * player actually stands from one to pick it, that is atan(0.35/1) ≈ 19° off
+ * dead centre for the far side of the same cluster. 2.5° (the first attempt)
+ * only ever caught whichever one the exact ray happened to hit outright,
+ * which read as "only the first berry works" — everything else in the same
+ * clump fell outside a cone that tight.
+ */
+const SMALL_OBJECT_CONE_COS = Math.cos((16 * Math.PI) / 180)
 
 /**
  * The nearest small object roughly under the crosshair, within a forgiving
