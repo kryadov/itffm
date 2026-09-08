@@ -36,7 +36,7 @@ describe('matchesFilters', () => {
     const combined = all.filter((s) => matchesFilters(s, { edibility: 'edible', hymenium: 'pores' }))
     for (const s of combined) {
       expect(s.edibility).toBe('edible')
-      expect(s.morphology.hymenium.type).toBe('pores')
+      expect(s.kind === 'mushroom' && s.morphology.hymenium.type).toBe('pores')
     }
     expect(combined.length).toBeLessThan(all.length)
   })

@@ -22,14 +22,15 @@ export const TREE_GENERA = [
 export const GREGARIOUS = ['solitary', 'scattered', 'clustered', 'troops', 'rings'] as const
 export const FREQUENCY = ['common', 'occasional', 'rare'] as const
 /**
- * What kind of thing a species is — a mushroom for now, with berries, herbs,
- * nuts and non-food finds to follow (see
+ * What kind of thing a species is (see
  * docs/superpowers/specs/2026-09-08-forest-finds-design.md). Each kind gets
- * its own morphology and its own generator (mushroom/build.ts today; berry/,
- * herb/, nut/, find/ as they land) — this field is what a dispatcher and the
- * encyclopedia's kind filter key off.
+ * its own morphology and its own generator (mushroom/build.ts, berry/build.ts)
+ * — this field is what the `Species` union, the collectible dispatcher and
+ * the encyclopedia's kind filter all key off. Grows by one entry — and one
+ * union member below — each time a new kind is actually implemented; herbs,
+ * nuts and non-food finds are designed but not yet here.
  */
-export const KINDS = ['mushroom', 'berry', 'herb', 'nut', 'find'] as const
+export const KINDS = ['mushroom', 'berry'] as const
 
 export type Edibility = (typeof EDIBILITY)[number]
 export type HymeniumType = (typeof HYMENIUM)[number]
@@ -46,13 +47,25 @@ export type Frequency = (typeof FREQUENCY)[number]
 export type Kind = (typeof KINDS)[number]
 export type Range = [number, number]
 
-/** Everything the mesh generator needs to build this species. */
-export interface Morphology {
+/** Everything the mesh generator needs to build a mushroom. */
+export interface MushroomMorphology {
   cap: { shape: CapShape; ageShape: CapShape; diameter: Range; color: string; surface: Surface; surfaceColor: string }
   hymenium: { type: HymeniumType; attachment: Attachment; color: string }
   stipe: { height: Range; width: Range; color: string; position: StipePosition; ring: RingType; volva: VolvaType }
   flesh: { color: string; bruising: (typeof BRUISING)[number] }
   latex: (typeof LATEX)[number]
+}
+
+/** Everything the mesh generator needs to build a berry cluster. */
+export interface BerryMorphology {
+  /** Ripe berry colour. */
+  color: string
+  /** One berry's diameter, mm. */
+  diameter: Range
+  /** Berries in one cluster. */
+  clusterSize: Range
+  /** The small tuft of foliage under the cluster. */
+  leafColor: string
 }
 
 /** Everything the world generator needs to decide where this species grows. */
@@ -74,21 +87,29 @@ export interface MediaRef {
   source: string
 }
 
-export interface Species {
+interface SpeciesCommon {
   id: string
   gbifKey: number
   name: { la: string; ru: string; en: string }
-  kind: Kind
-  /** Absent only for a non-food find (kind: 'find') — the question of
-   *  edibility does not apply to a feather or a stone, and leaving the field
-   *  required there would force a lie into the data rather than an "n/a". */
-  edibility?: Edibility
+  /** Required for everything edible-or-not (mushroom, berry, ...); a future
+   *  non-food find is the one kind allowed to leave this out entirely — see
+   *  docs/superpowers/specs/2026-09-08-forest-finds-design.md. */
+  edibility: Edibility
   lookalikes: string[]
-  morphology: Morphology
   ecology: Ecology
   media: MediaRef[]
   text: { ru: string; en: string }
 }
+
+/**
+ * A species is one of these, discriminated by `kind` — narrowing on `kind`
+ * narrows `morphology` to the matching type, which is what lets
+ * `collectible/build.ts`'s dispatcher and each kind's own build.ts stay
+ * simply typed instead of casting.
+ */
+export type Species =
+  | (SpeciesCommon & { kind: 'mushroom'; morphology: MushroomMorphology })
+  | (SpeciesCommon & { kind: 'berry'; morphology: BerryMorphology })
 
 class SpeciesError extends Error {
   constructor(file: string, field: string, why: string) {
@@ -159,34 +180,14 @@ function listOf<T extends string>(obj: unknown, field: string, allowed: readonly
   return v as T[]
 }
 
-/**
- * Parses and checks one species. Throws a SpeciesError naming the file and the
- * field: these errors are the guard rail on hand-curated data, so they have to
- * say exactly where the typo is.
- */
-export function validateSpecies(raw: unknown, file: string): Species {
-  const id = str(raw, 'id', file, '')
-  if (!/^[a-z0-9-]+$/.test(id)) throw new SpeciesError(file, 'id', 'lowercase letters, digits and hyphens only')
-
-  const gbifKey = get(raw, 'gbifKey', file, '')
-  if (typeof gbifKey !== 'number' || !Number.isInteger(gbifKey)) {
-    throw new SpeciesError(file, 'gbifKey', 'expected an integer')
-  }
-
-  const nameObj = get(raw, 'name', file, '')
-  const name = {
-    la: str(nameObj, 'la', file, 'name'),
-    ru: str(nameObj, 'ru', file, 'name'),
-    en: str(nameObj, 'en', file, 'name'),
-  }
-
+function parseMushroomMorphology(raw: unknown, file: string): MushroomMorphology {
   const mo = get(raw, 'morphology', file, '')
   const capObj = get(mo, 'cap', file, 'morphology')
   const hyObj = get(mo, 'hymenium', file, 'morphology')
   const stObj = get(mo, 'stipe', file, 'morphology')
   const flObj = get(mo, 'flesh', file, 'morphology')
 
-  const morphology: Morphology = {
+  return {
     cap: {
       shape: oneOf(capObj, 'shape', CAP_SHAPES, file, 'morphology.cap'),
       ageShape: oneOf(capObj, 'ageShape', CAP_SHAPES, file, 'morphology.cap'),
@@ -214,6 +215,44 @@ export function validateSpecies(raw: unknown, file: string): Species {
     },
     latex: oneOf(mo, 'latex', LATEX, file, 'morphology'),
   }
+}
+
+function parseBerryMorphology(raw: unknown, file: string): BerryMorphology {
+  const mo = get(raw, 'morphology', file, '')
+  return {
+    color: color(mo, 'color', file, 'morphology'),
+    diameter: range(mo, 'diameter', file, 'morphology'),
+    clusterSize: range(mo, 'clusterSize', file, 'morphology'),
+    leafColor: color(mo, 'leafColor', file, 'morphology'),
+  }
+}
+
+/**
+ * Parses and checks one species. Throws a SpeciesError naming the file and the
+ * field: these errors are the guard rail on hand-curated data, so they have to
+ * say exactly where the typo is.
+ */
+export function validateSpecies(raw: unknown, file: string): Species {
+  const id = str(raw, 'id', file, '')
+  if (!/^[a-z0-9-]+$/.test(id)) throw new SpeciesError(file, 'id', 'lowercase letters, digits and hyphens only')
+
+  const gbifKey = get(raw, 'gbifKey', file, '')
+  if (typeof gbifKey !== 'number' || !Number.isInteger(gbifKey)) {
+    throw new SpeciesError(file, 'gbifKey', 'expected an integer')
+  }
+
+  const nameObj = get(raw, 'name', file, '')
+  const name = {
+    la: str(nameObj, 'la', file, 'name'),
+    ru: str(nameObj, 'ru', file, 'name'),
+    en: str(nameObj, 'en', file, 'name'),
+  }
+
+  // Absent defaults to 'mushroom': the 31 species curated before this field
+  // existed name no kind at all, and re-touching every one of them just to
+  // spell out what they already are would be busywork, not data.
+  const kind: Kind = hasField(raw, 'kind') ? oneOf(raw, 'kind', KINDS, file, '') : 'mushroom'
+  const edibility = oneOf(raw, 'edibility', EDIBILITY, file, '')
 
   const ec = get(raw, 'ecology', file, '')
   const season = get(ec, 'season', file, 'ecology')
@@ -251,30 +290,17 @@ export function validateSpecies(raw: unknown, file: string): Species {
   const textObj = get(raw, 'text', file, '')
   const text = { ru: str(textObj, 'ru', file, 'text'), en: str(textObj, 'en', file, 'text') }
 
-  // Absent defaults to 'mushroom': the 31 species curated before this field
-  // existed name no kind at all, and re-touching every one of them just to
-  // spell out what they already are would be busywork, not data.
-  const kind: Kind = hasField(raw, 'kind') ? oneOf(raw, 'kind', KINDS, file, '') : 'mushroom'
-  // Edibility is required for anything a forager could put in a basket to
-  // eat; a non-food find (kind: 'find') is the one place the question does
-  // not apply, so it alone is allowed to leave the field out entirely.
-  const edibility: Edibility | undefined =
-    kind === 'find'
-      ? hasField(raw, 'edibility')
-        ? oneOf(raw, 'edibility', EDIBILITY, file, '')
-        : undefined
-      : oneOf(raw, 'edibility', EDIBILITY, file, '')
-
-  return {
+  const common = {
     id,
     gbifKey,
     name,
-    kind,
     edibility,
     lookalikes: lookalikesRaw as string[],
-    morphology,
     ecology,
     media,
     text,
   }
+
+  if (kind === 'berry') return { ...common, kind, morphology: parseBerryMorphology(raw, file) }
+  return { ...common, kind: 'mushroom', morphology: parseMushroomMorphology(raw, file) }
 }

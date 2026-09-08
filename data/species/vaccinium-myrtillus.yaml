@@ -1,0 +1,37 @@
+id: vaccinium-myrtillus
+gbifKey: 3170243
+name:
+  la: Vaccinium myrtillus
+  ru: Черника
+  en: Bilberry
+kind: berry
+edibility: edible
+lookalikes: []
+morphology:
+  color: "#262c5e"
+  diameter: [6, 9]
+  clusterSize: [1, 3]
+  leafColor: "#3f5a2c"
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed]
+  season: [7, 8, 9]
+  moisture: [0.4, 0.8]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Низкий, до колена, кустарничек со светло-зелёными ребристыми веточками —
+    сам куст легко узнать ещё до ягод. Плоды почти чёрные с сизым восковым
+    налётом, мякоть и сок ярко-фиолетовые (в отличие от голубики, у которой
+    мякоть светлая) — это главный способ отличить их на вкус. Растёт сплошным
+    подлеском в сыром хвойном лесу, часто рядом с брусникой, но на более
+    влажной почве.
+  en: >-
+    A low, knee-high shrub with light-green ridged twigs, recognisable before
+    a single berry shows. Nearly black fruit with a dusty bloom, and flesh and
+    juice stained a deep violet-purple — unlike blueberry's pale flesh, this
+    is the one taste test that tells them apart. Carpets the floor of damp
+    coniferous woods, often alongside lingonberry but on wetter ground.

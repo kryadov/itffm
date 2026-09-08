@@ -17,7 +17,7 @@ import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies, speciesById } from '../species/load'
-import { buildMushroom, toWorldMesh } from '../mushroom/build'
+import { buildCollectible, toWorldMesh } from '../collectible/build'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
 import type { Vec2 } from '../geo/types'
@@ -232,7 +232,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   for (const p of placements) {
     const species = speciesById(p.speciesId)
     if (!species) continue
-    const mesh = toWorldMesh(buildMushroom(species.morphology, p.seed, p.age))
+    const mesh = toWorldMesh(buildCollectible(species, p.seed, p.age))
     mesh.position.set(p.x, source.ground.heightAt(p.x, p.z), p.z)
     mesh.rotateY(p.rotationY)
     mesh.userData.placement = p

@@ -1,0 +1,38 @@
+id: fragaria-vesca
+gbifKey: 3020287
+name:
+  la: Fragaria vesca
+  ru: Земляника лесная
+  en: Wild strawberry
+kind: berry
+edibility: edible
+lookalikes: []
+morphology:
+  color: "#c41e3a"
+  diameter: [10, 15]
+  clusterSize: [1, 2]
+  leafColor: "#4c6b32"
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [meadow-scrub, forest-broadleaved]
+  season: [6, 7]
+  moisture: [0.3, 0.6]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Тройчатый лист на длинном черешке и низкая розетка — не спутать с
+    культурной клубникой её крупных грядок, а с настоящим лесным низкорослым
+    кустиком. Ягоды мельче садовых, ярко-красные, с семенами прямо на
+    поверхности (это не ягода в ботаническом смысле, а разросшееся
+    цветоложе), и куда ароматнее. Растёт на опушках и полянах, где солнце
+    достаёт до земли, — не под сомкнутым пологом, где для неё темно.
+  en: >-
+    A trifoliate leaf on a long stalk and a low rosette give it away at once —
+    nothing like a garden strawberry's bed, a genuinely wild, low-growing
+    plant. Smaller fruit than the cultivated kind, bright red, seeds sitting
+    right on the surface (botanically not a berry at all, but a swollen
+    flower base), and far more fragrant. Grows on clearings and edges where
+    the sun reaches the ground, not under a closed canopy where it goes dark.

@@ -26,6 +26,32 @@ const valid = {
   text: { ru: 'Описание.', en: 'Description.' },
 }
 
+const validBerry = {
+  id: 'vaccinium-myrtillus',
+  gbifKey: 3086357,
+  name: { la: 'Vaccinium myrtillus', ru: 'Черника', en: 'Bilberry' },
+  kind: 'berry',
+  edibility: 'edible',
+  lookalikes: [],
+  morphology: {
+    color: '#2a2f6b',
+    diameter: [6, 10],
+    clusterSize: [3, 8],
+    leafColor: '#3f5a2c',
+  },
+  ecology: {
+    mycorrhizal: [],
+    substrate: 'soil',
+    biomes: ['forest-coniferous'],
+    season: [7, 8, 9],
+    moisture: [0.4, 0.9],
+    gregarious: 'clustered',
+    frequency: 'common',
+  },
+  media: [],
+  text: { ru: 'Описание.', en: 'Description.' },
+}
+
 describe('validateSpecies', () => {
   it('accepts a well-formed species', () => {
     expect(validateSpecies(valid, 'amanita-muscaria.yaml').id).toBe('amanita-muscaria')
@@ -65,10 +91,6 @@ describe('validateSpecies', () => {
     expect(validateSpecies(valid, 'x.yaml').kind).toBe('mushroom')
   })
 
-  it('accepts an explicit kind', () => {
-    expect(validateSpecies({ ...valid, kind: 'berry' }, 'x.yaml').kind).toBe('berry')
-  })
-
   it('rejects an unknown kind and names the file', () => {
     expect(() => validateSpecies({ ...valid, kind: 'vegetable' }, 'x.yaml')).toThrow(/x\.yaml.*kind/s)
   })
@@ -79,14 +101,19 @@ describe('validateSpecies', () => {
     expect(() => validateSpecies(withoutEdibility, 'x.yaml')).toThrow(/edibility/)
   })
 
-  it('lets a find go without edibility', () => {
-    const { edibility, ...withoutEdibility } = valid
-    void edibility
-    const s = validateSpecies({ ...withoutEdibility, kind: 'find' }, 'x.yaml')
-    expect(s.edibility).toBeUndefined()
+  it('accepts a well-formed berry', () => {
+    const s = validateSpecies(validBerry, 'x.yaml')
+    expect(s.kind).toBe('berry')
+    expect(s.kind === 'berry' && s.morphology.color).toBe('#2a2f6b')
   })
 
-  it('still validates edibility for a find when it is given', () => {
-    expect(() => validateSpecies({ ...valid, kind: 'find', edibility: 'tasty' }, 'x.yaml')).toThrow(/edibility/)
+  it('rejects a berry with mushroom-shaped morphology', () => {
+    const bad = { ...validBerry, morphology: valid.morphology }
+    expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/x\.yaml.*morphology/s)
+  })
+
+  it('rejects a berry cluster range that is inverted', () => {
+    const bad = { ...validBerry, morphology: { ...validBerry.morphology, clusterSize: [8, 3] } }
+    expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/clusterSize/)
   })
 })

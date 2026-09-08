@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { buildMushroom } from '../mushroom/build'
+import { buildCollectible } from '../collectible/build'
 import { attachOrbit } from './orbit'
 import { t, speciesName, speciesText } from '../i18n/i18n'
 import type { Species, Edibility } from '../species/schema'
@@ -43,10 +43,25 @@ export function openInspect(
   card.style.cssText = 'flex:1 1 45%;max-width:480px;padding:32px 34px;overflow:auto'
   overlay.append(view, card)
 
-  const m = species.morphology
   const label = (k: string) => t(k as Parameters<typeof t>[0])
-  const ringText = m.stipe.ring !== 'none' ? t('withRing') : t('noRing')
-  const volvaText = m.stipe.volva !== 'none' ? `, ${t('withVolva')}` : ''
+  // Each kind reads its own trait list off its own morphology shape — kept
+  // here, not in mushroom/build.ts or berry/build.ts, because it is
+  // translated text, and those modules are pure core with no i18n dependency.
+  let traitsHtml: string
+  if (species.kind === 'mushroom') {
+    const m = species.morphology
+    const ringText = m.stipe.ring !== 'none' ? t('withRing') : t('noRing')
+    const volvaText = m.stipe.volva !== 'none' ? `, ${t('withVolva')}` : ''
+    traitsHtml = `
+      <li>${t('capSize')}: ${m.cap.diameter[0]}–${m.cap.diameter[1]} ${t('mm')}</li>
+      <li>${t('underside')}: ${label(m.hymenium.type)}</li>
+      <li>${t('stipe')}: ${m.stipe.height[0]}–${m.stipe.height[1]} ${t('mm')}, ${ringText}${volvaText}</li>`
+  } else {
+    const m = species.morphology
+    traitsHtml = `
+      <li>${t('berrySize')}: ${m.diameter[0]}–${m.diameter[1]} ${t('mm')}</li>
+      <li>${t('clusterSize')}: ${m.clusterSize[0]}–${m.clusterSize[1]}</li>`
+  }
   // Absent only for a non-food find (kind: 'find') — nothing to badge.
   const edibilityBadge = species.edibility
     ? `<div style="display:inline-block;padding:4px 12px;border-radius:14px;margin-bottom:20px;color:#12160f;font-weight:600;background:${EDIBILITY_COLOR[species.edibility]}">
@@ -60,11 +75,7 @@ export function openInspect(
     ${edibilityBadge}
     <p style="line-height:1.55;opacity:.9;margin:0">${speciesText(species)}</p>
     <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.09em;opacity:.5;margin:26px 0 8px">${t('traits')}</h2>
-    <ul style="line-height:1.75;padding-left:20px;margin:0">
-      <li>${t('capSize')}: ${m.cap.diameter[0]}–${m.cap.diameter[1]} ${t('mm')}</li>
-      <li>${t('underside')}: ${label(m.hymenium.type)}</li>
-      <li>${t('stipe')}: ${m.stipe.height[0]}–${m.stipe.height[1]} ${t('mm')}, ${ringText}${volvaText}</li>
-    </ul>
+    <ul style="line-height:1.75;padding-left:20px;margin:0">${traitsHtml}</ul>
     <h2 style="font-size:13px;text-transform:uppercase;letter-spacing:.09em;opacity:.5;margin:26px 0 8px">${t('ecology')}</h2>
     <ul style="line-height:1.75;padding-left:20px;margin:0">
       <li>${t('substrate')}: ${label(species.ecology.substrate)}</li>
@@ -98,7 +109,7 @@ export function openInspect(
   scene.add(key)
 
   // The detailed group, not the merged world mesh: here the parts matter.
-  const model = buildMushroom(species.morphology, seed, age)
+  const model = buildCollectible(species, seed, age)
   // Centre the model on the origin, or the orbit turns around the ground
   // beneath it and the underside can never be brought into view.
   const box = new THREE.Box3().setFromObject(model)

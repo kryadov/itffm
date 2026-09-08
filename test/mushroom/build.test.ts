@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 import { buildMushroom } from '../../src/mushroom/build'
 import { loadSpecies, speciesById } from '../../src/species/load'
+import type { MushroomMorphology } from '../../src/species/schema'
 
-const amanita = speciesById('amanita-muscaria')!.morphology
-const oyster = speciesById('pleurotus-ostreatus')!.morphology
+const amanita = speciesById('amanita-muscaria')!.morphology as MushroomMorphology
+const oyster = speciesById('pleurotus-ostreatus')!.morphology as MushroomMorphology
 
 function capPositions(g: THREE.Group): number[] {
   const cap = g.getObjectByName('cap') as THREE.Mesh
@@ -50,8 +51,9 @@ describe('buildMushroom', () => {
     expect(h).toBeLessThan(0.3)
   })
 
-  it('builds every species in the database without throwing', () => {
+  it('builds every mushroom in the database without throwing', () => {
     for (const s of loadSpecies()) {
+      if (s.kind !== 'mushroom') continue
       const g = buildMushroom(s.morphology, 1, 0.5)
       const box = new THREE.Box3().setFromObject(g)
       expect(box.isEmpty(), `${s.id} produced empty geometry`).toBe(false)

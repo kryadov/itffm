@@ -1,12 +1,17 @@
 import * as THREE from 'three'
 import { loadSpecies } from '../species/load'
-import { buildMushroom } from '../mushroom/build'
+import { buildCollectible } from '../collectible/build'
 import { hashString } from '../util/rng'
 import { t, speciesName } from '../i18n/i18n'
 import { matchesFilters, type EncyclopediaFilters, type Season } from './encyclopediaFilters'
-import { EDIBILITY, HYMENIUM, BIOMES } from '../species/schema'
+import { EDIBILITY, HYMENIUM, BIOMES, KINDS } from '../species/schema'
 import type { SaveData } from '../save/store'
-import type { Species, Biome, Edibility, HymeniumType } from '../species/schema'
+import type { Species, Biome, Edibility, HymeniumType, Kind } from '../species/schema'
+
+const KIND_LABEL: Record<Kind, 'kindMushroom' | 'kindBerry'> = {
+  mushroom: 'kindMushroom',
+  berry: 'kindBerry',
+}
 
 const BIOME_LABEL: Record<Biome, { ru: string; en: string }> = {
   'forest-broadleaved': { ru: 'лиственный лес', en: 'broadleaf woods' },
@@ -36,7 +41,7 @@ function renderPreview(species: Species, size: number, silhouette: boolean): str
   key.position.set(1, 2, 1.5)
   scene.add(key)
 
-  const model = buildMushroom(species.morphology, hashString(species.id), 0.7)
+  const model = buildCollectible(species, hashString(species.id), 0.7)
   if (silhouette) {
     model.traverse((o) => {
       const mesh = o as THREE.Mesh
@@ -96,6 +101,10 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
   const selectStyle =
     'padding:6px 10px;border-radius:6px;border:1px solid #444;background:#1a201a;color:#ddd;font-size:13px'
 
+  const kindSelect = `<select id="filter-kind" style="${selectStyle}">
+    ${selectOption('', t('filterAny'))}
+    ${KINDS.map((k) => selectOption(k, t(KIND_LABEL[k]))).join('')}
+  </select>`
   const biomeSelect = `<select id="filter-biome" style="${selectStyle}">
     ${selectOption('', t('filterAny'))}
     ${BIOMES.map((b) => selectOption(b, BIOME_LABEL[b][lang])).join('')}
@@ -127,6 +136,7 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
       ${t('disclaimer')}
     </p>
     <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:20px">
+      ${labeled(t('filterKind'), kindSelect)}
       ${labeled(t('filterBiome'), biomeSelect)}
       ${labeled(t('filterEdibility'), edibilitySelect)}
       ${labeled(t('filterHymenium'), hymeniumSelect)}
@@ -137,6 +147,7 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
 
   const grid = overlay.querySelector<HTMLDivElement>('#encyclopedia-grid')!
   const empty = overlay.querySelector<HTMLParagraphElement>('#encyclopedia-empty')!
+  const kindInput = overlay.querySelector<HTMLSelectElement>('#filter-kind')!
   const biomeInput = overlay.querySelector<HTMLSelectElement>('#filter-biome')!
   const edibilityInput = overlay.querySelector<HTMLSelectElement>('#filter-edibility')!
   const hymeniumInput = overlay.querySelector<HTMLSelectElement>('#filter-hymenium')!
@@ -144,6 +155,7 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
 
   const renderGrid = (): void => {
     const filters: EncyclopediaFilters = {
+      kind: (kindInput.value || undefined) as Kind | undefined,
       biome: (biomeInput.value || undefined) as Biome | undefined,
       edibility: (edibilityInput.value || undefined) as Edibility | undefined,
       hymenium: (hymeniumInput.value || undefined) as HymeniumType | undefined,
@@ -154,7 +166,7 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
     empty.hidden = shown.length > 0
   }
 
-  for (const input of [biomeInput, edibilityInput, hymeniumInput, seasonInput]) {
+  for (const input of [kindInput, biomeInput, edibilityInput, hymeniumInput, seasonInput]) {
     input.addEventListener('change', renderGrid)
   }
   renderGrid()

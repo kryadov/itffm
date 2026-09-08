@@ -1,0 +1,37 @@
+id: vaccinium-vitis-idaea
+gbifKey: 3170225
+name:
+  la: Vaccinium vitis-idaea
+  ru: Брусника
+  en: Lingonberry
+kind: berry
+edibility: edible
+lookalikes: []
+morphology:
+  color: "#a01f2e"
+  diameter: [6, 8]
+  clusterSize: [2, 6]
+  leafColor: "#38512a"
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-coniferous]
+  season: [8, 9, 10]
+  moisture: [0.25, 0.6]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Стелющийся вечнозелёный кустарничек с мелкими блестящими кожистыми
+    листьями — единственная местная ягода, у которой листья зимуют под
+    снегом. Ягоды ярко-красные, собраны в короткие кисти, мякоть светлая и
+    сок бесцветный — этим сразу отличается от черники. Предпочитает более
+    сухие, песчаные участки соснового бора, чем черника или голубика, и
+    хорошо переносит небольшой мороз на кусте.
+  en: >-
+    A creeping evergreen shrublet with small, glossy leathery leaves — the one
+    local berry whose foliage stays green under the snow. Bright red berries
+    in short clusters, pale flesh and colourless juice, unlike bilberry's
+    stained purple. Prefers drier, sandier ground in pine woods than bilberry
+    or blueberry, and tolerates a light frost on the bush without harm.
