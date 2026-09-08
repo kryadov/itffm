@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { mulberry32, pickWeighted, hashString } from '../util/rng'
 import { fbm2 } from '../util/noise'
 import type { ElevationProvider } from '../terrain/provider'
@@ -199,6 +200,62 @@ const BROADLEAF_CROWNS: CrownShape[] = [
   { geometry: buildRaggedCrown(3), yScale: 1.35, xzScale: 0.7, heightFrac: 0.88 },
 ]
 
+interface ConiferShape {
+  /** Unit geometry: apex at y=+0.5, widest tier's base radius 1, centred at
+   *  the origin — the same convention buildRaggedCrown's broadleaf shapes use,
+   *  so real size comes entirely from the instance's own scale. */
+  geometry: THREE.BufferGeometry
+  /** The crown's own height as a fraction of the whole tree's height — this
+   *  is what actually tells a spruce from a pine: how far down the trunk the
+   *  crown reaches, not the cone's proportions. */
+  crownHeightFrac: number
+  /** Extra width multiplier on top of the genus's own `look.crown`. */
+  xzScale: number
+}
+
+/** One plain cone, shared by every genus whose crown is a single unbroken
+ *  spire rather than tiers — cheap, since geometry is shared, only the
+ *  instance transform differs. */
+const SINGLE_CONE = new THREE.ConeGeometry(1, 1, 8)
+
+/**
+ * A "wedding cake" of `tiers` cones, narrowing and shrinking toward the top
+ * with a gap between each — the airy, layered look a pine or larch crown
+ * actually has, as opposed to spruce or fir's one unbroken spire. Built once
+ * per tier count and shared by every instance of that genus.
+ */
+function buildTieredConiferCrown(tiers: number): THREE.BufferGeometry {
+  const gap = 0.08
+  const bandHeight = 1 / tiers
+  const coneHeight = bandHeight - gap
+  const parts: THREE.BufferGeometry[] = []
+  for (let i = 0; i < tiers; i++) {
+    const bottomY = -0.5 + i * bandHeight
+    const topY = bottomY + coneHeight
+    const radius = 1 - (i / tiers) * 0.7
+    const cone = new THREE.ConeGeometry(radius, coneHeight, 7)
+    cone.translate(0, topY - coneHeight / 2, 0)
+    parts.push(cone)
+  }
+  const merged = mergeGeometries(parts, false)
+  merged.computeVertexNormals()
+  return merged
+}
+
+/**
+ * One silhouette per conifer genus instead of one cone proportion for all of
+ * them — spruce and pine used to be nearly indistinguishable. `crownHeightFrac`
+ * is doing the real work: spruce and fir droop low with an unbroken spire,
+ * pine and larch sit raised and visibly tiered.
+ */
+const CONIFER_SHAPES: Partial<Record<TreeGenus, ConiferShape>> = {
+  picea: { geometry: SINGLE_CONE, crownHeightFrac: 0.78, xzScale: 0.8 },
+  abies: { geometry: SINGLE_CONE, crownHeightFrac: 0.62, xzScale: 0.95 },
+  pinus: { geometry: buildTieredConiferCrown(3), crownHeightFrac: 0.5, xzScale: 1.1 },
+  larix: { geometry: buildTieredConiferCrown(2), crownHeightFrac: 0.48, xzScale: 1.0 },
+}
+const DEFAULT_CONIFER_SHAPE: ConiferShape = CONIFER_SHAPES.picea!
+
 /**
  * Tree meshes, instanced per genus (and, for broadleaf crowns, per shape
  * variant too): a thousand trees would otherwise cost a thousand draw calls
@@ -235,16 +292,15 @@ export function buildTreeMeshes(trees: Tree[]): THREE.Group {
     const crownMat = new THREE.MeshStandardMaterial({ color: look.crownColor, roughness: 1 })
 
     if (look.conifer) {
-      // Crowns sit high and stay narrow enough to walk under. A wide cone
-      // starting low reads from below as a black lid over the whole wood,
-      // which is exactly what it looked like before.
-      const crowns = new THREE.InstancedMesh(new THREE.ConeGeometry(look.crown, 1, 8), crownMat, list.length)
+      const shape = CONIFER_SHAPES[genus] ?? DEFAULT_CONIFER_SHAPE
+      const crowns = new THREE.InstancedMesh(shape.geometry, crownMat, list.length)
       list.forEach((t, i) => {
         const spread = 0.75 + ((t.height - look.height[0]) / (look.height[1] - look.height[0])) * 0.5
-        const crownH = t.height * 0.55
+        const crownH = t.height * shape.crownHeightFrac
+        const crownR = spread * look.crown * shape.xzScale
         dummy.rotation.set(0, 0, 0)
         dummy.position.set(t.x, t.y + t.height - crownH / 2, t.z)
-        dummy.scale.set(spread, crownH, spread)
+        dummy.scale.set(crownR, crownH, crownR)
         dummy.updateMatrix()
         crowns.setMatrixAt(i, dummy.matrix)
       })
