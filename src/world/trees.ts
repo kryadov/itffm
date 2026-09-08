@@ -20,7 +20,7 @@ const MIN_GAP = 1.6
 /** How sharply a genus wins its patch. Higher means cleaner stands. */
 const STAND_SHARPNESS = 5
 
-interface GenusLook {
+export interface GenusLook {
   trunk: number
   crown: number
   height: [number, number]
@@ -29,16 +29,28 @@ interface GenusLook {
   conifer: boolean
 }
 
-/** The genera the first plan needs. The rest arrive with the other biomes. */
-const LOOK: Partial<Record<TreeGenus, GenusLook>> = {
+/**
+ * How each genus is drawn. Every genus the species data can name as a partner
+ * has to be here: a mushroom that grows with hornbeam needs a hornbeam to grow
+ * under, and a missing entry would silently fall back to birch.
+ */
+export const LOOK: Record<TreeGenus, GenusLook> = {
   betula: { trunk: 0.16, crown: 2.4, height: [14, 22], crownColor: 0x74963f, trunkColor: 0xe8e4d8, conifer: false },
   picea: { trunk: 0.22, crown: 1.7, height: [16, 28], crownColor: 0x2f4a33, trunkColor: 0x4a3b2c, conifer: true },
   pinus: { trunk: 0.26, crown: 2.1, height: [18, 30], crownColor: 0x44603a, trunkColor: 0x8a5a3b, conifer: true },
+  abies: { trunk: 0.24, crown: 1.8, height: [18, 32], crownColor: 0x27412f, trunkColor: 0x5a4a3a, conifer: true },
+  larix: { trunk: 0.22, crown: 1.9, height: [18, 30], crownColor: 0x6d8a3c, trunkColor: 0x7a5533, conifer: true },
   quercus: { trunk: 0.34, crown: 3.4, height: [15, 24], crownColor: 0x556b2f, trunkColor: 0x5a4632, conifer: false },
   populus: { trunk: 0.24, crown: 2.4, height: [16, 26], crownColor: 0x7a9a4a, trunkColor: 0x6b6154, conifer: false },
+  fagus: { trunk: 0.32, crown: 3.2, height: [18, 28], crownColor: 0x5f7a33, trunkColor: 0x8b8378, conifer: false },
+  carpinus: { trunk: 0.22, crown: 2.6, height: [12, 20], crownColor: 0x63803a, trunkColor: 0x8a8478, conifer: false },
+  tilia: { trunk: 0.30, crown: 3.0, height: [16, 26], crownColor: 0x6b8a3e, trunkColor: 0x5f5348, conifer: false },
+  acer: { trunk: 0.26, crown: 2.9, height: [14, 22], crownColor: 0x6f8b38, trunkColor: 0x6a5a49, conifer: false },
+  alnus: { trunk: 0.20, crown: 2.2, height: [12, 20], crownColor: 0x4e6b34, trunkColor: 0x53483f, conifer: false },
+  salix: { trunk: 0.22, crown: 2.5, height: [10, 18], crownColor: 0x8aa055, trunkColor: 0x5d5347, conifer: false },
 }
 
-const DEFAULT_LOOK: GenusLook = LOOK.betula!
+const DEFAULT_LOOK: GenusLook = LOOK.betula
 
 /**
  * Scatters trees across the plot.

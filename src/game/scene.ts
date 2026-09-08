@@ -1,15 +1,31 @@
 import * as THREE from 'three'
-import { proceduralTerrain } from '../terrain/procedural'
 import { buildGround } from '../world/ground'
-import { placeTrees, buildTreeMeshes, type Tree } from '../world/trees'
+import { buildTreeMeshes, type Tree } from '../world/trees'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
 import { loadSpecies, speciesById } from '../species/load'
 import { buildMushroom, toWorldMesh } from '../mushroom/build'
 import type { ElevationProvider } from '../terrain/provider'
+import type { Biome } from '../species/schema'
 
 /** Half the plot's side, metres. Ninety is about a quarter-hour's slow walk across. */
 export const HALF_SIZE = 90
+/** Ground mesh resolution per side. Shared with loadForest.ts so a real DEM is
+ *  resampled onto exactly the same grid the mesh renders — otherwise the
+ *  visible surface (linear between mesh vertices) and heightAt() (the source's
+ *  own curve) disagree between vertices, and the player floats or sinks. */
+export const GROUND_SEGMENTS = 160
+
+/**
+ * Where a wood's terrain and trees come from. Procedural noise for now (plan 1);
+ * OpenStreetMap and a real DEM (plan 2, via game/loadForest.ts) build the very
+ * same shape without createForest knowing the difference.
+ */
+export interface ForestSource {
+  ground: ElevationProvider
+  trees: Tree[]
+  biomeAt: (x: number, z: number) => Biome
+}
 
 export interface Forest {
   scene: THREE.Scene
@@ -21,13 +37,12 @@ export interface Forest {
 }
 
 /**
- * Builds the wood: terrain, ground, trees, and mushrooms by their ecology.
+ * Builds the wood: ground, trees, and mushrooms by their ecology.
  *
- * The month and the days since rain are fixed for now. September after recent
- * rain is the best week of the year, and for a first walk the wood should be
- * generous. A calendar arrives with the save file.
+ * The season follows the real calendar month; days-since-rain is fixed for now
+ * — a real weather system is future work (see TODO.md).
  */
-export function createForest(seed: number): Forest {
+export function createForest(source: ForestSource, seed: number): Forest {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0xa8c0a2)
   scene.fog = new THREE.Fog(0xa8c0a2, 30, 140)
@@ -40,26 +55,24 @@ export function createForest(seed: number): Forest {
   sun.position.set(40, 80, 20)
   scene.add(sun)
 
-  const ground = proceduralTerrain(seed)
-  scene.add(buildGround(ground, HALF_SIZE, 160))
+  scene.add(buildGround(source.ground, HALF_SIZE, GROUND_SEGMENTS))
+  scene.add(buildTreeMeshes(source.trees))
 
-  const trees = placeTrees(ground, HALF_SIZE, seed + 1, ['betula', 'picea', 'pinus', 'populus'], 0.03)
-  scene.add(buildTreeMeshes(trees))
-
-  const sites = buildSites(ground, trees, HALF_SIZE, seed + 2, 'forest-mixed', 1600)
-  const placements = spawnMushrooms(loadSpecies(), sites, { month: 9, seed: seed + 3, daysSinceRain: 2 })
+  const sites = buildSites(source.ground, source.trees, HALF_SIZE, seed + 2, source.biomeAt, 1600)
+  const month = new Date().getMonth() + 1
+  const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })
 
   const mushroomObjects: THREE.Object3D[] = []
   for (const p of placements) {
     const species = speciesById(p.speciesId)
     if (!species) continue
     const mesh = toWorldMesh(buildMushroom(species.morphology, p.seed, p.age))
-    mesh.position.set(p.x, ground.heightAt(p.x, p.z), p.z)
+    mesh.position.set(p.x, source.ground.heightAt(p.x, p.z), p.z)
     mesh.rotateY(p.rotationY)
     mesh.userData.placement = p
     scene.add(mesh)
     mushroomObjects.push(mesh)
   }
 
-  return { scene, ground, trees, placements, mushroomObjects }
+  return { scene, ground: source.ground, trees: source.trees, placements, mushroomObjects }
 }

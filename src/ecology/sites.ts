@@ -52,13 +52,17 @@ export function moistureAt(provider: ElevationProvider, x: number, z: number): n
  * Each knows its own ecology: biome, nearby host genera, substrate, moisture.
  * Choosing the species is spawn.ts's job — this is only the description of a
  * place.
+ *
+ * @param biomeAt biome at a given point — a plain constant for a procedural
+ *   wood, or a real map built from OpenStreetMap tags. Sites need not all
+ *   share one biome: a real plot can cross from wood into a clearing.
  */
 export function buildSites(
   provider: ElevationProvider,
   trees: Tree[],
   halfSize: number,
   seed: number,
-  biome: Biome,
+  biomeAt: (x: number, z: number) => Biome,
   count = 1200,
 ): Site[] {
   const rng = mulberry32(seed)
@@ -85,7 +89,7 @@ export function buildSites(
       x,
       z,
       y: provider.heightAt(x, z),
-      biome,
+      biome: biomeAt(x, z),
       hosts,
       substrate,
       moisture: moistureAt(provider, x, z),
