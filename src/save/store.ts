@@ -6,8 +6,13 @@ export interface Find {
   speciesId: string
   x: number
   z: number
-  /** When it was found, Date.now(). */
+  /** When it was found, Date.now() — also this find's own identity: nothing
+   *  else needs one, and two finds sharing a millisecond is not worth
+   *  guarding against. */
   at: number
+  /** The player's own note — where exactly, what stood out. Empty until
+   *  they write one. */
+  note?: string
 }
 
 export interface Prefs {
@@ -64,6 +69,13 @@ export function applyFind(save: SaveData, find: Find): SaveData {
       : [...save.discovered, find.speciesId],
     finds: [...save.finds, find],
   }
+}
+
+/** Sets one find's note by its `at` timestamp. Returns a new object and
+ *  leaves the old one untouched, same as `applyFind`. A find with no
+ *  matching `at` (already gone, or never existed) leaves the save as is. */
+export function setFindNote(save: SaveData, at: number, note: string): SaveData {
+  return { ...save, finds: save.finds.map((f) => (f.at === at ? { ...f, note } : f)) }
 }
 
 function openDb(): Promise<IDBDatabase> {

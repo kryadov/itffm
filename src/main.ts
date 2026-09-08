@@ -6,6 +6,7 @@ import { createControls } from './game/controls'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView } from './game/pick'
+import type { Placement } from './ecology/spawn'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
 import { createMinimap, headingFromYaw } from './ui/minimap'
@@ -16,7 +17,7 @@ import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, DAY_TIME } from './world/daynight'
 import { speciesById } from './species/load'
-import { emptySave, loadSave, persistSave, applyFind, type SaveData } from './save/store'
+import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 
 declare global {
@@ -94,6 +95,10 @@ async function main(): Promise<void> {
   // place-picker interaction takes far longer than the IndexedDB round trip.
   const controls = createControls(renderer.domElement, save.prefs.mouseSensitivity)
   const basket = createBasket(BASKET_CAPACITY)
+  // Which save/store.ts Find a basket item's note belongs to — a Placement
+  // carries no identity of its own, but it is the very object the collect
+  // handler already has in hand at the moment it creates that Find.
+  const findAtByPlacement = new WeakMap<Placement, number>()
   const hud = createHud(ui, () => {
     if (!modalOpen()) openSettings()
   })
@@ -209,12 +214,9 @@ async function main(): Promise<void> {
         removeFromSmallObjects(target)
         leaveTrace(placement)
         hud.setBasket(basket.items.length, BASKET_CAPACITY)
-        save = applyFind(save, {
-          speciesId: placement.speciesId,
-          x: placement.x,
-          z: placement.z,
-          at: Date.now(),
-        })
+        const at = Date.now()
+        findAtByPlacement.set(placement, at)
+        save = applyFind(save, { speciesId: placement.speciesId, x: placement.x, z: placement.z, at })
         void persistSave(save)
       },
       () => {},
@@ -315,14 +317,24 @@ async function main(): Promise<void> {
         const s = speciesById(item.speciesId)!
         const preview = renderCollectiblePreview(s, item.seed, item.age, 120, false)
         const edibility = s.kind !== 'find' ? ` <span style="opacity:.6">(${t(s.edibility)})</span>` : ''
+        const at = findAtByPlacement.get(item)
+        const note = at !== undefined ? (save.finds.find((f) => f.at === at)?.note ?? '') : ''
+        const noteBox =
+          at !== undefined
+            ? `<textarea data-note-at="${at}" placeholder="${t('notePlaceholder')}" rows="2"
+                 style="width:100%;margin-top:6px;padding:5px;box-sizing:border-box;background:#0e120c;
+                 color:#ddd;border:1px solid #384030;border-radius:6px;font:inherit;font-size:12px;resize:none"
+               >${note}</textarea>`
+            : ''
         return `<div style="background:#171d15;border-radius:10px;padding:10px;text-align:center">
           <img src="${preview}" width="120" height="120" alt="" style="display:block;margin:0 auto 6px" />
           <div style="font-size:13px">${speciesName(s)}${edibility}</div>
+          ${noteBox}
         </div>`
       })
       .join('')
 
-    overlay(
+    const el = overlay(
       'tally',
       `<div style="max-width:640px;max-height:80vh;overflow:auto;padding:34px">
          <h1 style="margin:0 0 18px;font-size:24px">${t('tally')} — ${basket.items.length}</h1>
@@ -335,6 +347,18 @@ async function main(): Promise<void> {
        </div>`,
       ['Escape', 'KeyQ', 'Tab'],
     )
+    el.querySelectorAll<HTMLTextAreaElement>('textarea[data-note-at]').forEach((box) => {
+      const at = Number(box.dataset.noteAt)
+      // Typing a literal "q" or hitting Tab to leave the field must not also
+      // trigger this same overlay's own close-key handler on `window`.
+      box.addEventListener('keydown', (e) => {
+        if (e.code !== 'Escape') e.stopPropagation()
+      })
+      box.addEventListener('blur', () => {
+        save = setFindNote(save, at, box.value)
+        void persistSave(save)
+      })
+    })
   }
 
   function openExitConfirm(): void {

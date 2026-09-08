@@ -1,4 +1,4 @@
-import { emptySave, applyFind, type Find } from '../../src/save/store'
+import { emptySave, applyFind, setFindNote, type Find } from '../../src/save/store'
 
 const find = (id: string, at = 1000): Find => ({ speciesId: id, x: 1, z: 2, at })
 
@@ -37,5 +37,27 @@ describe('applyFind', () => {
     expect(s.discovered).toEqual([])
     expect(s.finds).toEqual([])
     expect(s.disclaimerSeen).toBe(false)
+  })
+})
+
+describe('setFindNote', () => {
+  it('sets the note on the find with a matching timestamp', () => {
+    let s = applyFind(emptySave(), find('boletus-edulis', 1000))
+    s = applyFind(s, find('amanita-muscaria', 2000))
+    s = setFindNote(s, 2000, 'under the big spruce')
+    expect(s.finds.find((f) => f.at === 2000)?.note).toBe('under the big spruce')
+    expect(s.finds.find((f) => f.at === 1000)?.note).toBeUndefined()
+  })
+
+  it('leaves the save untouched when no find matches', () => {
+    const before = applyFind(emptySave(), find('boletus-edulis', 1000))
+    const after = setFindNote(before, 9999, 'nobody home')
+    expect(after.finds).toEqual(before.finds)
+  })
+
+  it('leaves the original save untouched', () => {
+    const before = applyFind(emptySave(), find('boletus-edulis', 1000))
+    setFindNote(before, 1000, 'a note')
+    expect(before.finds[0].note).toBeUndefined()
   })
 })

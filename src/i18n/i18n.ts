@@ -110,6 +110,7 @@ export const RU = {
   stageTerrain: 'Строим рельеф…',
   stageBuild: 'Расставляем грибы…',
   fellBackNotice: 'Не удалось построить участок по этому месту — показываю запасной лес.',
+  notePlaceholder: 'Своя заметка…',
   lang: 'EN',
 } as const
 
@@ -217,6 +218,7 @@ export const EN: Record<keyof typeof RU, string> = {
   stageTerrain: 'Shaping the terrain…',
   stageBuild: 'Placing the mushrooms…',
   fellBackNotice: 'Could not build a plot from that place — showing the demo wood instead.',
+  notePlaceholder: 'Your own note…',
   lang: 'RU',
 }
 
