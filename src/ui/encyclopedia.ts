@@ -2,10 +2,11 @@ import { loadSpecies } from '../species/load'
 import { hashString } from '../util/rng'
 import { t, speciesName } from '../i18n/i18n'
 import { renderCollectiblePreview } from './preview'
+import { columnsFor, layoutGrid, EXPORT_CELL_SIZE } from './export'
 import { matchesFilters, type EncyclopediaFilters, type Season } from './encyclopediaFilters'
 import { EDIBILITY, HYMENIUM, BIOMES, KINDS } from '../species/schema'
 import type { SaveData } from '../save/store'
-import type { Biome, Edibility, HymeniumType, Kind } from '../species/schema'
+import type { Biome, Edibility, HymeniumType, Kind, Species } from '../species/schema'
 
 const KIND_LABEL: Record<Kind, 'kindMushroom' | 'kindBerry' | 'kindHerb' | 'kindNut' | 'kindFind'> = {
   mushroom: 'kindMushroom',
@@ -25,6 +26,54 @@ const BIOME_LABEL: Record<Biome, { ru: string; en: string }> = {
   'cave-adit': { ru: 'штольни и пещеры', en: 'adits and caves' },
   'park-urban': { ru: 'парки', en: 'parks' },
   alpine: { ru: 'высокогорье', en: 'high mountains' },
+}
+
+/**
+ * Draws the discovered species onto a plain 2D canvas — a picture worth
+ * sharing, not the encyclopedia's own WebGL previews rearranged in place —
+ * and triggers a normal browser download of it. Nothing here needs to be
+ * fast: it runs once, on a deliberate click, for a species list that tops
+ * out in the dozens.
+ */
+async function exportEncyclopediaImage(discovered: Species[]): Promise<void> {
+  if (discovered.length === 0) return
+  const cols = columnsFor(discovered.length)
+  const layout = layoutGrid(discovered.length, cols)
+
+  const canvas = document.createElement('canvas')
+  canvas.width = layout.width
+  canvas.height = layout.height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.fillStyle = '#0f130e'
+  ctx.fillRect(0, 0, layout.width, layout.height)
+  ctx.fillStyle = '#eee'
+  ctx.font = '600 24px system-ui, sans-serif'
+  ctx.fillText(`${t('encyclopedia')} — ${discovered.length}`, 24, 40)
+
+  await Promise.all(
+    discovered.map(
+      (s, i) =>
+        new Promise<void>((resolve) => {
+          const img = new Image()
+          img.onload = () => {
+            const { x, y } = layout.cellAt(i)
+            ctx.drawImage(img, x, y, EXPORT_CELL_SIZE, EXPORT_CELL_SIZE)
+            ctx.fillStyle = '#eee'
+            ctx.font = '600 13px system-ui, sans-serif'
+            ctx.fillText(speciesName(s), x, y + EXPORT_CELL_SIZE + 18, EXPORT_CELL_SIZE)
+            resolve()
+          }
+          img.onerror = () => resolve()
+          img.src = renderCollectiblePreview(s, hashString(s.id), 0.7, EXPORT_CELL_SIZE, false)
+        }),
+    ),
+  )
+
+  const a = document.createElement('a')
+  a.href = canvas.toDataURL('image/png')
+  a.download = 'itffm-encyclopedia.png'
+  a.click()
 }
 
 /** The encyclopedia: what has been found, and what is still out there. */
@@ -94,7 +143,8 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
     <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px">
       <h1 style="margin:0;font-size:28px">${t('encyclopedia')}</h1>
       <span style="opacity:.55">${found.size} ${t('of')} ${all.length}</span>
-      <span style="margin-left:auto;opacity:.5;font-size:14px">${t('closeHint')}</span>
+      <button id="export-encyclopedia" style="margin-left:auto;padding:6px 14px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:13px;cursor:pointer">${t('exportEncyclopedia')}</button>
+      <span style="opacity:.5;font-size:14px">${t('closeHint')}</span>
     </div>
     <p style="margin:0 0 18px;padding:10px 14px;background:#2a1f14;border-left:3px solid #d8a04a;border-radius:0 6px 6px 0;font-size:13px;line-height:1.5;opacity:.9;max-width:760px">
       ${t('disclaimer')}
@@ -134,6 +184,10 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
     input.addEventListener('change', renderGrid)
   }
   renderGrid()
+
+  overlay.querySelector('#export-encyclopedia')!.addEventListener('click', () => {
+    void exportEncyclopediaImage(all.filter((s) => found.has(s.id)))
+  })
 
   const close = (e: KeyboardEvent) => {
     if (e.code !== 'Tab' && e.code !== 'Escape') return

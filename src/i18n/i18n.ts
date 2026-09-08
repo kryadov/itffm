@@ -111,6 +111,7 @@ export const RU = {
   stageBuild: 'Расставляем грибы…',
   fellBackNotice: 'Не удалось построить участок по этому месту — показываю запасной лес.',
   notePlaceholder: 'Своя заметка…',
+  exportEncyclopedia: 'Экспорт картинкой',
   lang: 'EN',
 } as const
 
@@ -219,6 +220,7 @@ export const EN: Record<keyof typeof RU, string> = {
   stageBuild: 'Placing the mushrooms…',
   fellBackNotice: 'Could not build a plot from that place — showing the demo wood instead.',
   notePlaceholder: 'Your own note…',
+  exportEncyclopedia: 'Export as an image',
   lang: 'RU',
 }
 
