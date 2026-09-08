@@ -75,16 +75,18 @@ npm run dev
 
 ## Where it stands
 
-Work in progress. Done so far: the mushroom generator, the species database with
-validation, procedural terrain and wood, walking in first person, the
-inspection view, the encyclopedia and saving.
+Work in progress, but the wood is real now. Name a place and elevation comes
+from [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/), while
+the trees, clearings, water and paths come from
+[OpenStreetMap](https://www.openstreetmap.org) — your own local wood, a nature
+reserve, a national park. Any failure along the way — the place not found, the
+map bare, the network down — falls back honestly to a baked-in demo wood rather
+than an error screen.
 
-Next the wood stops being invented. Elevation comes from
-[AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/), and the
-trees, clearings, dunes, wetlands and cave entrances come from
-[OpenStreetMap](https://www.openstreetmap.org). You will be able to name a real
-place — your own local wood, the Curonian Spit, the Alps — and pick mushrooms
-there, by the ecology of that particular wood.
+Left to do: the species database still holds three mushrooms, not the twenty or
+so a proper walk deserves, and their photographs are not wired up yet. See
+`TODO.md` for the rest — atmosphere, sound, wildlife, and everything else a
+wood is missing.
 
 Design documents and plans live in `docs/superpowers/` and are written in
 Russian. The backlog is `TODO.md`.

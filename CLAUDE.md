@@ -11,9 +11,10 @@ parameters, and those same parameters decide where in the wood it grows.
 
 Live: https://kryadov.github.io/itffm/
 
-Current state: plan 1 done and released as `v0.2.0` (procedural wood, walking,
-inspection, encyclopedia, save, RU/EN). Plan 2 — real geography from OSM and
-elevation tiles — is in progress.
+Current state: plans 1 and 2 done, released as `v0.3.0`. The wood is built from
+a real place name via OpenStreetMap and AWS Terrain Tiles, with an offline demo
+wood as an honest fallback on any failure. Next: expanding the species database
+past three, and the ETL pipeline for photos (see TODO.md).
 
 Documents are in Russian; the code is in English (see Conventions).
 

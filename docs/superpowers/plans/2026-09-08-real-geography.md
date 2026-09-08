@@ -2,9 +2,15 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**Статус: выполнен.** Все 9 задач сделаны, выпущено как `v0.3.0`. Один пункт
+архитектуры уточнён по факту реализации: `buildSites` в `ecology/sites.ts`
+принимает `biomeAt` — функцию точки, а не константный `Biome` на всю локацию,
+потому что реальный участок пересекает границы леса и открытой земли. Это
+единственное изменение в `ecology/`; остальное соответствует плану как задумано.
+
 **Goal:** Заменить выдуманный лес настоящим: игрок вводит место — свой дачный лес, Лосиный Остров, Куршскую косу — и собирает грибы там, по экологии этого самого леса.
 
-**Architecture:** Рельеф приходит из AWS Terrain Tiles, растительность и вода — из OpenStreetMap через Overpass. Всё считается в браузере, бэкенда нет. `ElevationProvider` и `Tree` спроектированы под эту подмену в первом плане, поэтому меняются только `terrain/` и `world/trees.ts`; `ecology/`, `mushroom/`, `game/` и `ui/` не трогаются вовсе.
+**Architecture:** Рельеф приходит из AWS Terrain Tiles, растительность и вода — из OpenStreetMap через Overpass. Всё считается в браузере, бэкенда нет. `ElevationProvider` и `Tree` спроектированы под эту подмену в первом плане, поэтому меняются только `terrain/` и `world/trees.ts`; `mushroom/`, `game/` и `ui/` не трогаются вовсе (по факту `ecology/sites.ts` тоже потребовал минимальной правки — см. выше).
 
 **Tech Stack:** TypeScript 5.6, Vite 5.4, Three.js 0.169, Vitest 2.1. Никаких новых зависимостей.
 
