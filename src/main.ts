@@ -5,6 +5,7 @@ import { createControls } from './game/controls'
 import { stepPlayer, eyeHeight, type PlayerState, type Obstacle } from './game/player'
 import { createBasket, nearestInView } from './game/pick'
 import { createHud } from './ui/hud'
+import { createCompass } from './ui/compass'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
@@ -72,6 +73,7 @@ async function main(): Promise<void> {
   const basket = createBasket(BASKET_CAPACITY)
   const hud = createHud(ui)
   hud.setBasket(0, BASKET_CAPACITY)
+  const compass = createCompass(ui)
 
   const obstacles: Obstacle[] = forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
   let player: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false }
@@ -242,6 +244,7 @@ async function main(): Promise<void> {
       player.z,
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+    compass.update(player.yaw)
 
     cullDistantMushrooms()
     updateAim()
