@@ -78,4 +78,52 @@ describe('nearestInView', () => {
     grassBlade.updateMatrixWorld(true)
     expect(nearestInView(camera, [m], 10, [grassBlade])).toBe(m)
   })
+
+  // A berry/nut/find is real-world millimetres across — far too small for the
+  // exact ray above to land on reliably — so it gets a forgiving aim cone
+  // instead (see TODO.md, 2026-09-08).
+  describe('small-object fallback', () => {
+    const tinyBerry = (x: number, z: number): THREE.Object3D => {
+      const g = new THREE.Group()
+      g.position.set(x, 0, z)
+      g.userData.placement = item('vaccinium-myrtillus')
+      g.updateMatrixWorld(true)
+      return g
+    }
+
+    it('finds a tiny object the exact ray missed, straight ahead', () => {
+      const b = tinyBerry(0, -3)
+      expect(nearestInView(camera, [], 10, [], [b])).toBe(b)
+    })
+
+    it('ignores a tiny object well outside the aim cone', () => {
+      const b = tinyBerry(3, -3)
+      expect(nearestInView(camera, [], 10, [], [b])).toBe(null)
+    })
+
+    it('ignores a tiny object beyond the given distance', () => {
+      const b = tinyBerry(0, -3)
+      expect(nearestInView(camera, [], 2, [], [b])).toBe(null)
+    })
+
+    it('prefers an exact hit over the small-object cone', () => {
+      const m = mushroom(-3)
+      const b = tinyBerry(0, -3)
+      expect(nearestInView(camera, [m], 10, [], [b])).toBe(m)
+    })
+
+    it('never falls through to the cone when an occluder blocks the exact ray', () => {
+      const b = tinyBerry(0, -3)
+      const grassBlade = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
+      grassBlade.position.set(0, 0, -1)
+      grassBlade.updateMatrixWorld(true)
+      expect(nearestInView(camera, [], 10, [grassBlade], [b])).toBe(null)
+    })
+
+    it('picks the nearer of two tiny objects both inside the cone', () => {
+      const near = tinyBerry(0, -2)
+      const far = tinyBerry(0, -5)
+      expect(nearestInView(camera, [], 10, [], [far, near])).toBe(near)
+    })
+  })
 })

@@ -140,7 +140,7 @@ async function main(): Promise<void> {
       hud.setTarget(null)
       return
     }
-    aimed = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders)
+    aimed = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders, forest.smallObjects)
     const species = aimed ? speciesById(aimed.userData.placement.speciesId) : undefined
     hud.setTarget(species ? speciesName(species) : null)
   }

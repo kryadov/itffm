@@ -75,6 +75,10 @@ export interface Forest {
   placements: Placement[]
   /** One object per mushroom, in the same order as placements. */
   mushroomObjects: THREE.Object3D[]
+  /** The subset of `mushroomObjects` for a non-mushroom kind (berry, herb,
+   *  nut, find) — small enough that game/pick.ts gives them a forgiving aim
+   *  cone the exact crosshair ray alone would too often miss. */
+  smallObjects: THREE.Object3D[]
   /** Everything besides standing trees that blocks the player — fallen logs,
    *  stumps, boulders, bushes — as collision circles for the same obstacle
    *  list `stepPlayer` and `chooseStartPose` already use for tree trunks. */
@@ -250,6 +254,13 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   }
 
   const mushroomObjects: THREE.Object3D[] = []
+  // A berry, a nut or a find is a few centimetres across — far smaller than a
+  // mushroom cap — so it subtends only a few screen pixels at any reasonable
+  // distance, and the crosshair's exact ray routinely misses it even when
+  // aimed "at" it by eye (see TODO.md, 2026-09-08). Tagged here, once, so
+  // game/pick.ts can give only these a forgiving cone instead of scanning
+  // every mushroom in the wood for one that rarely needs it.
+  const smallObjects: THREE.Object3D[] = []
   for (const p of placements) {
     const species = speciesById(p.speciesId)
     if (!species) continue
@@ -259,10 +270,11 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     mesh.userData.placement = p
     scene.add(mesh)
     mushroomObjects.push(mesh)
+    if (species.kind !== 'mushroom') smallObjects.push(mesh)
   }
 
   return {
-    scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
+    scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, smallObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter,
   }
