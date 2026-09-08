@@ -1,0 +1,53 @@
+id: leccinum-aurantiacum
+gbifKey: 5331982
+name:
+  la: Leccinum aurantiacum
+  ru: Подосиновик красный
+  en: Aspen bolete
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [70, 200]
+    color: "#d85a1e"
+    surface: velvety
+    surfaceColor: "#d85a1e"
+  hymenium:
+    type: pores
+    attachment: free
+    color: "#d8d0be"
+  stipe:
+    height: [80, 180]
+    width: [20, 40]
+    color: "#e8e0cc"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fffdf0"
+    bruising: black
+  latex: none
+ecology:
+  mycorrhizal: [populus]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed]
+  season: [6, 7, 8, 9, 10]
+  moisture: [0.35, 0.7]
+  gregarious: solitary
+  frequency: common
+media: []
+text:
+  ru: >-
+    Кирпично-оранжевая шляпка ярче и краснее, чем у подберёзовика, и ножка так
+    же покрыта тёмными чешуйками. На срезе белая мякоть за несколько минут
+    проходит путь от розового к серо-синему и наконец к чёрному — эффектная
+    проверка. Как и подберёзовик, привязан к одному партнёру: искать только
+    под осиной и тополем, больше нигде.
+  en: >-
+    A brick-orange cap, brighter and redder than the birch bolete's, on a stem
+    roughened the same way with dark scales. Cut it and the white flesh runs
+    through pink, then slate-blue, then black within minutes — a striking
+    test. Like its birch-partnered relative, it is tied to one host alone:
+    look under aspen and poplar, nowhere else.

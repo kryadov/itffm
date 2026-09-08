@@ -1,0 +1,54 @@
+id: morchella-esculenta
+gbifKey: 5289456
+name:
+  la: Morchella esculenta
+  ru: Сморчок настоящий
+  en: Common morel
+edibility: conditional
+lookalikes: [gyromitra-esculenta]
+morphology:
+  cap:
+    shape: conical
+    ageShape: conical
+    diameter: [20, 60]
+    color: "#c9a866"
+    surface: scaly
+    surfaceColor: "#a9824a"
+  hymenium:
+    type: smooth
+    attachment: adnate
+    color: "#c9a866"
+  stipe:
+    height: [30, 90]
+    width: [15, 35]
+    color: "#f0ead0"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0ead0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: burnt
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed]
+  season: [4, 5]
+  moisture: [0.4, 0.75]
+  gregarious: scattered
+  frequency: rare
+media: []
+text:
+  ru: >-
+    Медово-жёлтая головка с сотовым узором ямок и гребней, сросшаяся прямо с
+    полой ножкой, — весь гриб хрупкий и полый насквозь. Один из первых грибов
+    года, часто на гари прошлого сезона. Есть только после тщательной варки:
+    сырой сморчок токсичен. Опасно похож на строчок — у настоящего сморчка
+    ямки правильные и ровные, а не спутанные складки мозговидной формы.
+  en: >-
+    A honey-yellow head patterned with a honeycomb of pits and ridges, fused
+    directly to a hollow stem — the whole mushroom is brittle and hollow
+    throughout. One of the first mushrooms of the year, often on ground burned
+    the previous season. Edible only after thorough cooking: raw morels are
+    toxic. Dangerously similar to the false morel — a true morel's pits are
+    regular and even, not the tangled, brain-like folds of its look-alike.

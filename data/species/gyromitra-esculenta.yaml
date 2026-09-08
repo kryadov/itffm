@@ -1,0 +1,55 @@
+id: gyromitra-esculenta
+gbifKey: 5289203
+name:
+  la: Gyromitra esculenta
+  ru: Строчок обыкновенный
+  en: False morel
+edibility: poisonous
+lookalikes: [morchella-esculenta]
+morphology:
+  cap:
+    shape: ovoid
+    ageShape: ovoid
+    diameter: [40, 120]
+    color: "#7a3a24"
+    surface: fibrous
+    surfaceColor: "#7a3a24"
+  hymenium:
+    type: smooth
+    attachment: adnate
+    color: "#7a3a24"
+  stipe:
+    height: [30, 70]
+    width: [15, 30]
+    color: "#e8ddc0"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#e8ddc0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [pinus]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed]
+  season: [4, 5]
+  moisture: [0.3, 0.6]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Красновато-бурая шляпка сминается в бесформенные извилины, похожие на
+    мозг, а не в ровные соты настоящего сморчка, и ножка внутри рыхлая,
+    камерная, а не чисто полая. Растёт в тех же сосняках на песке и в те же
+    недели ранней весны, что и сморчок, — самая опасная пара сезона. Содержит
+    гиромитрин, родственный ракетному топливу; известны смертельные
+    отравления. Не стоит риска, сколько бы раз ни отваривали.
+  en: >-
+    A reddish-brown cap crumpled into shapeless, brain-like folds rather than
+    the true morel's neat honeycomb, with a stem that is loosely chambered
+    inside rather than cleanly hollow. Fruits in the same sandy pine woods, in
+    the same early-spring weeks, as the true morel — the most dangerous pair
+    of the season. Contains gyromitrin, related to rocket fuel; fatalities are
+    documented. Not worth the risk, however many times it is parboiled.

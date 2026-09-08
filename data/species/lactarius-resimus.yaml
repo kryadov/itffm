@@ -1,0 +1,53 @@
+id: lactarius-resimus
+gbifKey: 5244811
+name:
+  la: Lactarius resimus
+  ru: Груздь настоящий
+  en: White milk cap
+edibility: conditional
+lookalikes: []
+morphology:
+  cap:
+    shape: depressed
+    ageShape: funnel
+    diameter: [60, 200]
+    color: "#f0ecd8"
+    surface: viscid
+    surfaceColor: "#f0ecd8"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#f5f0dc"
+  stipe:
+    height: [30, 70]
+    width: [20, 45]
+    color: "#f5f0dc"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fdfaf0"
+    bruising: none
+  latex: white
+ecology:
+  mycorrhizal: [betula]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed]
+  season: [7, 8, 9]
+  moisture: [0.4, 0.75]
+  gregarious: troops
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Крупная белая слизистая воронка с мохнатым завёрнутым краем, из любого
+    надреза обильно выделяется едкий белый млечный сок — в отличие от
+    оранжевого сока рыжика. Растёт только с берёзой, часто большими группами.
+    Традиционно едят только после многонедельного засола: свежим или
+    недоваренным гриб остро едок и может расстроить желудок.
+  en: >-
+    A large white, slimy, funnel-shaped cap with a shaggy, inrolled rim,
+    bleeding copious acrid white latex from any cut — unlike the orange latex
+    of the saffron milk cap. Found only with birch, often in large troops.
+    Traditionally eaten only after weeks of salting: fresh or undercooked it
+    is sharply acrid and can upset the stomach.

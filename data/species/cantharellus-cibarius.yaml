@@ -5,7 +5,7 @@ name:
   ru: Лисичка настоящая
   en: Chanterelle
 edibility: edible
-lookalikes: [omphalotus-olearius]
+lookalikes: [omphalotus-olearius, hygrophoropsis-aurantiaca]
 morphology:
   cap:
     shape: convex

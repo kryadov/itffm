@@ -1,0 +1,57 @@
+id: hygrophoropsis-aurantiaca
+gbifKey: 5257655
+name:
+  la: Hygrophoropsis aurantiaca
+  ru: Лисичка ложная
+  en: False chanterelle
+edibility: inedible
+lookalikes: [cantharellus-cibarius]
+morphology:
+  cap:
+    shape: convex
+    ageShape: depressed
+    diameter: [30, 80]
+    color: "#d8641e"
+    surface: velvety
+    surfaceColor: "#d8641e"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#e8802a"
+  stipe:
+    height: [20, 50]
+    width: [5, 12]
+    color: "#e8802a"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0b070"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: litter
+  biomes: [forest-coniferous, forest-mixed]
+  season: [7, 8, 9, 10, 11]
+  moisture: [0.4, 0.75]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Несмотря на название и общий оранжевый оттенок, это совершенно другой,
+    не родственный лисичке гриб: настоящие тонкие пластинки, часто
+    вильчато-ветвящиеся, а не тупые складки, цвет глубже и однороднее, ножка
+    тоньше и нередко смещена от центра. Растёт на хвойной подстилке и
+    гниющей древесине, а не на почве в связи с живым деревом. Не опасен
+    всерьёз, но невкусен — если пластинки настоящие и легко отделяются
+    ногтем, это не настоящая лисичка.
+  en: >-
+    Despite the name and the shared orange tone, this is an entirely
+    unrelated species: true thin gills, often forking, rather than blunt
+    ridges, a deeper and more uniform colour, and a thinner stem that is
+    often off-centre. Grows on conifer litter and rotting wood rather than
+    soil tied to a living tree's roots. Not seriously dangerous, but
+    unpleasant — if the gills are real and easily separated with a
+    fingernail, it isn't the true chanterelle.
