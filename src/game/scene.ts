@@ -14,13 +14,27 @@ import { buildMushroom, toWorldMesh } from '../mushroom/build'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
 
-/** Half the plot's side, metres. Ninety is about a quarter-hour's slow walk across. */
-export const HALF_SIZE = 90
-/** Ground mesh resolution per side. Shared with loadForest.ts so a real DEM is
- *  resampled onto exactly the same grid the mesh renders — otherwise the
- *  visible surface (linear between mesh vertices) and heightAt() (the source's
- *  own curve) disagree between vertices, and the player floats or sinks. */
-export const GROUND_SEGMENTS = 160
+/** Default half the plot's side, metres. Ninety is about a quarter-hour's
+ *  slow walk across — the player can ask for a bigger or smaller wood on the
+ *  place-picker screen (see ui/worldSize.ts), and this is what they get if
+ *  they don't. */
+export const DEFAULT_HALF_SIZE = 90
+/** Site count spawnMushrooms works from at the default plot size — scaled by
+ *  area for any other size, so a bigger wood is not just an emptier one. */
+const DEFAULT_SITE_COUNT = 1600
+
+/**
+ * Ground mesh resolution per side, for a plot of this half-size. Shared with
+ * loadForest.ts so a real DEM is resampled onto exactly the same grid the
+ * mesh renders — otherwise the visible surface (linear between mesh
+ * vertices) and heightAt() (the source's own curve) disagree between
+ * vertices, and the player floats or sinks. Scales with the plot so a larger
+ * wood does not go coarse, but is capped: segments squared is the real
+ * mesh cost, and it must not run away as the plot grows.
+ */
+export function groundSegmentsFor(halfSize: number): number {
+  return Math.round(Math.max(100, Math.min(220, 160 * (halfSize / DEFAULT_HALF_SIZE))))
+}
 
 /**
  * Where a wood's terrain and trees come from. Procedural noise for now (plan 1);
@@ -54,7 +68,7 @@ export interface Forest {
  * The season follows the real calendar month; days-since-rain is fixed for now
  * — a real weather system is future work (see TODO.md).
  */
-export function createForest(source: ForestSource, seed: number): Forest {
+export function createForest(source: ForestSource, seed: number, halfSize: number = DEFAULT_HALF_SIZE): Forest {
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0xa8c0a2)
   scene.fog = new THREE.Fog(0xa8c0a2, 30, 140)
@@ -67,39 +81,40 @@ export function createForest(source: ForestSource, seed: number): Forest {
   sun.position.set(40, 80, 20)
   scene.add(sun)
 
-  scene.add(buildGround(source.ground, HALF_SIZE, GROUND_SEGMENTS))
+  scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize)))
   scene.add(buildTreeMeshes(source.trees))
 
-  const logs = placeLogs(source.ground, HALF_SIZE, seed + 5)
-  const stumps = placeStumps(source.ground, HALF_SIZE, seed + 6)
+  const logs = placeLogs(source.ground, halfSize, seed + 5)
+  const stumps = placeStumps(source.ground, halfSize, seed + 6)
   scene.add(buildDeadwoodMeshes(logs, stumps))
   const extraObstacles = [
     ...logs.flatMap((l) => logObstacles(l)),
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius })),
   ]
 
-  const boulders = placeBoulders(source.ground, HALF_SIZE, seed + 7)
+  const boulders = placeBoulders(source.ground, halfSize, seed + 7)
   scene.add(buildBoulderMeshes(boulders))
   extraObstacles.push(...boulders.map(boulderObstacle))
 
-  const bushes = placeBushes(source.ground, HALF_SIZE, seed + 8)
+  const bushes = placeBushes(source.ground, halfSize, seed + 8)
   scene.add(buildBushMeshes(bushes))
   extraObstacles.push(...bushes.map(bushObstacle))
 
   // Pure decoration: no substrate, no collision, nothing ecology.ts needs to
   // know about. Its only job is to give the eye something to search through.
-  scene.add(buildFloraMeshes(placeFlora(source.ground, HALF_SIZE, seed + 9)))
+  scene.add(buildFloraMeshes(placeFlora(source.ground, halfSize, seed + 9)))
 
   // One hut per wood, sited clear of everything already standing.
   const treeCircles = source.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
-  const shelter = placeShelter(source.ground, HALF_SIZE, seed + 10, [...treeCircles, ...extraObstacles])
+  const shelter = placeShelter(source.ground, halfSize, seed + 10, [...treeCircles, ...extraObstacles])
   scene.add(buildShelterMesh(shelter))
   extraObstacles.push(shelterObstacle(shelter))
 
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
+  const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
   const sites = buildSites(
-    source.ground, source.trees, HALF_SIZE, seed + 2, source.biomeAt, 1600, deadwoodPoints, mossPoints,
+    source.ground, source.trees, halfSize, seed + 2, source.biomeAt, siteCount, deadwoodPoints, mossPoints,
   )
   const month = new Date().getMonth() + 1
   const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })

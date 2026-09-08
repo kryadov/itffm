@@ -1,5 +1,6 @@
 import * as THREE from 'three'
-import { createForest, HALF_SIZE } from './game/scene'
+import { createForest } from './game/scene'
+import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
 import { stepPlayer, eyeHeight, type PlayerState, type Obstacle } from './game/player'
@@ -58,17 +59,25 @@ async function main(): Promise<void> {
     setLang(save.lang)
   })
 
-  const query = window.__BOOTCHECK ? null : await new Promise<string | null>((resolve) => openPlacePicker(resolve))
+  const [query, halfSize] = window.__BOOTCHECK
+    ? [null, DEFAULT_WORLD_SIZE.halfSize]
+    : await new Promise<[string | null, number]>((resolve) =>
+        openPlacePicker((q, hs) => resolve([q, hs])),
+      )
 
   const loading = showLoading(t(STAGE_KEY.geocode))
-  const { source, fellBackTo, seed } = await loadForestData(query, (stage) => {
-    loading.update(t(STAGE_KEY[stage]))
-  })
+  const { source, fellBackTo, seed } = await loadForestData(
+    query,
+    (stage) => {
+      loading.update(t(STAGE_KEY[stage]))
+    },
+    halfSize,
+  )
   loading.close()
 
   if (fellBackTo && query) toast(t('fellBackNotice'))
 
-  const forest = createForest(source, seed)
+  const forest = createForest(source, seed, halfSize)
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 300)
   const controls = createControls(renderer.domElement)
   const basket = createBasket(BASKET_CAPACITY)
@@ -80,7 +89,7 @@ async function main(): Promise<void> {
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
   ]
-  const startPose = chooseStartPose(obstacles, HALF_SIZE, forest.shelter)
+  const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false,
   }
@@ -241,8 +250,8 @@ async function main(): Promise<void> {
     // While an overlay is up the player stands still: the mouse belongs to it.
     if (!modalOpen()) {
       player = stepPlayer(player, controls.read(dt), forest.ground, obstacles)
-      player.x = Math.max(-HALF_SIZE, Math.min(HALF_SIZE, player.x))
-      player.z = Math.max(-HALF_SIZE, Math.min(HALF_SIZE, player.z))
+      player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
+      player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
     }
 
     camera.position.set(
