@@ -23,7 +23,7 @@ import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
 import { buildPathMeshes } from '../world/paths'
-import { buildWaterMeshes } from '../world/water'
+import { buildWaterMeshes, placeSprings, buildSpringMeshes } from '../world/water'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -110,6 +110,9 @@ export interface Forest {
   updateShelter: (dt: number) => void
   /** Drifts the flock — call every frame with the player's own position. */
   updateBirds: (dt: number, playerX: number, playerZ: number) => void
+  /** Ripples every stream, breathes every waterfall's spray and bobs every
+   *  spring — call every frame. */
+  updateWater: (dt: number) => void
 }
 
 /**
@@ -204,7 +207,17 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground, halfSize))
-  scene.add(buildWaterMeshes(source.water ?? [], source.ground))
+  const water = buildWaterMeshes(source.water ?? [], source.ground)
+  scene.add(water.group)
+  const springs = placeSprings(source.water ?? [], halfSize, mulberry32(seed + 16), 3)
+  const springFx = buildSpringMeshes(springs, source.ground)
+  scene.add(springFx.group)
+  let waterClock = 0
+  const updateWater = (dt: number): void => {
+    waterClock += dt
+    water.update(waterClock)
+    springFx.update(waterClock)
+  }
   scene.add(buildTreeMeshes(source.trees))
 
   const logs = placeLogs(source.ground, halfSize, seed + 5)
@@ -283,6 +296,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, smallObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateBirds,
+    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateBirds, updateWater,
   }
 }
