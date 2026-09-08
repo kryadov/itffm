@@ -201,7 +201,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius, topHeight: s.height })),
   ]
 
-  const leaningTrees = placeLeaningTrees(source.ground, halfSize, seed + 13)
+  const leaningTrees = placeLeaningTrees(source.ground, halfSize, seed + 14)
   scene.add(buildLeaningTreeMeshes(leaningTrees))
   extraObstacles.push(...leaningTrees.map(leaningTreeObstacle))
 
