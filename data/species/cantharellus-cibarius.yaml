@@ -1,0 +1,53 @@
+id: cantharellus-cibarius
+gbifKey: 8964789
+name:
+  la: Cantharellus cibarius
+  ru: Лисичка настоящая
+  en: Chanterelle
+edibility: edible
+lookalikes: [omphalotus-olearius]
+morphology:
+  cap:
+    shape: convex
+    ageShape: funnel
+    diameter: [30, 100]
+    color: "#f0a830"
+    surface: smooth
+    surfaceColor: "#f0a830"
+  hymenium:
+    type: maze
+    attachment: decurrent
+    color: "#f0a830"
+  stipe:
+    height: [30, 80]
+    width: [8, 20]
+    color: "#f0a830"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f5ecd0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [quercus, fagus, betula, picea, pinus]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed]
+  season: [6, 7, 8, 9, 10]
+  moisture: [0.4, 0.75]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Целиком яично-жёлтая, с тупыми вильчатыми складками вместо настоящих
+    пластинок, пахнет абрикосом. Ядовитый двойник — говорушка оливковая —
+    имеет острые настоящие пластинки и растёт плотными пучками на древесине, а
+    не рассеянно на почве. Проверка складок против пластинок — самый надёжный
+    способ отличить их.
+  en: >-
+    Uniformly egg-yolk yellow, with blunt forking ridges rather than true
+    gills, and a faint apricot scent. Its poisonous look-alike, the
+    jack-o'-lantern, has true sharp-edged gills and grows in dense clusters on
+    wood rather than scattered on soil — checking ridges against real gills is
+    the surest way to tell them apart.

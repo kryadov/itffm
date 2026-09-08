@@ -1,0 +1,55 @@
+id: coprinellus-micaceus
+gbifKey: 5251413
+name:
+  la: Coprinellus micaceus
+  ru: Навозник мерцающий
+  en: Mica cap
+edibility: conditional
+lookalikes: []
+morphology:
+  cap:
+    shape: ovoid
+    ageShape: conical
+    diameter: [20, 40]
+    color: "#a8763c"
+    surface: scaly
+    surfaceColor: "#e8d8a0"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#c9b899"
+  stipe:
+    height: [40, 100]
+    width: [3, 7]
+    color: "#fdfaf0"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fdfaf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: deadwood
+  biomes: [forest-broadleaved, park-urban, cave-adit]
+  season: [4, 5, 6, 7, 8, 9, 10, 11]
+  moisture: [0.4, 0.8]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Золотисто-бурые пучки на погребённой древесине и старых пнях, шляпка
+    молодого гриба искрится мельчайшими блёстками по росе — отсюда и название.
+    Растёт на любой заглублённой древесине, включая старые деревянные крепи в
+    заброшенных штольнях — редкий гриб, по-настоящему живущий под землёй.
+    Съедобен только молодым и свежим; как и другие навозники, не сочетайте с
+    алкоголем.
+  en: >-
+    Golden-brown tufts on buried wood and old stumps, the cap glistening with
+    tiny flecks when fresh and dew-covered — hence the name. Grows on any
+    buried timber, including the old wooden props still standing in disused
+    mine adits — one of the few mushrooms genuinely at home underground.
+    Edible only fresh and young; like other ink caps, best kept away from
+    alcohol.

@@ -1,0 +1,53 @@
+id: armillaria-mellea
+gbifKey: 5257997
+name:
+  la: Armillaria mellea
+  ru: Опёнок осенний
+  en: Honey fungus
+edibility: conditional
+lookalikes: [galerina-marginata, hypholoma-fasciculare]
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [30, 150]
+    color: "#a97c3c"
+    surface: scaly
+    surfaceColor: "#5c3a1e"
+  hymenium:
+    type: gills
+    attachment: adnate
+    color: "#f0e6c8"
+  stipe:
+    height: [60, 150]
+    width: [8, 20]
+    color: "#c9a56a"
+    position: central
+    ring: pendant
+    volva: none
+  flesh:
+    color: "#f0ead8"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: livewood
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, park-urban]
+  season: [9, 10, 11]
+  moisture: [0.4, 0.8]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Плотные пучки медово-бурых грибов у основания живых и мёртвых деревьев,
+    шляпка с мелкими тёмными чешуйками, плёнчатое кольцо на ножке, вольвы нет.
+    Съедобен только после тщательной варки. На той же древесине растут
+    смертельно ядовитая галерина окаймлённая и ядовитый ложноопёнок серно-
+    жёлтый — не берите пучки с дерева без полной уверенности в виде.
+  en: >-
+    Dense honey-brown tufts at the base of living and dead trees, a cap with
+    small dark scales, a membranous ring on the stem, no volva. Edible only
+    after thorough cooking. The deadly funeral bell and the poisonous sulphur
+    tuft grow in identical-looking clusters on the same wood — never pick a
+    tufted cluster from a tree without complete certainty of the species.

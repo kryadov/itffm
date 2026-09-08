@@ -1,0 +1,53 @@
+id: leccinum-scabrum
+gbifKey: 5331966
+name:
+  la: Leccinum scabrum
+  ru: Подберёзовик обыкновенный
+  en: Birch bolete
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [50, 150]
+    color: "#8a7454"
+    surface: smooth
+    surfaceColor: "#8a7454"
+  hymenium:
+    type: pores
+    attachment: free
+    color: "#d8d0be"
+  stipe:
+    height: [80, 180]
+    width: [15, 35]
+    color: "#e8e0cc"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fffdf0"
+    bruising: black
+  latex: none
+ecology:
+  mycorrhizal: [betula]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed, forest-coniferous, alpine]
+  season: [6, 7, 8, 9, 10]
+  moisture: [0.35, 0.75]
+  gregarious: solitary
+  frequency: common
+media: []
+text:
+  ru: >-
+    Растёт только рядом с берёзой — от карликовой полярной берёзки в тундре до
+    обычной берёзы в смешанном лесу — и больше нигде. Серо-бурая шляпка, белая
+    мякоть, медленно чернеющая на срезе, и светлая ножка, вся в мелких тёмных
+    чешуйках, как кора того дерева, под которым он растёт. Надёжный гриб для
+    начала: у него нет опасных двойников с той же экологией.
+  en: >-
+    Found only near birch — from dwarf polar birch on the tundra to ordinary
+    birch in mixed woodland — and nowhere else. A grey-brown cap, white flesh
+    that slowly blackens when cut, and a pale stem roughened all over with
+    small dark scales, like the bark of the tree it grows under. A reliable
+    species to learn first: no dangerous look-alike shares its exact ecology.

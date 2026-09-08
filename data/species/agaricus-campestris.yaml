@@ -1,0 +1,51 @@
+id: agaricus-campestris
+gbifKey: 2521205
+name:
+  la: Agaricus campestris
+  ru: Шампиньон полевой
+  en: Field mushroom
+edibility: edible
+lookalikes: [amanita-phalloides]
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: flat
+    diameter: [30, 100]
+    color: "#f5f0e0"
+    surface: smooth
+    surfaceColor: "#f5f0e0"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#a9748a"
+  stipe:
+    height: [30, 80]
+    width: [8, 15]
+    color: "#f0ece0"
+    position: central
+    ring: fugacious
+    volva: none
+  flesh:
+    color: "#fffdf0"
+    bruising: red
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [meadow-scrub, park-urban]
+  season: [6, 7, 8, 9, 10]
+  moisture: [0.3, 0.6]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Белая шляпка, пластинки от розовых до тёмно-коричневых — но никогда не
+    белые, как у бледной поганки. У основания ножки нет мешковидной вольвы:
+    это главная проверка перед тем, как взять любой белый гриб, найденный в
+    траве. Растёт группами на пастбищах, лугах и газонах, не под деревьями.
+  en: >-
+    A white cap over gills that run pink to dark brown but never stay white,
+    the way a death cap's do. No sac at the base of the stem — the first check
+    to make on any white mushroom picked from grass. Grows in troops in
+    pastures, meadows and lawns, not under trees.

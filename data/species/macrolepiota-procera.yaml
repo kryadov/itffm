@@ -1,0 +1,55 @@
+id: macrolepiota-procera
+gbifKey: 5254815
+name:
+  la: Macrolepiota procera
+  ru: Гриб-зонтик пёстрый
+  en: Parasol mushroom
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: ovoid
+    ageShape: flat
+    diameter: [100, 300]
+    color: "#c9a878"
+    surface: scaly
+    surfaceColor: "#7a5a35"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#fdfaf0"
+  stipe:
+    height: [150, 350]
+    width: [10, 25]
+    color: "#d8c8a0"
+    position: central
+    ring: ascending
+    volva: none
+  flesh:
+    color: "#fdfaf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [meadow-scrub, forest-broadleaved, park-urban]
+  season: [7, 8, 9, 10]
+  moisture: [0.3, 0.65]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Один из самых высоких грибов леса: лохматая бурая шляпка раскрывается
+    плоским зонтом на верхушке ножки выше ладони, покрытой змеиным рисунком.
+    Толстое кольцо свободно скользит вверх и вниз по ножке — в отличие от
+    неподвижных или хрупких колец у мелких опасных родственников; всегда
+    проверяйте это, прежде чем брать что-то похожее на маленький зонтик.
+    Лучше всего жарить шляпку целиком, как отбивную.
+  en: >-
+    One of the tallest mushrooms in the wood: a shaggy brown cap opens flat
+    like a parasol atop a snake-skin-patterned stem taller than a hand's span.
+    The thick ring slides freely up and down the stem, unlike the fixed or
+    fragile rings of smaller, riskier relatives — always slide the ring before
+    eating anything that looks like a small parasol. Best cooked whole,
+    breaded, like a cutlet.

@@ -1,0 +1,52 @@
+id: amanita-caesarea
+gbifKey: 5237390
+name:
+  la: Amanita caesarea
+  ru: Мухомор цезарский
+  en: Caesar's mushroom
+edibility: edible
+lookalikes: [amanita-muscaria]
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [80, 200]
+    color: "#e2701a"
+    surface: smooth
+    surfaceColor: "#e2701a"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#f2c94c"
+  stipe:
+    height: [80, 180]
+    width: [15, 30]
+    color: "#f0b429"
+    position: central
+    ring: pendant
+    volva: sheathing
+  flesh:
+    color: "#f5eecb"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [quercus, carpinus, tilia]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed]
+  season: [7, 8, 9, 10]
+  moisture: [0.3, 0.6]
+  gregarious: scattered
+  frequency: rare
+media: []
+text:
+  ru: >-
+    Гладкая оранжево-красная шляпка без белых бородавок — в этом главное
+    отличие от мухомора красного. Ярко-жёлтые пластинки и ножка, плёнчатое
+    кольцо и белый мешковидный вольва у основания. Ценный съедобный гриб юга
+    Европы, но род Amanita остаётся самым опасным родом грибов: проверяйте
+    каждый признак.
+  en: >-
+    A smooth orange-red cap with no white warts — the key difference from the
+    fly agaric. Bright yellow gills and stem, a membranous ring, and a white
+    sac-like volva at the base. A prized edible of southern Europe, but the
+    genus Amanita remains the most dangerous of all: check every feature.

@@ -5,7 +5,7 @@ name:
   ru: Мухомор красный
   en: Fly agaric
 edibility: poisonous
-lookalikes: []
+lookalikes: [amanita-caesarea]
 morphology:
   cap:
     shape: hemispherical

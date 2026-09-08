@@ -1,0 +1,54 @@
+id: lepista-nuda
+gbifKey: 5247727
+name:
+  la: Lepista nuda
+  ru: Рядовка фиолетовая
+  en: Wood blewit
+edibility: conditional
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [60, 150]
+    color: "#8a6b9a"
+    surface: smooth
+    surfaceColor: "#8a6b9a"
+  hymenium:
+    type: gills
+    attachment: adnexed
+    color: "#9a7ab0"
+  stipe:
+    height: [50, 100]
+    width: [15, 30]
+    color: "#8a6ba0"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#c9b0d8"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: litter
+  biomes: [forest-broadleaved, forest-mixed, park-urban]
+  season: [9, 10, 11, 12]
+  moisture: [0.4, 0.75]
+  gregarious: troops
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Целиком в оттенках фиолетового — шляпка, пластинки и ножка — пока молод; с
+    возрастом бледнеет до тускло-бурого, из-за чего старые экземпляры легко
+    пропустить или спутать. Один из последних грибов сезона, плодоносит после
+    первых заморозков в опавшей листве, компостных кучах и садовой мульче.
+    Готовить только тщательно проваренным; несколько похожих на вид
+    родственников небезопасны.
+  en: >-
+    Violet all over — cap, gills and stem — when young, fading to a duller
+    tan-brown with age, which makes older specimens much easier to overlook or
+    misidentify. One of the last mushrooms of the year, fruiting after the
+    first frosts in leaf litter, compost heaps and garden mulch. Cook only
+    thoroughly; several similar-looking relatives are not safe.

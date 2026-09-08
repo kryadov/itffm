@@ -1,0 +1,52 @@
+id: lactarius-deliciosus
+gbifKey: 5244854
+name:
+  la: Lactarius deliciosus
+  ru: Рыжик настоящий
+  en: Saffron milk cap
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: depressed
+    diameter: [40, 120]
+    color: "#e07a2a"
+    surface: viscid
+    surfaceColor: "#e07a2a"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#e8942a"
+  stipe:
+    height: [30, 70]
+    width: [10, 25]
+    color: "#e8942a"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0a45a"
+    bruising: none
+  latex: orange
+ecology:
+  mycorrhizal: [pinus, picea]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed]
+  season: [8, 9, 10, 11]
+  moisture: [0.35, 0.7]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Целиком оранжевый, с концентрическими кругами на вдавленной липкой
+    шляпке. При любом надрезе или надломе выделяет оранжевый млечный сок —
+    это главная проверка для всего рода. С возрастом и от прикосновений
+    постепенно зеленеет, хотя точный оттенок трудно передать словами. Растёт
+    только под сосной и елью.
+  en: >-
+    Orange throughout, with concentric rings on a depressed, sticky cap. Any
+    cut or bruise brings out an orange latex — the defining test for the whole
+    genus. Slowly stains greenish with age and handling, a colour easier to
+    see in the field than to describe. Found only under pine and spruce.

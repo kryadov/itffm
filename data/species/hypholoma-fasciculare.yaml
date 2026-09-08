@@ -1,0 +1,53 @@
+id: hypholoma-fasciculare
+gbifKey: 5257226
+name:
+  la: Hypholoma fasciculare
+  ru: Ложноопёнок серно-жёлтый
+  en: Sulphur tuft
+edibility: poisonous
+lookalikes: [armillaria-mellea]
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [20, 60]
+    color: "#d9c23a"
+    surface: smooth
+    surfaceColor: "#d9c23a"
+  hymenium:
+    type: gills
+    attachment: adnexed
+    color: "#8a8a3a"
+  stipe:
+    height: [40, 120]
+    width: [4, 10]
+    color: "#d9c23a"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#e8d97a"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: deadwood
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, park-urban]
+  season: [5, 6, 7, 8, 9, 10, 11]
+  moisture: [0.3, 0.8]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Густые серно-жёлтые пучки на пнях и погребённой древесине почти круглый
+    год — один из самых обычных грибов леса. В отличие от опёнка осеннего, на
+    ножке нет кольца, а пластинки зеленовато-жёлтые, темнеющие с возрастом.
+    Горький вкус выдаёт его сразу, но лучше не пробовать неизвестные грибы на
+    вкус вообще.
+  en: >-
+    Dense sulphur-yellow tufts on stumps and buried wood almost year-round —
+    one of the most common fungi in any wood. Unlike honey fungus, the stem
+    carries no ring, and the gills are greenish-yellow, darkening with age.
+    Bitter enough to warn most people off at the first bite, though tasting
+    unknown fungi is a risk of its own.

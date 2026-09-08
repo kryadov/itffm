@@ -1,0 +1,52 @@
+id: psathyrella-ammophila
+gbifKey: 5256541
+name:
+  la: Psathyrella ammophila
+  ru: Псатирелла песчаная
+  en: Dune brittlestem
+edibility: inedible
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [15, 40]
+    color: "#a88860"
+    surface: smooth
+    surfaceColor: "#a88860"
+  hymenium:
+    type: gills
+    attachment: adnate
+    color: "#8a6a4a"
+  stipe:
+    height: [40, 90]
+    width: [4, 8]
+    color: "#e8e0cc"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#e8e0cc"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: sand
+  biomes: [dunes-coast]
+  season: [5, 6, 7, 8, 9, 10, 11]
+  moisture: [0.3, 0.6]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Единственный гриб, растущий только на песке — на погребённых, отмирающих
+    корнях песколюба, который держит дюну на месте. Непримечательный бурый
+    гриб в любом другом месте здесь, на открытом песке без единого дерева и
+    подстилки, оказывается самой заметной находкой всей вылазки к морю.
+  en: >-
+    The one mushroom that grows nowhere but sand, feeding on the buried,
+    decaying roots of marram grass that binds a dune together. An unremarkable
+    brown mushroom anywhere else, but on open sand with no tree or leaf litter
+    in sight, it becomes the whole point of interest on a walk along the
+    coast.

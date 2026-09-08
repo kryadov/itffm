@@ -1,0 +1,53 @@
+id: hygrocybe-conica
+gbifKey: 5248882
+name:
+  la: Hygrocybe conica
+  ru: Гигроцибе коническая
+  en: Blackening waxcap
+edibility: inedible
+lookalikes: []
+morphology:
+  cap:
+    shape: conical
+    ageShape: conical
+    diameter: [15, 50]
+    color: "#e8641a"
+    surface: viscid
+    surfaceColor: "#e8641a"
+  hymenium:
+    type: gills
+    attachment: adnexed
+    color: "#f0d878"
+  stipe:
+    height: [40, 100]
+    width: [5, 12]
+    color: "#e8942a"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0d878"
+    bruising: black
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [meadow-scrub, alpine]
+  season: [8, 9, 10, 11]
+  moisture: [0.3, 0.6]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Резко коническая оранжево-жёлтая шляпка на скрученной ножке — узнаётся по
+    одному фокусу: тронь или просто подожди, и весь гриб, от шляпки до
+    основания, почернеет с возрастом или от прикосновения. Растёт только на
+    старых, никогда не удобрявшихся лугах — от равнинных пастбищ до
+    высокогорья, и само его присутствие говорит о здоровье этого луга.
+  en: >-
+    A sharply conical orange-yellow cap on a twisted stem, identified by one
+    trick: bruise it, or just wait, and the whole mushroom, cap to base, turns
+    black with age or handling. Found only in old, unfertilised grassland,
+    from lowland pasture up into alpine meadow — its presence alone marks a
+    healthy, ancient grassland.

@@ -1,0 +1,54 @@
+id: russula-emetica
+gbifKey: 5245721
+name:
+  la: Russula emetica
+  ru: Сыроежка рвотная
+  en: The sickener
+edibility: poisonous
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [30, 85]
+    color: "#d81e3a"
+    surface: viscid
+    surfaceColor: "#d81e3a"
+  hymenium:
+    type: gills
+    attachment: adnexed
+    color: "#fdfaf0"
+  stipe:
+    height: [40, 90]
+    width: [10, 20]
+    color: "#fdfaf0"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fdfaf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [betula, picea, pinus]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed, wetland]
+  season: [7, 8, 9, 10]
+  moisture: [0.55, 0.9]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Ярко-красная, почти лакированная шляпка на белой мякоти, которая ломается,
+    как мел, а не гнётся, как у любого другого рода — эту хрупкость разделяют
+    все сыроежки. Растёт в самых сырых, замшелых уголках леса, часто прямо во
+    мху сфагнума. Вкус резко жгучий (безопасный способ проверить, не
+    проглатывая), а само название говорит, к чему приводит употребление в
+    пищу.
+  en: >-
+    A bright, almost lacquered red cap on white flesh that snaps like chalk
+    rather than bending, a brittleness shared by every Russula. Grows in the
+    wettest, mossiest corners of the wood, often right in the sphagnum. Sharply
+    acrid to taste (a safe way to check without swallowing), and eating it
+    brings on exactly what the name promises.

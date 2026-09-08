@@ -1,0 +1,53 @@
+id: tylopilus-felleus
+gbifKey: 5332032
+name:
+  la: Tylopilus felleus
+  ru: Желчный гриб
+  en: Bitter bolete
+edibility: inedible
+lookalikes: [boletus-edulis]
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [60, 200]
+    color: "#8a6a4a"
+    surface: smooth
+    surfaceColor: "#8a6a4a"
+  hymenium:
+    type: pores
+    attachment: adnate
+    color: "#e8a8a0"
+  stipe:
+    height: [60, 150]
+    width: [20, 50]
+    color: "#c9a878"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f5eecb"
+    bruising: red
+  latex: none
+ecology:
+  mycorrhizal: [picea, pinus, quercus, fagus]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed, forest-broadleaved]
+  season: [6, 7, 8, 9, 10]
+  moisture: [0.35, 0.75]
+  gregarious: solitary
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Удивительно похож на белый гриб и растёт в тех же лесах под теми же
+    деревьями, но трубчатый слой розовеет с возрастом и от нажатия, а сетка на
+    ножке грубее и темнее — у белого гриба поры не розовеют никогда. Не
+    ядовит, но невыносимо горек: одного гриба хватит, чтобы испортить целую
+    кастрюлю супа.
+  en: >-
+    Remarkably similar to the penny bun and grows in the same woods under the
+    same trees, but its pores turn pink with age and bruise pink when pressed
+    — something the penny bun's pores never do — and the stem net is coarser
+    and darker. Not toxic, but intensely bitter: one mushroom is enough to
+    ruin an entire pot of soup.

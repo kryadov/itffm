@@ -1,0 +1,55 @@
+id: coprinus-comatus
+gbifKey: 5250417
+name:
+  la: Coprinus comatus
+  ru: Навозник белый лохматый
+  en: Shaggy ink cap
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: ovoid
+    ageShape: conical
+    diameter: [30, 70]
+    color: "#f5f0e0"
+    surface: scaly
+    surfaceColor: "#c9a878"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#fffdf0"
+  stipe:
+    height: [100, 300]
+    width: [10, 20]
+    color: "#fdfaf0"
+    position: central
+    ring: ascending
+    volva: none
+  flesh:
+    color: "#fdfaf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [meadow-scrub, park-urban]
+  season: [6, 7, 8, 9, 10, 11]
+  moisture: [0.3, 0.7]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Высокие белые цилиндры, лохматые от отогнутых чешуек, пробиваются сквозь
+    газоны и обочины дорог, иногда прямо через асфальт. Собирать и готовить
+    нужно, пока шляпка ещё белая и плотная: за сутки она растворяется в чёрные
+    чернила снизу вверх — фокус, свойственный лишь этой небольшой группе
+    видов. Хороший гриб для начала: ничего опасного не разделяет с ним эту
+    форму и повадку.
+  en: >-
+    Tall white cylinders, shaggy with upturned scales, pushing up through
+    lawns and roadside verges, sometimes through tarmac. Must be picked and
+    cooked while the cap is still white and firm — within a day it dissolves
+    into black ink from the rim upward, a trick unique to this small group of
+    species. A good one to learn first: nothing dangerous shares this shape
+    and habit.

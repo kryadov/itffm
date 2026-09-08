@@ -5,7 +5,7 @@ name:
   ru: Белый гриб
   en: Penny bun
 edibility: edible
-lookalikes: []
+lookalikes: [tylopilus-felleus, imleria-badia]
 morphology:
   cap:
     shape: hemispherical
@@ -30,7 +30,7 @@ morphology:
     bruising: none
   latex: none
 ecology:
-  mycorrhizal: [picea, pinus, betula, quercus, fagus]
+  mycorrhizal: [picea, pinus, betula, quercus, fagus, populus, salix]
   substrate: soil
   biomes: [forest-coniferous, forest-mixed, forest-broadleaved]
   season: [6, 7, 8, 9, 10]

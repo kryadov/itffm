@@ -1,0 +1,51 @@
+id: omphalotus-olearius
+gbifKey: 5258482
+name:
+  la: Omphalotus olearius
+  ru: Омфалотус оливковый
+  en: Jack-o'-lantern mushroom
+edibility: poisonous
+lookalikes: [cantharellus-cibarius]
+morphology:
+  cap:
+    shape: convex
+    ageShape: funnel
+    diameter: [60, 150]
+    color: "#e8631a"
+    surface: smooth
+    surfaceColor: "#e8631a"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#e8631a"
+  stipe:
+    height: [60, 150]
+    width: [10, 25]
+    color: "#e8631a"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0a45a"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: deadwood
+  biomes: [forest-broadleaved, forest-mixed, park-urban]
+  season: [8, 9, 10, 11]
+  moisture: [0.4, 0.8]
+  gregarious: clustered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Ярко-оранжевый целиком, растёт крупными плотными пучками у основания
+    лиственных деревьев и пней, с настоящими острыми пластинками, сбегающими
+    на ножку, — в отличие от тупых складок лисички. Пластинки слабо светятся в
+    темноте. Вызывает тяжёлое пищевое отравление.
+  en: >-
+    Brilliant orange throughout, growing in large dense clusters at the base
+    of broadleaf trees and stumps, with true sharp-edged gills running down
+    the stem — unlike the chanterelle's blunt ridges. The gills glow faintly
+    in the dark. Causes severe gastrointestinal poisoning.

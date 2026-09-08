@@ -1,0 +1,52 @@
+id: suillus-luteus
+gbifKey: 5332259
+name:
+  la: Suillus luteus
+  ru: Маслёнок обыкновенный
+  en: Slippery jack
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [40, 120]
+    color: "#6b4423"
+    surface: viscid
+    surfaceColor: "#6b4423"
+  hymenium:
+    type: pores
+    attachment: adnate
+    color: "#f0d878"
+  stipe:
+    height: [40, 100]
+    width: [10, 25]
+    color: "#f0e0a0"
+    position: central
+    ring: pendant
+    volva: none
+  flesh:
+    color: "#f5e8b8"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [pinus]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed, dunes-coast]
+  season: [7, 8, 9, 10, 11]
+  moisture: [0.3, 0.7]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Скользкая каштаново-бурая шляпка и светло-жёлтый трубчатый слой появляются
+    только рядом с сосной — в том числе в молодых посадках на прибрежных
+    дюнах, которыми укрепляют песок. Плёнчатое кольцо на ножке — хороший
+    ориентир. Перед готовкой снимите липкую кожицу со шляпки, иначе гриб может
+    вызвать лёгкое расстройство желудка.
+  en: >-
+    A slimy chestnut-brown cap and pale yellow pores appear only near pine —
+    including young plantations used to hold the sand on coastal dunes. A ring
+    on the stem is a useful check. Peel the sticky skin before cooking; some
+    people find it mildly upsetting otherwise.

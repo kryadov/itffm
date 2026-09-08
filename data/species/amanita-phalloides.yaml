@@ -1,0 +1,53 @@
+id: amanita-phalloides
+gbifKey: 5237472
+name:
+  la: Amanita phalloides
+  ru: Бледная поганка
+  en: Death cap
+edibility: deadly
+lookalikes: [agaricus-campestris]
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: flat
+    diameter: [60, 150]
+    color: "#a9b98a"
+    surface: smooth
+    surfaceColor: "#a9b98a"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#fffdf0"
+  stipe:
+    height: [80, 150]
+    width: [10, 20]
+    color: "#f0ecd8"
+    position: central
+    ring: pendant
+    volva: sheathing
+  flesh:
+    color: "#fffdf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [quercus, fagus, tilia, carpinus]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed, park-urban]
+  season: [8, 9, 10, 11]
+  moisture: [0.3, 0.7]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Бледно-зеленоватая шляпка, ослепительно белые пластинки, юбка на ножке и
+    крупная мешковидная вольва у основания, обычно скрытая в почве — её надо
+    откапывать. Смертельно ядовита, содержит аматоксины. Растёт с дубом, буком
+    и липой, в том числе под старыми парковыми деревьями. Ответственна за
+    большинство смертельных отравлений грибами в мире.
+  en: >-
+    A pale olive-green cap over gills that stay pure white at every age, a
+    skirt-like ring, and a large sac-like volva at the base, usually buried and
+    needing to be dug up to see. Deadly — contains amatoxins. Grows with oak,
+    beech and lime, including under old ornamental trees in parks. Responsible
+    for most fatal mushroom poisonings worldwide.

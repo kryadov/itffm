@@ -1,0 +1,53 @@
+id: hydnum-repandum
+gbifKey: 5241966
+name:
+  la: Hydnum repandum
+  ru: Ежовик жёлтый
+  en: Wood hedgehog
+edibility: edible
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: depressed
+    diameter: [30, 120]
+    color: "#e8c896"
+    surface: smooth
+    surfaceColor: "#e8c896"
+  hymenium:
+    type: teeth
+    attachment: decurrent
+    color: "#f0e0b8"
+  stipe:
+    height: [30, 70]
+    width: [10, 25]
+    color: "#f0e8c8"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fffdf0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [fagus, quercus, picea, pinus]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed]
+  season: [7, 8, 9, 10, 11]
+  moisture: [0.35, 0.7]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Переверните шляпку — и определение сделано само собой: вместо пластинок
+    или пор снизу свисают мягкие бледные шипики, как иглы ежа, легко
+    стирающиеся пальцем. Ни один опасный гриб умеренного леса не имеет такого
+    гименофора, что делает его одним из самых безопасных грибов для новичка.
+    Мягкий ореховый вкус, хотя старые экземпляры горчат.
+  en: >-
+    Turn it over and the identification makes itself: instead of gills or
+    pores, soft pale spines hang from the underside like a hedgehog's quills,
+    brittle enough to rub off with a thumb. No dangerous species in temperate
+    woodland shares this feature, making it one of the safest mushrooms for a
+    beginner to learn. Mild and nutty, though older caps turn bitter.

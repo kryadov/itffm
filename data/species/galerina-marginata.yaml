@@ -1,0 +1,51 @@
+id: galerina-marginata
+gbifKey: 5241948
+name:
+  la: Galerina marginata
+  ru: Галерина окаймлённая
+  en: Funeral bell
+edibility: deadly
+lookalikes: [armillaria-mellea]
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [10, 40]
+    color: "#8a6339"
+    surface: viscid
+    surfaceColor: "#8a6339"
+  hymenium:
+    type: gills
+    attachment: adnate
+    color: "#7a5a35"
+  stipe:
+    height: [20, 60]
+    width: [3, 6]
+    color: "#7a5f3d"
+    position: central
+    ring: fugacious
+    volva: none
+  flesh:
+    color: "#c9b899"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: deadwood
+  biomes: [forest-coniferous, forest-mixed, forest-broadleaved]
+  season: [8, 9, 10, 11]
+  moisture: [0.4, 0.8]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Мелкий рыжевато-бурый гриб на гниющей древесине, легко теряется среди
+    других грибов на пне или принимается за съедобный опёнок. Содержит те же
+    аматоксины, что и бледная поганка. Никогда не ешьте мелкие бурые грибы,
+    найденные на древесине, без точного определения специалистом.
+  en: >-
+    A small tawny-brown mushroom on rotting wood, easy to overlook or mistake
+    for an edible honey fungus growing alongside it. Contains the same
+    amatoxins as the death cap. Never eat a small brown mushroom found on wood
+    without certain expert identification.

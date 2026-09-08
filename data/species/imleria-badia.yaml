@@ -1,0 +1,53 @@
+id: imleria-badia
+gbifKey: 8324180
+name:
+  la: Imleria badia
+  ru: Моховик каштановый
+  en: Bay bolete
+edibility: edible
+lookalikes: [tylopilus-felleus]
+morphology:
+  cap:
+    shape: hemispherical
+    ageShape: convex
+    diameter: [50, 150]
+    color: "#6b4023"
+    surface: velvety
+    surfaceColor: "#6b4023"
+  hymenium:
+    type: pores
+    attachment: adnate
+    color: "#d8c860"
+  stipe:
+    height: [50, 120]
+    width: [15, 30]
+    color: "#c9a878"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0e8c8"
+    bruising: blue
+  latex: none
+ecology:
+  mycorrhizal: [pinus, picea, betula]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed]
+  season: [6, 7, 8, 9, 10, 11]
+  moisture: [0.35, 0.75]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Близкий родственник белого гриба, но узнаётся по тому, что делает с ним
+    нож: бледно-жёлтая мякоть и трубчатый слой синеют на срезе за несколько
+    секунд, чего белый гриб не делает никогда. Ножка также более гладкая, без
+    заметной сетки. Обычен и надёжен на протяжении долгого сезона, вплоть до
+    поздней осени.
+  en: >-
+    A close relative of the penny bun, told apart by what a knife does to it —
+    the pale yellow flesh and pores both turn blue within seconds of being
+    cut, something the penny bun never does. The stem is smoother too, lacking
+    a raised net pattern. Common and reliable through a long season into late
+    autumn.
