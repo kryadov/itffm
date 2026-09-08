@@ -3,7 +3,7 @@ import { createForest } from './game/scene'
 import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
-import { stepPlayer, eyeHeight, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
+import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView } from './game/pick'
 import { createHud } from './ui/hud'
@@ -106,6 +106,7 @@ async function main(): Promise<void> {
   const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
+    bobPhase: 0,
   }
   let aimed: THREE.Object3D | null = null
 
@@ -352,10 +353,11 @@ async function main(): Promise<void> {
       player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
     }
 
+    const bob = cameraBob(player)
     camera.position.set(
-      player.x,
-      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand,
-      player.z,
+      player.x + Math.cos(player.yaw) * bob.dx,
+      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand + bob.dy,
+      player.z - Math.sin(player.yaw) * bob.dx,
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
     compass.update(player.yaw)

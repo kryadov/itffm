@@ -1,8 +1,17 @@
-import { stepPlayer, eyeHeight, biomeSpeedFactor, type PlayerState, type PlayerInput } from '../../src/game/player'
+import {
+  stepPlayer,
+  eyeHeight,
+  cameraBob,
+  biomeSpeedFactor,
+  type PlayerState,
+  type PlayerInput,
+} from '../../src/game/player'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
-const start: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0 }
+const start: PlayerState = {
+  x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0, bobPhase: 0,
+}
 const idle: PlayerInput = {
   forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 60,
 }
@@ -172,6 +181,40 @@ describe('stepPlayer', () => {
       const crouched: PlayerState = { ...start, crouch: 1 }
       const s = stepPlayer(crouched, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
       expect(s.airborne).toBe(false)
+    })
+  })
+
+  describe('walking bob', () => {
+    it('holds the bob phase still when not moving', () => {
+      const s = stepPlayer(start, { ...idle, dt: 1 }, flat, [])
+      expect(s.bobPhase).toBe(0)
+    })
+
+    it('advances the bob phase with distance walked', () => {
+      const s = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+      expect(s.bobPhase).toBeGreaterThan(0)
+    })
+
+    it('does not advance the bob phase while airborne', () => {
+      let s = stepPlayer(start, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
+      const phaseAtTakeoff = s.bobPhase
+      for (let i = 0; i < 10 && s.airborne; i++) {
+        s = stepPlayer(s, { ...idle, forward: 1, dt: 1 / 60 }, flat, [])
+      }
+      expect(s.bobPhase).toBe(phaseAtTakeoff)
+    })
+
+    it('never lifts the camera below eye height', () => {
+      for (let phase = 0; phase < 20; phase++) {
+        const s: PlayerState = { ...start, bobPhase: phase }
+        expect(cameraBob(s).dy).toBeGreaterThanOrEqual(0)
+      }
+    })
+
+    it('sways side to side, not just up and down', () => {
+      const atZero = cameraBob({ ...start, bobPhase: 0 })
+      const atHalfCycle = cameraBob({ ...start, bobPhase: Math.PI })
+      expect(atZero.dx).not.toBeCloseTo(atHalfCycle.dx, 5)
     })
   })
 

@@ -21,6 +21,10 @@ export interface PlayerState {
    *  stump), 0 on bare ground. Added to `hop`, not replacing it: jumping
    *  while already standing on a stump still leaves the ground beneath it. */
   stand: number
+  /** Walking-bob phase, radians. Advances with distance actually covered on
+   *  the ground, not with time, so standing still holds the camera still
+   *  instead of bobbing on the spot. */
+  bobPhase: number
 }
 
 export interface PlayerInput {
@@ -72,6 +76,14 @@ const SLOPE_BLOCK = 1.4
 const JUMP_SPEED = 3.4
 const GRAVITY = 9.8
 
+/** Ground distance covered per full bob cycle, metres — roughly two strides. */
+const STRIDE_LENGTH = 1.3
+/** Vertical bob amplitude, metres. */
+const BOB_VERTICAL = 0.035
+/** Sideways sway amplitude, metres — smaller than the vertical bob, the way
+ *  an actual gait's side-to-side weight shift is subtler than its up-down. */
+const BOB_HORIZONTAL = 0.018
+
 /** How much wetland ground costs, as a fraction of normal walking speed —
  *  the same "grounds you" idea as a steep slope (`slopeFactor`), applied to
  *  mud instead of a grade. */
@@ -86,6 +98,19 @@ export function biomeSpeedFactor(biome: Biome): number {
 /** Eye height above the ground, accounting for the crouch. */
 export function eyeHeight(s: PlayerState): number {
   return STAND_EYE + (CROUCH_EYE - STAND_EYE) * s.crouch
+}
+
+/**
+ * The camera's walking-bob offset for the current phase: vertical lift
+ * (always upward — a footstep raises the head, it never lowers it below eye
+ * height) twice per stride, and a gentler side-to-side sway once per stride,
+ * the way a real gait's weight shift alternates left-right.
+ */
+export function cameraBob(s: PlayerState): { dy: number; dx: number } {
+  return {
+    dy: Math.abs(Math.sin(s.bobPhase)) * BOB_VERTICAL,
+    dx: Math.cos(s.bobPhase / 2) * BOB_HORIZONTAL,
+  }
 }
 
 /**
@@ -166,6 +191,12 @@ export function stepPlayer(
     }
   }
 
+  // Bob phase advances with distance actually covered while grounded — not
+  // while airborne (the jump arc is its own vertical motion) and not just
+  // because time passed, or standing still would bob on the spot.
+  const bobPhase =
+    s.hop <= 0 ? s.bobPhase + (Math.hypot(x - s.x, z - s.z) / STRIDE_LENGTH) * Math.PI * 2 : s.bobPhase
+
   // Standing on top follows from where the feet ended up this step, not from
   // dodging the obstacle above — a boulder low enough to climb is simply never
   // pushed out of, so walking onto it is all it takes.
@@ -189,5 +220,5 @@ export function stepPlayer(
     vy = 0
   }
 
-  return { x, z, yaw, pitch, crouch, vy, hop, airborne: hop > 0, stand }
+  return { x, z, yaw, pitch, crouch, vy, hop, airborne: hop > 0, stand, bobPhase }
 }
