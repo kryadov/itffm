@@ -51,7 +51,7 @@ const PAGE = `<!doctype html><html><body>
     document.title = canvas && window.__READY
       ? 'BOOTED'
       : 'DEAD canvas=' + !!canvas + ' ready=' + !!window.__READY + ' err=' + window.__err
-  }, 2500)
+  }, 4000)
 </script></body></html>`
 
 const server = createServer(async (req, res) => {

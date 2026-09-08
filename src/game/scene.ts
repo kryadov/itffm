@@ -7,6 +7,7 @@ import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
+import { buildSky } from '../world/sky'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -65,6 +66,9 @@ export interface Forest {
    *  too, so a mushroom genuinely hidden behind a tuft or a bush is hidden
    *  from the aim ray, not just from the eye. */
   occluders: THREE.Object3D[]
+  /** Keeps the sky dome centred on the camera — call every frame with the
+   *  camera's world position. */
+  updateSky: (camPos: THREE.Vector3) => void
 }
 
 /**
@@ -75,16 +79,28 @@ export interface Forest {
  */
 export function createForest(source: ForestSource, seed: number, halfSize: number = DEFAULT_HALF_SIZE): Forest {
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0xa8c0a2)
   scene.fog = new THREE.Fog(0xa8c0a2, 30, 140)
 
   // Under a closed canopy almost all the light is bounced, not direct. A
   // strong sky term with a lit ground colour is what keeps the undersides of
   // the crowns from reading as black lids.
   scene.add(new THREE.HemisphereLight(0xe6f2e0, 0x6b6a4a, 2.6))
+  const sunPosition = new THREE.Vector3(40, 80, 20)
   const sun = new THREE.DirectionalLight(0xfff1cf, 1.1)
-  sun.position.set(40, 80, 20)
+  sun.position.copy(sunPosition)
   scene.add(sun)
+
+  // Replaces the old flat background colour: a dome the fog never quite
+  // hides above the treeline, rather than a solid fill with a visible seam
+  // at the horizon. `night` stays 0 — there is no calendar yet (see
+  // TODO.md) — but the sky already takes it, so daynight.ts has nothing of
+  // this module left to touch when that lands.
+  const sky = buildSky()
+  scene.add(sky.mesh)
+  sky.update(new THREE.Vector3(), 0xa8c0a2, 0xfff1cf, sunPosition, 1, 0)
+  const updateSky = (camPos: THREE.Vector3): void => {
+    sky.update(camPos, 0xa8c0a2, 0xfff1cf, sunPosition, 1, 0)
+  }
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize)))
   scene.add(buildTreeMeshes(source.trees))
@@ -146,6 +162,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
-    shelter: { x: shelter.x, z: shelter.z }, occluders,
+    shelter: { x: shelter.x, z: shelter.z }, occluders, updateSky,
   }
 }

@@ -78,7 +78,10 @@ async function main(): Promise<void> {
   if (fellBackTo && query) toast(t('fellBackNotice'))
 
   const forest = createForest(source, seed, halfSize)
-  const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 300)
+  // Far enough that the sky dome (radius 1500, see world/sky.ts) is not
+  // clipped away — the fog (scene.ts) still hides the forest floor at 140m
+  // regardless, so this only decides whether the sky above it is visible.
+  const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 2000)
   const controls = createControls(renderer.domElement)
   const basket = createBasket(BASKET_CAPACITY)
   const hud = createHud(ui)
@@ -261,6 +264,7 @@ async function main(): Promise<void> {
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
     compass.update(player.yaw)
+    forest.updateSky(camera.position)
 
     cullDistantMushrooms()
     updateAim()
