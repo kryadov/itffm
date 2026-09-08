@@ -6,6 +6,8 @@ import { buildCollectible } from '../collectible/build'
 import { speciesById } from '../species/load'
 import { hashString } from '../util/rng'
 
+declare const __APP_VERSION__: string
+
 /**
  * The place-picker screen: name a real wood, or walk into the baked demo one.
  *
@@ -45,7 +47,8 @@ export function openPlacePicker(onPick: (query: string | null, halfSize: number)
     <p style="position:fixed;bottom:10px;opacity:.4;font-size:11px;text-align:center;max-width:600px">
       Terrain © <a href="https://registry.opendata.aws/terrain-tiles/" style="color:inherit">AWS Terrain Tiles</a>.
       Map data © <a href="https://www.openstreetmap.org/copyright" style="color:inherit">OpenStreetMap</a> contributors, ODbL.
-    </p>`
+    </p>
+    <div style="position:fixed;left:8px;bottom:2px;font-size:10px;text-shadow:0 1px 2px #000;opacity:.35;pointer-events:none">v${__APP_VERSION__}</div>`
 
   document.getElementById('ui')!.appendChild(overlay)
 
