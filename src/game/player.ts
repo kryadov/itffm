@@ -76,8 +76,10 @@ const SLOPE_BLOCK = 1.4
 const JUMP_SPEED = 3.4
 const GRAVITY = 9.8
 
-/** Ground distance covered per full bob cycle, metres — roughly two strides. */
-const STRIDE_LENGTH = 1.3
+/** Ground distance covered per full bob cycle, metres — roughly two strides.
+ *  `dy` bumps twice per cycle (abs(sin)), so this is what actually sets the
+ *  bob's felt frequency; 1.3 read as a fine shiver rather than footsteps. */
+const STRIDE_LENGTH = 2.6
 /** Vertical bob amplitude, metres. */
 const BOB_VERTICAL = 0.035
 /** Sideways sway amplitude, metres — smaller than the vertical bob, the way
