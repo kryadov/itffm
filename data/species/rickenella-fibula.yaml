@@ -1,0 +1,52 @@
+id: rickenella-fibula
+gbifKey: 5257912
+name:
+  la: Rickenella fibula
+  ru: Рикенелла оранжевая
+  en: Orange mosscap
+edibility: inedible
+lookalikes: []
+morphology:
+  cap:
+    shape: convex
+    ageShape: depressed
+    diameter: [3, 10]
+    color: "#e8942a"
+    surface: smooth
+    surfaceColor: "#e8942a"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#f0c878"
+  stipe:
+    height: [15, 40]
+    width: [1, 2]
+    color: "#e8b04a"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#f0c878"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: moss
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub]
+  season: [6, 7, 8, 9, 10, 11]
+  moisture: [0.5, 0.9]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Крошечный оранжевый гвоздик на волосок толщиной — шляпка едва достигает
+    сантиметра, а ножка тоньше спички. Растёт только среди настоящего мха,
+    прямо из его дерновины, и больше нигде: ни на голой почве, ни на
+    древесине. Слишком мал, чтобы собирать, но верный знак, что мох под
+    ногами живой и влажный.
+  en: >-
+    A tiny orange pin barely a centimetre tall, with a stem thinner than a
+    matchstick. Grows only out of a living moss cushion, nowhere else — not on
+    bare soil, not on wood. Too small to be worth picking, but a reliable sign
+    that the moss underfoot is alive and damp.

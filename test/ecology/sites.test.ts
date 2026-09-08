@@ -73,6 +73,14 @@ describe('buildSites', () => {
     expect(wood.map((s) => [s.x, s.z]).sort()).toEqual(deadwoodPoints.map((p) => [p.x, p.z]).sort())
   })
 
+  it('grows moss only at given points, same as deadwood', () => {
+    const mossPoints = [{ x: 7, z: 7 }]
+    const sites = buildSites(terrain, trees, 60, 11, () => 'forest-mixed', 400, [], mossPoints)
+    const moss = sites.filter((s) => s.substrate === 'moss')
+    expect(moss).toHaveLength(1)
+    expect([moss[0].x, moss[0].z]).toEqual([7, 7])
+  })
+
   it('lets the biome vary from point to point', () => {
     const sites = buildSites(terrain, trees, 60, 11, (x) => (x < 0 ? 'forest-coniferous' : 'dunes-coast'), 200)
     expect(sites.some((s) => s.biome === 'forest-coniferous')).toBe(true)

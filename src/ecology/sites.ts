@@ -61,6 +61,10 @@ export function moistureAt(provider: ElevationProvider, x: number, z: number): n
  *   'deadwood'` — a guess at "probably rotting, it's near a tree" used to
  *   grow deadwood mushrooms on bare ground with nothing under them; now they
  *   grow only where there is an actual log to grow on.
+ * @param mossPoints where moss grows around a real boulder (see
+ *   world/boulders.ts). Each becomes one site with `substrate: 'moss'`; the
+ *   site's own measured moisture still decides whether anything moss-loving
+ *   actually wants to grow there.
  */
 export function buildSites(
   provider: ElevationProvider,
@@ -70,6 +74,7 @@ export function buildSites(
   biomeAt: (x: number, z: number) => Biome,
   count = 1200,
   deadwoodPoints: { x: number; z: number }[] = [],
+  mossPoints: { x: number; z: number }[] = [],
 ): Site[] {
   const rng = mulberry32(seed)
   const sites: Site[] = []
@@ -84,33 +89,24 @@ export function buildSites(
     return hosts
   }
 
+  const siteAt = (x: number, z: number, substrate: Substrate): Site => ({
+    x,
+    z,
+    y: provider.heightAt(x, z),
+    biome: biomeAt(x, z),
+    hosts: hostsNear(x, z),
+    substrate,
+    moisture: moistureAt(provider, x, z),
+  })
+
   for (let i = 0; i < count; i++) {
     const x = (rng() * 2 - 1) * halfSize
     const z = (rng() * 2 - 1) * halfSize
-    const substrate: Substrate = rng() < 0.3 ? 'litter' : 'soil'
-
-    sites.push({
-      x,
-      z,
-      y: provider.heightAt(x, z),
-      biome: biomeAt(x, z),
-      hosts: hostsNear(x, z),
-      substrate,
-      moisture: moistureAt(provider, x, z),
-    })
+    sites.push(siteAt(x, z, rng() < 0.3 ? 'litter' : 'soil'))
   }
 
-  for (const p of deadwoodPoints) {
-    sites.push({
-      x: p.x,
-      z: p.z,
-      y: provider.heightAt(p.x, p.z),
-      biome: biomeAt(p.x, p.z),
-      hosts: hostsNear(p.x, p.z),
-      substrate: 'deadwood',
-      moisture: moistureAt(provider, p.x, p.z),
-    })
-  }
+  for (const p of deadwoodPoints) sites.push(siteAt(p.x, p.z, 'deadwood'))
+  for (const p of mossPoints) sites.push(siteAt(p.x, p.z, 'moss'))
 
   return sites
 }

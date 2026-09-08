@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { buildGround } from '../world/ground'
 import { buildTreeMeshes, type Tree } from '../world/trees'
 import { placeLogs, placeStumps, logObstacles, logSpawnPoints, buildDeadwoodMeshes } from '../world/deadwood'
+import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } from '../world/boulders'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
 import { loadSpecies, speciesById } from '../species/load'
@@ -35,8 +36,8 @@ export interface Forest {
   placements: Placement[]
   /** One object per mushroom, in the same order as placements. */
   mushroomObjects: THREE.Object3D[]
-  /** Fallen logs and stumps as collision circles, for the same obstacle list
-   *  that already keeps the player out of standing trunks. */
+  /** Fallen logs, stumps and boulders as collision circles, for the same
+   *  obstacle list that already keeps the player out of standing trunks. */
   deadwoodObstacles: { x: number; z: number; radius: number }[]
 }
 
@@ -70,8 +71,15 @@ export function createForest(source: ForestSource, seed: number): Forest {
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius })),
   ]
 
+  const boulders = placeBoulders(source.ground, HALF_SIZE, seed + 7)
+  scene.add(buildBoulderMeshes(boulders))
+  deadwoodObstacles.push(...boulders.map(boulderObstacle))
+
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
-  const sites = buildSites(source.ground, source.trees, HALF_SIZE, seed + 2, source.biomeAt, 1600, deadwoodPoints)
+  const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
+  const sites = buildSites(
+    source.ground, source.trees, HALF_SIZE, seed + 2, source.biomeAt, 1600, deadwoodPoints, mossPoints,
+  )
   const month = new Date().getMonth() + 1
   const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })
 
