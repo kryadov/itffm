@@ -144,6 +144,24 @@ async function main(): Promise<void> {
     hud.setTarget(species ? speciesName(species) : null)
   }
 
+  const traceGeo = new THREE.CircleGeometry(0.07, 8)
+  const traceMat = new THREE.MeshStandardMaterial({ color: 0x2e2418, roughness: 1 })
+
+  /**
+   * A collected specimen (unlike a cut one) leaves nothing behind by itself —
+   * removing the object is the whole game-state change. This adds the honest
+   * "something grew here" mark a real forager's disturbed leaf litter would
+   * leave, so retracing a walk shows its own history instead of looking
+   * untouched.
+   */
+  function leaveTrace(placement: { x: number; z: number; rotationY: number }): void {
+    const mark = new THREE.Mesh(traceGeo, traceMat)
+    mark.rotation.x = -Math.PI / 2
+    mark.rotation.z = placement.rotationY
+    mark.position.set(placement.x, forest.ground.heightAt(placement.x, placement.z) + 0.003, placement.z)
+    forest.scene.add(mark)
+  }
+
   function examineAimed(): void {
     const target = aimed
     if (!target) return
@@ -159,6 +177,7 @@ async function main(): Promise<void> {
         if (!basket.add(placement)) return
         target.removeFromParent()
         forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
+        leaveTrace(placement)
         hud.setBasket(basket.items.length, BASKET_CAPACITY)
         save = applyFind(save, {
           speciesId: placement.speciesId,
