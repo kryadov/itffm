@@ -1,5 +1,6 @@
 import { t, getLang } from '../i18n/i18n'
 import { POPULAR_PLACES } from './popularPlaces'
+import { WORLD_SIZES, DEFAULT_WORLD_SIZE } from './worldSize'
 
 /**
  * The place-picker screen: name a real wood, or walk into the baked demo one.
@@ -10,7 +11,7 @@ import { POPULAR_PLACES } from './popularPlaces'
  * text itself stays in English regardless of interface language, matching how
  * most software credits its data sources.
  */
-export function openPlacePicker(onPick: (query: string | null) => void): void {
+export function openPlacePicker(onPick: (query: string | null, halfSize: number) => void): void {
   const overlay = document.createElement('div')
   overlay.id = 'place-picker'
   overlay.dataset.modal = 'true'
@@ -18,11 +19,19 @@ export function openPlacePicker(onPick: (query: string | null) => void): void {
     'position:fixed;inset:0;background:#0f130e;pointer-events:auto;display:flex;flex-direction:column;' +
     'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee;gap:18px;padding:24px'
 
+  const sizeOptions = WORLD_SIZES.map(
+    (o) =>
+      `<option value="${o.id}" ${o.id === DEFAULT_WORLD_SIZE.id ? 'selected' : ''}>${getLang() === 'ru' ? o.ru : o.en}</option>`,
+  ).join('')
+
   overlay.innerHTML = `
     <h1 style="margin:0;font-size:28px">itffm</h1>
     <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">${t('placeIntro')}</p>
     <input id="place-input" type="text" placeholder="${t('placePlaceholder')}"
       style="width:min(420px,90vw);padding:11px 14px;font-size:16px;border-radius:8px;border:1px solid #444;background:#1a201a;color:#eee" />
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:.8">${t('placeSize')}
+      <select id="place-size" style="padding:6px 10px;border-radius:6px;border:1px solid #444;background:#1a201a;color:#ddd;font-size:13px">${sizeOptions}</select>
+    </label>
     <div style="display:flex;gap:12px;margin-top:4px">
       <button id="place-go" style="padding:11px 22px;border:0;border-radius:8px;background:#7ec46b;color:#12160f;font-weight:600;font-size:15px;cursor:pointer">${t('placeGo')}</button>
       <button id="place-demo" style="padding:11px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:15px;cursor:pointer">${t('placeDemo')}</button>
@@ -37,10 +46,15 @@ export function openPlacePicker(onPick: (query: string | null) => void): void {
   document.getElementById('ui')!.appendChild(overlay)
 
   const input = overlay.querySelector<HTMLInputElement>('#place-input')!
+  const sizeInput = overlay.querySelector<HTMLSelectElement>('#place-size')!
+  const chosenHalfSize = (): number =>
+    (WORLD_SIZES.find((o) => o.id === sizeInput.value) ?? DEFAULT_WORLD_SIZE).halfSize
+
   const go = () => {
     const q = input.value.trim()
+    const halfSize = chosenHalfSize()
     overlay.remove()
-    onPick(q.length > 0 ? q : null)
+    onPick(q.length > 0 ? q : null, halfSize)
   }
 
   overlay.querySelector('#place-go')!.addEventListener('click', go)
@@ -48,8 +62,9 @@ export function openPlacePicker(onPick: (query: string | null) => void): void {
     if (e.code === 'Enter') go()
   })
   overlay.querySelector('#place-demo')!.addEventListener('click', () => {
+    const halfSize = chosenHalfSize()
     overlay.remove()
-    onPick(null)
+    onPick(null, halfSize)
   })
 
   const popular = overlay.querySelector<HTMLDivElement>('#place-popular')!
@@ -59,8 +74,9 @@ export function openPlacePicker(onPick: (query: string | null) => void): void {
     button.style.cssText =
       'padding:7px 14px;border:1px solid #444;border-radius:16px;background:#1a201a;color:#ccc;font-size:13px;cursor:pointer'
     button.addEventListener('click', () => {
+      const halfSize = chosenHalfSize()
       overlay.remove()
-      onPick(place.query)
+      onPick(place.query, halfSize)
     })
     popular.appendChild(button)
   }

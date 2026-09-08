@@ -13,7 +13,7 @@ import { placeOsmTrees } from '../world/osmTrees'
 import { buildBiomeMap } from '../world/biome'
 import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
-import { HALF_SIZE, GROUND_SEGMENTS, type ForestSource } from './scene'
+import { DEFAULT_HALF_SIZE, groundSegmentsFor, type ForestSource } from './scene'
 import type { WorldData, BBox } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
@@ -23,7 +23,7 @@ const FOREST_BIOMES: Set<Biome> = new Set(['forest-coniferous', 'forest-broadlea
 export type LoadStage = 'geocode' | 'osm' | 'terrain' | 'build'
 
 /** Margin requested beyond the play area, so trees near the edge have context. */
-const OSM_RADIUS = HALF_SIZE + 60
+const OSM_MARGIN = 60
 /** Fixed seed for the offline demo wood, so it is the same every time. */
 const DEMO_SEED = 2026
 /** The Overpass query version baked into the cache key (see cache.ts). */
@@ -40,8 +40,8 @@ export function chooseFallback(world: WorldData): 'demo' | null {
   return world.woods.length === 0 && world.open.length === 0 ? 'demo' : null
 }
 
-function proceduralGround(seed: number): ElevationProvider {
-  return griddedProvider(withPits(proceduralTerrain(seed), seed + 3), HALF_SIZE, GROUND_SEGMENTS)
+function proceduralGround(seed: number, halfSize: number): ElevationProvider {
+  return griddedProvider(withPits(proceduralTerrain(seed), seed + 3), halfSize, groundSegmentsFor(halfSize))
 }
 
 /**
@@ -49,12 +49,17 @@ function proceduralGround(seed: number): ElevationProvider {
  * scene.ts). Falls back to procedural terrain on its own: a tile fetch failing
  * should not throw away OSM data that loaded just fine.
  */
-async function realGround(bbox: BBox, projector: Projector, seed: number): Promise<ElevationProvider> {
+async function realGround(
+  bbox: BBox,
+  projector: Projector,
+  seed: number,
+  halfSize: number,
+): Promise<ElevationProvider> {
   try {
     const dem = await loadTerrarium(bbox, projector)
-    return griddedProvider(withPits(withDetail(dem, seed), seed + 3), HALF_SIZE, GROUND_SEGMENTS)
+    return griddedProvider(withPits(withDetail(dem, seed), seed + 3), halfSize, groundSegmentsFor(halfSize))
   } catch {
-    return proceduralGround(seed)
+    return proceduralGround(seed, halfSize)
   }
 }
 
@@ -74,12 +79,18 @@ async function fetchWithCache(bbox: BBox): Promise<OverpassResponse> {
   }
 }
 
-function buildSource(world: WorldData, ground: ElevationProvider, lat: number, seed: number): ForestSource {
+function buildSource(
+  world: WorldData,
+  ground: ElevationProvider,
+  lat: number,
+  seed: number,
+  halfSize: number,
+): ForestSource {
   // Trees and biome share this seed for isClearing() so a gap in the canopy
   // and its patch of meadow-scrub ecology are the same hole in the ground,
   // not two noise fields that happen to disagree.
   const treeSeed = seed + 1
-  const trees = placeOsmTrees(world, ground, lat, treeSeed, HALF_SIZE)
+  const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize)
   const biomeMap = buildBiomeMap(world, ground, lat)
   const biomeAt = (x: number, z: number): Biome => {
     const biome = biomeMap.at(x, z)
@@ -96,6 +107,9 @@ export interface LoadResult {
   fellBackTo: 'demo' | null
   /** The seed the ecology was grown with — pass straight through to createForest. */
   seed: number
+  /** The plot half-size this source was actually built at — pass straight
+   *  through to createForest, same as the seed. */
+  halfSize: number
 }
 
 /**
@@ -106,17 +120,20 @@ export interface LoadResult {
  * player still ends up standing in a wood, not staring at an error.
  *
  * @param query a place name, "lat,lon", or null to go straight to the demo wood
+ * @param halfSize half the plot's side, metres — the player's choice on the
+ *   place-picker screen (ui/worldSize.ts)
  */
 export async function loadForestData(
   query: string | null,
   onStage: (s: LoadStage) => void,
+  halfSize: number = DEFAULT_HALF_SIZE,
 ): Promise<LoadResult> {
   if (query) {
     try {
       onStage('geocode')
       const center = await geocode(query)
       const projector = new Projector(center)
-      const bbox = bboxAround(center, OSM_RADIUS)
+      const bbox = bboxAround(center, halfSize + OSM_MARGIN)
       const seed = hashString(query)
 
       onStage('osm')
@@ -125,9 +142,9 @@ export async function loadForestData(
 
       if (!fellBackTo) {
         onStage('terrain')
-        const ground = await realGround(bbox, projector, seed)
+        const ground = await realGround(bbox, projector, seed, halfSize)
         onStage('build')
-        return { source: buildSource(world, ground, center.lat, seed), fellBackTo: null, seed }
+        return { source: buildSource(world, ground, center.lat, seed, halfSize), fellBackTo: null, seed, halfSize }
       }
       // Tagging here was too sparse to build anything from. Rather than mix a
       // demo wood's invented layout with this place's real elevation, show the
@@ -141,8 +158,9 @@ export async function loadForestData(
   onStage('build')
   const { world, center } = demoForest()
   return {
-    source: buildSource(world, proceduralGround(DEMO_SEED), center.lat, DEMO_SEED),
+    source: buildSource(world, proceduralGround(DEMO_SEED, halfSize), center.lat, DEMO_SEED, halfSize),
     fellBackTo: 'demo',
     seed: DEMO_SEED,
+    halfSize,
   }
 }
