@@ -10,8 +10,14 @@ export function createControls(dom: HTMLElement): { read(dt: number): PlayerInpu
   const keys = new Set<string>()
   let dYaw = 0
   let dPitch = 0
+  let jumpPending = false
 
-  const down = (e: KeyboardEvent) => keys.add(e.code)
+  const down = (e: KeyboardEvent) => {
+    // Edge-triggered: the browser repeats keydown while a key is held, but a
+    // jump command should fire once per press, not once per repeat event.
+    if (e.code === 'Space' && !keys.has('Space')) jumpPending = true
+    keys.add(e.code)
+  }
   const up = (e: KeyboardEvent) => keys.delete(e.code)
   const move = (e: MouseEvent) => {
     if (document.pointerLockElement !== dom) return
@@ -41,10 +47,12 @@ export function createControls(dom: HTMLElement): { read(dt: number): PlayerInpu
         dYaw,
         dPitch,
         crouching: keys.has('ShiftLeft') || keys.has('ControlLeft'),
+        jumping: jumpPending,
         dt,
       }
       dYaw = 0
       dPitch = 0
+      jumpPending = false
       return input
     },
     dispose() {

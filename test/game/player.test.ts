@@ -2,8 +2,10 @@ import { stepPlayer, eyeHeight, type PlayerState, type PlayerInput } from '../..
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
-const start: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0 }
-const idle: PlayerInput = { forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, dt: 1 / 60 }
+const start: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false }
+const idle: PlayerInput = {
+  forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 60,
+}
 
 describe('stepPlayer', () => {
   it('stands still without input', () => {
@@ -72,5 +74,86 @@ describe('stepPlayer', () => {
       s = stepPlayer(s, { ...idle, forward: 1, dt: 1 / 30 }, flat, [tree])
     }
     expect(Math.abs(s.x)).toBeGreaterThan(0.1)
+  })
+
+  describe('slopes', () => {
+    // At yaw 0, forward moves toward -z, so height must rise as z falls to
+    // read as an uphill climb in the direction the player is walking.
+    const slope = (grade: number): ElevationProvider => ({ heightAt: (_x, z) => -z * grade })
+
+    it('does not slow a gentle slope at all', () => {
+      const gentle = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, slope(0.3), [])
+      const flatMove = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+      expect(Math.hypot(gentle.x, gentle.z)).toBeCloseTo(Math.hypot(flatMove.x, flatMove.z), 5)
+    })
+
+    it('slows a moderate uphill climb', () => {
+      const moderate = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, slope(1.0), [])
+      const flatMove = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+      const slowed = Math.hypot(moderate.x, moderate.z)
+      expect(slowed).toBeGreaterThan(0)
+      expect(slowed).toBeLessThan(Math.hypot(flatMove.x, flatMove.z))
+    })
+
+    it('fully blocks a cliff-steep climb', () => {
+      let s = start
+      for (let i = 0; i < 60; i++) s = stepPlayer(s, { ...idle, forward: 1, dt: 1 / 30 }, slope(3), [])
+      expect(Math.hypot(s.x, s.z)).toBeCloseTo(0, 5)
+    })
+
+    it('never slows walking downhill, however steep', () => {
+      const down = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, slope(-5), [])
+      const flatMove = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+      expect(Math.hypot(down.x, down.z)).toBeCloseTo(Math.hypot(flatMove.x, flatMove.z), 5)
+    })
+  })
+
+  describe('jumping', () => {
+    it('leaves the ground on jump', () => {
+      const s = stepPlayer(start, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
+      expect(s.vy).toBeGreaterThan(0)
+      expect(s.hop).toBeGreaterThan(0)
+      expect(s.airborne).toBe(true)
+    })
+
+    it('rises to a peak and comes back down through a real height, not just a sign flip', () => {
+      let s = start
+      let peak = 0
+      for (let i = 0; i < 200 && (i === 0 || s.airborne); i++) {
+        s = stepPlayer(s, i === 0 ? { ...idle, jumping: true, dt: 1 / 60 } : { ...idle, dt: 1 / 60 }, flat, [])
+        peak = Math.max(peak, s.hop)
+      }
+      expect(peak).toBeGreaterThan(0.05)
+      expect(s.hop).toBe(0)
+    })
+
+    it('cannot jump again while already airborne', () => {
+      let s = stepPlayer(start, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
+      const vyAfterFirst = s.vy
+      s = stepPlayer(s, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
+      // Gravity only: a second jump command mid-air must not add more lift.
+      expect(s.vy).toBeLessThan(vyAfterFirst)
+    })
+
+    it('comes back down and lands', () => {
+      let s = stepPlayer(start, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
+      for (let i = 0; i < 200 && s.airborne; i++) {
+        s = stepPlayer(s, { ...idle, dt: 1 / 60 }, flat, [])
+      }
+      expect(s.airborne).toBe(false)
+      expect(s.vy).toBe(0)
+    })
+
+    it('does not drift into flight: forward speed is unchanged by jumping', () => {
+      const grounded = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+      const jumped = stepPlayer(start, { ...idle, forward: 1, jumping: true, dt: 1 }, flat, [])
+      expect(Math.hypot(jumped.x, jumped.z)).toBeCloseTo(Math.hypot(grounded.x, grounded.z), 5)
+    })
+
+    it('cannot jump while crouching', () => {
+      const crouched: PlayerState = { ...start, crouch: 1 }
+      const s = stepPlayer(crouched, { ...idle, jumping: true, dt: 1 / 60 }, flat, [])
+      expect(s.airborne).toBe(false)
+    })
   })
 })

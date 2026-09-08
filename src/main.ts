@@ -74,7 +74,7 @@ async function main(): Promise<void> {
   hud.setBasket(0, BASKET_CAPACITY)
 
   const obstacles: Obstacle[] = forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
-  let player: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0 }
+  let player: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false }
   let aimed: THREE.Object3D | null = null
 
   function toast(text: string): void {
@@ -236,7 +236,11 @@ async function main(): Promise<void> {
       player.z = Math.max(-HALF_SIZE, Math.min(HALF_SIZE, player.z))
     }
 
-    camera.position.set(player.x, forest.ground.heightAt(player.x, player.z) + eyeHeight(player), player.z)
+    camera.position.set(
+      player.x,
+      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop,
+      player.z,
+    )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
 
     cullDistantMushrooms()
