@@ -8,6 +8,7 @@ import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
 import { buildSky } from '../world/sky'
+import { buildClouds } from '../world/clouds'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -69,6 +70,8 @@ export interface Forest {
   /** Keeps the sky dome centred on the camera — call every frame with the
    *  camera's world position. */
   updateSky: (camPos: THREE.Vector3) => void
+  /** Drifts the cloud layer with the camera — call every frame. */
+  updateClouds: (camPos: THREE.Vector3, dt: number) => void
 }
 
 /**
@@ -100,6 +103,14 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   sky.update(new THREE.Vector3(), 0xa8c0a2, 0xfff1cf, sunPosition, 1, 0)
   const updateSky = (camPos: THREE.Vector3): void => {
     sky.update(camPos, 0xa8c0a2, 0xfff1cf, sunPosition, 1, 0)
+  }
+
+  // A clear sky by default — setCover(1) is there for weather.ts to reach
+  // for once it exists (see TODO.md), not called from anywhere yet.
+  const clouds = buildClouds(seed + 12)
+  scene.add(clouds.mesh)
+  const updateClouds = (camPos: THREE.Vector3, dt: number): void => {
+    clouds.update(camPos, dt, source.ground.heightAt(camPos.x, camPos.z))
   }
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize)))
@@ -162,6 +173,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
-    shelter: { x: shelter.x, z: shelter.z }, occluders, updateSky,
+    shelter: { x: shelter.x, z: shelter.z }, occluders, updateSky, updateClouds,
   }
 }

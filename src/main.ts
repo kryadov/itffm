@@ -265,6 +265,7 @@ async function main(): Promise<void> {
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
     compass.update(player.yaw)
     forest.updateSky(camera.position)
+    forest.updateClouds(camera.position, dt)
 
     cullDistantMushrooms()
     updateAim()
