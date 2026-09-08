@@ -81,6 +81,13 @@ describe('buildSites', () => {
     expect([moss[0].x, moss[0].z]).toEqual([7, 7])
   })
 
+  it('wets the ground near a pond even where the terrain shape says dry', () => {
+    const pond = [{ x: 40, z: 40 }, { x: 46, z: 40 }, { x: 46, z: 46 }, { x: 40, z: 46 }]
+    const near = buildSites(flat, [], 60, 11, () => 'forest-mixed', 0, [{ x: 43, z: 38 }], [], [pond])[0]
+    const far = buildSites(flat, [], 60, 11, () => 'forest-mixed', 0, [{ x: -43, z: -30 }], [], [pond])[0]
+    expect(near.moisture).toBeGreaterThan(far.moisture)
+  })
+
   it('lets the biome vary from point to point', () => {
     const sites = buildSites(terrain, trees, 60, 11, (x) => (x < 0 ? 'forest-coniferous' : 'dunes-coast'), 200)
     expect(sites.some((s) => s.biome === 'forest-coniferous')).toBe(true)

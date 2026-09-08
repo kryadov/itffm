@@ -10,6 +10,7 @@ import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelte
 import { buildSky } from '../world/sky'
 import { buildClouds } from '../world/clouds'
 import { buildPathMeshes } from '../world/paths'
+import { buildWaterMeshes } from '../world/water'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -52,6 +53,8 @@ export interface ForestSource {
   biomeAt: (x: number, z: number) => Biome
   /** Trails, in local metres — empty for a source that has none. */
   paths?: Vec2[][]
+  /** Ponds and streams, in local metres — empty for a source that has none. */
+  water?: Vec2[][]
 }
 
 export interface Forest {
@@ -119,6 +122,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize)))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground))
+  scene.add(buildWaterMeshes(source.water ?? [], source.ground))
   scene.add(buildTreeMeshes(source.trees))
 
   const logs = placeLogs(source.ground, halfSize, seed + 5)
@@ -156,6 +160,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
   const sites = buildSites(
     source.ground, source.trees, halfSize, seed + 2, source.biomeAt, siteCount, deadwoodPoints, mossPoints,
+    source.water ?? [],
   )
   const month = new Date().getMonth() + 1
   const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })

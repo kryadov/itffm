@@ -38,6 +38,30 @@ export function densify(points: Vec2[], step: number): Vec2[] {
   return out
 }
 
+/** Distance from a point to a segment, in the plane. */
+function distanceToSegment(x: number, z: number, a: Vec2, b: Vec2): number {
+  const dx = b.x - a.x
+  const dz = b.z - a.z
+  const lenSq = dx * dx + dz * dz
+  const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / lenSq))
+  return Math.hypot(x - (a.x + dx * t), z - (a.z + dz * t))
+}
+
+/**
+ * Distance from a point to a ring's boundary, or 0 when the point falls
+ * inside it — a pond's own water counts as no distance from itself at all,
+ * only the ground around it is "near" but dry.
+ */
+export function distanceToRing(x: number, z: number, ring: Vec2[]): number {
+  if (ring.length < 2) return Infinity
+  if (ring.length >= 3 && pointInPolygon(x, z, ring)) return 0
+  let min = Infinity
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    min = Math.min(min, distanceToSegment(x, z, ring[j], ring[i]))
+  }
+  return min
+}
+
 /** The axis-aligned bounds of a ring, or null if it has no points. */
 export function boundsOf(poly: Vec2[]): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
   if (poly.length === 0) return null

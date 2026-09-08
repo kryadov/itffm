@@ -98,7 +98,7 @@ function buildSource(
     // dune or a cave mouth would not mean anything.
     return FOREST_BIOMES.has(biome) && isClearing(x, z, treeSeed) ? 'meadow-scrub' : biome
   }
-  return { ground, trees, biomeAt, paths: world.paths.map((p) => p.points) }
+  return { ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water }
 }
 
 export interface LoadResult {

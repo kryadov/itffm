@@ -1,7 +1,9 @@
 import { mulberry32 } from '../util/rng'
+import { distanceToRing } from '../util/geometry'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Tree } from '../world/trees'
 import type { Biome, Substrate, TreeGenus } from '../species/schema'
+import type { Vec2 } from '../geo/types'
 
 export interface HostRef {
   genus: TreeGenus
@@ -25,6 +27,8 @@ export interface Site {
 const PROBE = 4
 /** Beyond this a tree is no longer a partner. */
 const HOST_RADIUS = 8
+/** Beyond this a pond or stream no longer wets the ground around it, metres. */
+const WATER_REACH = 12
 
 /**
  * A site's moisture, read from the shape of the ground.
@@ -65,6 +69,9 @@ export function moistureAt(provider: ElevationProvider, x: number, z: number): n
  *   world/boulders.ts). Each becomes one site with `substrate: 'moss'`; the
  *   site's own measured moisture still decides whether anything moss-loving
  *   actually wants to grow there.
+ * @param water outlines of ponds and streams (see world/water.ts): ground
+ *   within `WATER_REACH` of one reads wetter than the terrain shape alone
+ *   would say, the way a real bank does.
  */
 export function buildSites(
   provider: ElevationProvider,
@@ -75,6 +82,7 @@ export function buildSites(
   count = 1200,
   deadwoodPoints: { x: number; z: number }[] = [],
   mossPoints: { x: number; z: number }[] = [],
+  water: Vec2[][] = [],
 ): Site[] {
   const rng = mulberry32(seed)
   const sites: Site[] = []
@@ -89,6 +97,14 @@ export function buildSites(
     return hosts
   }
 
+  const moistureNear = (x: number, z: number): number => {
+    const ground = moistureAt(provider, x, z)
+    let nearestWater = Infinity
+    for (const ring of water) nearestWater = Math.min(nearestWater, distanceToRing(x, z, ring))
+    const bankBoost = Math.max(0, 1 - nearestWater / WATER_REACH)
+    return Math.max(ground, bankBoost)
+  }
+
   const siteAt = (x: number, z: number, substrate: Substrate): Site => ({
     x,
     z,
@@ -96,7 +112,7 @@ export function buildSites(
     biome: biomeAt(x, z),
     hosts: hostsNear(x, z),
     substrate,
-    moisture: moistureAt(provider, x, z),
+    moisture: moistureNear(x, z),
   })
 
   for (let i = 0; i < count; i++) {

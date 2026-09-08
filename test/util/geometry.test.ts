@@ -1,4 +1,4 @@
-import { pointInPolygon, boundsOf, densify } from '../../src/util/geometry'
+import { pointInPolygon, boundsOf, densify, distanceToRing } from '../../src/util/geometry'
 
 const square = [
   { x: -10, z: -10 }, { x: 10, z: -10 },
@@ -39,6 +39,26 @@ describe('boundsOf', () => {
 
   it('returns null for an empty ring', () => {
     expect(boundsOf([])).toBeNull()
+  })
+})
+
+describe('distanceToRing', () => {
+  it('is zero inside the ring', () => {
+    expect(distanceToRing(0, 0, square)).toBe(0)
+  })
+
+  it('measures the gap to the nearest edge outside the ring', () => {
+    expect(distanceToRing(20, 0, square)).toBeCloseTo(10, 5)
+  })
+
+  it('measures to the nearest point on a diagonal edge, not just a vertex', () => {
+    const triangle = [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 0, z: 10 }]
+    expect(distanceToRing(6, 6, triangle)).toBeCloseTo(Math.SQRT2, 5)
+  })
+
+  it('returns Infinity for a degenerate ring', () => {
+    expect(distanceToRing(0, 0, [])).toBe(Infinity)
+    expect(distanceToRing(0, 0, [{ x: 1, z: 1 }])).toBe(Infinity)
   })
 })
 
