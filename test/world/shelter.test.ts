@@ -53,8 +53,8 @@ describe('buildShelterMesh', () => {
 
   it('stays dark by day and glows at full night', () => {
     const { group, setNight } = buildShelterMesh(s)
-    const window = group.children.find((c) => (c as THREE.Mesh).geometry?.type === 'PlaneGeometry') as THREE.Mesh
-    const mat = window.material as THREE.MeshStandardMaterial
+    const glass = group.getObjectByName('glass') as THREE.Mesh
+    const mat = glass.material as THREE.MeshStandardMaterial
     setNight(0)
     expect(mat.emissiveIntensity).toBe(0)
     setNight(1)

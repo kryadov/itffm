@@ -72,19 +72,25 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const wallHeight = 1.7
 
   // Log-course ripple: a plain box reads as smooth siding, not stacked logs.
-  // A deterministic sine along each vertex's own normal is enough — one hut
-  // per wood needs no per-instance variety, just enough texture to stop
-  // reading as a clean architectural box.
-  const wallGeo = new THREE.BoxGeometry(width, wallHeight, depth, 5, 8, 5)
+  // Bump depends on height alone, never on the vertex's own normal — the
+  // first version mixed in nx/nz too, which put a different bump on each
+  // face at the very edge two faces share, splitting the corner into a
+  // visible crack. Height-only bump moves both faces at a shared edge by the
+  // same amount, so the corner stays a clean line. Never negative, either:
+  // each course only bulges outward, the way a real round log does, rather
+  // than alternately bulging and pinching in like a wavy sheet.
+  const COURSES = 8
+  const wallGeo = new THREE.BoxGeometry(width, wallHeight, depth, 1, COURSES, 1)
   const wpos = wallGeo.attributes.position
   const wnorm = wallGeo.attributes.normal
   for (let i = 0; i < wpos.count; i++) {
     const y = wpos.getY(i)
     const nx = wnorm.getX(i)
-    const ny = wnorm.getY(i)
     const nz = wnorm.getZ(i)
-    const bump = 0.025 * Math.sin(y * 14 + nx * 3 + nz * 3)
-    wpos.setXYZ(i, wpos.getX(i) + nx * bump, wpos.getY(i) + ny * bump * 0.2, wpos.getZ(i) + nz * bump)
+    if (nx === 0 && nz === 0) continue // the flat roof-line and floor caps
+    const coursePhase = ((y + wallHeight / 2) / wallHeight) * COURSES * Math.PI * 2
+    const bump = 0.05 * (0.5 + 0.5 * Math.cos(coursePhase))
+    wpos.setXYZ(i, wpos.getX(i) + nx * bump, y, wpos.getZ(i) + nz * bump)
   }
   wallGeo.computeVertexNormals()
 
@@ -98,30 +104,61 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   roof.position.y = wallHeight + 0.55
   group.add(roof)
 
-  // The door: a darker slab set into the front face, not a hole — cheaper,
-  // and a hut nobody enters has no need of an actual opening.
-  const doorMat = new THREE.MeshStandardMaterial({ color: 0x241a10, roughness: 1 })
-  const door = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.25, 0.06), doorMat)
-  door.position.set(0, 0.625, -depth / 2 - 0.01)
-  group.add(door)
+  // The door: a plank slab set into the front face, not a hole — cheaper,
+  // and a hut nobody enters has no need of an actual opening. Two darker
+  // grooves mark it as individual planks rather than one flat monolith, and
+  // a small round handle is what actually reads as "door" at a glance —
+  // without it the slab alone is easy to mistake for a shadow or a stain.
+  const doorGroup = new THREE.Group()
+  const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 })
+  const doorFace = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.25, 0.06), doorMat)
+  doorGroup.add(doorFace)
+  const grooveMat = new THREE.MeshStandardMaterial({ color: 0x1f150c, roughness: 1 })
+  for (const gx of [-0.17, 0.17]) {
+    const groove = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.2, 0.01), grooveMat)
+    groove.position.set(gx, 0, 0.035)
+    doorGroup.add(groove)
+  }
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 0.4, metalness: 0.3 })
+  const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), handleMat)
+  handle.position.set(0.24, -0.05, 0.05)
+  doorGroup.add(handle)
+  // Clearance has to beat the log-course bump's own reach (up to 0.05, see
+  // above) at every height, or the wall bulges out past the door and hides
+  // it — which is exactly what a too-thin 0.01 clearance did here once the
+  // courses stopped being flat.
+  doorGroup.position.set(0, 0.625, -depth / 2 - 0.08)
+  group.add(doorGroup)
 
-  // Two windows, one per side wall — dark by day, glowing amber once
-  // setNight() says it is dark outside.
-  const windowMat = new THREE.MeshStandardMaterial({
-    color: 0x1c1710,
-    roughness: 0.6,
+  // Two windows, one per side wall — a pale, faintly blue "glass" pane on a
+  // darker wooden frame, so it reads as a window by day (not just a same-
+  // colour patch on the wall) and glows amber once setNight() says it is
+  // dark outside.
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a1f14, roughness: 1 })
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0x8fa8ac,
+    roughness: 0.3,
     emissive: 0xffcf8a,
     emissiveIntensity: 0,
   })
-  const windowGeo = new THREE.PlaneGeometry(0.45, 0.45)
-  const winLeft = new THREE.Mesh(windowGeo, windowMat)
-  winLeft.position.set(-width / 2 - 0.005, wallHeight * 0.58, 0)
-  winLeft.rotation.y = Math.PI / 2
-  group.add(winLeft)
-  const winRight = new THREE.Mesh(windowGeo, windowMat)
-  winRight.position.set(width / 2 + 0.005, wallHeight * 0.58, 0)
-  winRight.rotation.y = -Math.PI / 2
-  group.add(winRight)
+  const frameGeo = new THREE.PlaneGeometry(0.5, 0.5)
+  const glassGeo = new THREE.PlaneGeometry(0.38, 0.38)
+  const buildWindow = (x: number, faceOut: number): THREE.Group => {
+    const win = new THREE.Group()
+    const frame = new THREE.Mesh(frameGeo, frameMat)
+    win.add(frame)
+    const glass = new THREE.Mesh(glassGeo, glassMat)
+    glass.name = 'glass'
+    glass.position.z = 0.005
+    win.add(glass)
+    win.position.set(x, wallHeight * 0.58, 0)
+    win.rotation.y = faceOut
+    return win
+  }
+  // Same clearance reasoning as the door: has to clear the log-course bump.
+  const winLeft = buildWindow(-width / 2 - 0.08, Math.PI / 2)
+  const winRight = buildWindow(width / 2 + 0.08, -Math.PI / 2)
+  group.add(winLeft, winRight)
 
   // A point light at the hearth: physically-correct falloff (three r150+)
   // means it needs tens, not units, to read from a few metres out — see the
@@ -131,7 +168,7 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   group.add(hearthLight)
 
   const setNight = (t: number): void => {
-    windowMat.emissiveIntensity = t * 2.2
+    glassMat.emissiveIntensity = t * 2.2
     hearthLight.intensity = t * 18
   }
 
