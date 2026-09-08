@@ -1,0 +1,37 @@
+id: corylus-avellana
+gbifKey: 2874515
+name:
+  la: Corylus avellana
+  ru: Лещина обыкновенная
+  en: Common hazel
+kind: nut
+edibility: edible
+lookalikes: []
+morphology:
+  bodyColor: "#8a5a2a"
+  capColor: "#5a7a3a"
+  size: [12, 18]
+  capCoverage: [0.4, 0.7]
+ecology:
+  mycorrhizal: []
+  substrate: livewood
+  biomes: [forest-broadleaved, forest-mixed]
+  season: [8, 9]
+  moisture: [0.3, 0.7]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Твёрдая гладкая скорлупа орешка выступает из зелёной, позже
+    буреющей, рассечённой на лопасти обёртки — обёртка охватывает орех
+    заметно больше, чем у жёлудя, иногда почти целиком. Растёт кустом,
+    не деревом, часто подлеском в широколиственном или смешанном лесу.
+    Орехи собирают в конце лета — начале осени, когда обёртка начинает
+    буреть и подсыхать.
+  en: >-
+    A hard, smooth nutshell sits inside a green (later browning), lobed
+    husk — the husk wraps the nut noticeably more than an acorn's cap does,
+    sometimes almost entirely. Grows as a shrub, not a tree, often as
+    understorey in broadleaf or mixed woods. Nuts are gathered in late
+    summer to early autumn, as the husk starts to brown and dry.

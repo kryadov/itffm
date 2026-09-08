@@ -25,12 +25,12 @@ export const FREQUENCY = ['common', 'occasional', 'rare'] as const
  * What kind of thing a species is (see
  * docs/superpowers/specs/2026-09-08-forest-finds-design.md). Each kind gets
  * its own morphology and its own generator (mushroom/build.ts, berry/build.ts,
- * herb/build.ts) — this field is what the `Species` union, the collectible
- * dispatcher and the encyclopedia's kind filter all key off. Grows by one
- * entry — and one union member below — each time a new kind is actually
- * implemented; nuts and non-food finds are designed but not yet here.
+ * herb/build.ts, nut/build.ts) — this field is what the `Species` union, the
+ * collectible dispatcher and the encyclopedia's kind filter all key off.
+ * Grows by one entry — and one union member below — each time a new kind is
+ * actually implemented; non-food finds are designed but not yet here.
  */
-export const KINDS = ['mushroom', 'berry', 'herb'] as const
+export const KINDS = ['mushroom', 'berry', 'herb', 'nut'] as const
 
 export type Edibility = (typeof EDIBILITY)[number]
 export type HymeniumType = (typeof HYMENIUM)[number]
@@ -80,6 +80,17 @@ export interface HerbMorphology {
   leafCount: Range
 }
 
+/** Everything the mesh generator needs to build one nut or seed. */
+export interface NutMorphology {
+  bodyColor: string
+  capColor: string
+  /** Nut body diameter, mm. */
+  size: Range
+  /** Fraction of the body a cap/husk covers, 0..1 (an acorn's cap is small,
+   *  a hazelnut's husk can wrap most of the shell). */
+  capCoverage: Range
+}
+
 /** Everything the world generator needs to decide where this species grows. */
 export interface Ecology {
   mycorrhizal: TreeGenus[]
@@ -123,6 +134,7 @@ export type Species =
   | (SpeciesCommon & { kind: 'mushroom'; morphology: MushroomMorphology })
   | (SpeciesCommon & { kind: 'berry'; morphology: BerryMorphology })
   | (SpeciesCommon & { kind: 'herb'; morphology: HerbMorphology })
+  | (SpeciesCommon & { kind: 'nut'; morphology: NutMorphology })
 
 class SpeciesError extends Error {
   constructor(file: string, field: string, why: string) {
@@ -240,6 +252,20 @@ function parseBerryMorphology(raw: unknown, file: string): BerryMorphology {
   }
 }
 
+function parseNutMorphology(raw: unknown, file: string): NutMorphology {
+  const mo = get(raw, 'morphology', file, '')
+  const capCoverage = range(mo, 'capCoverage', file, 'morphology')
+  if (capCoverage[0] < 0 || capCoverage[1] > 1) {
+    throw new SpeciesError(file, 'morphology.capCoverage', 'values outside 0..1')
+  }
+  return {
+    bodyColor: color(mo, 'bodyColor', file, 'morphology'),
+    capColor: color(mo, 'capColor', file, 'morphology'),
+    size: range(mo, 'size', file, 'morphology'),
+    capCoverage,
+  }
+}
+
 function parseHerbMorphology(raw: unknown, file: string): HerbMorphology {
   const mo = get(raw, 'morphology', file, '')
   return {
@@ -327,5 +353,6 @@ export function validateSpecies(raw: unknown, file: string): Species {
 
   if (kind === 'berry') return { ...common, kind, morphology: parseBerryMorphology(raw, file) }
   if (kind === 'herb') return { ...common, kind, morphology: parseHerbMorphology(raw, file) }
+  if (kind === 'nut') return { ...common, kind, morphology: parseNutMorphology(raw, file) }
   return { ...common, kind: 'mushroom', morphology: parseMushroomMorphology(raw, file) }
 }

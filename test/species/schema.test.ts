@@ -79,6 +79,32 @@ const validHerb = {
   text: { ru: 'Описание.', en: 'Description.' },
 }
 
+const validNut = {
+  id: 'corylus-avellana',
+  gbifKey: 2874515,
+  name: { la: 'Corylus avellana', ru: 'Лещина обыкновенная', en: 'Common hazel' },
+  kind: 'nut',
+  edibility: 'edible',
+  lookalikes: [],
+  morphology: {
+    bodyColor: '#8a5a2a',
+    capColor: '#5a7a3a',
+    size: [12, 18],
+    capCoverage: [0.4, 0.7],
+  },
+  ecology: {
+    mycorrhizal: [],
+    substrate: 'livewood',
+    biomes: ['forest-broadleaved'],
+    season: [8, 9],
+    moisture: [0.3, 0.7],
+    gregarious: 'clustered',
+    frequency: 'common',
+  },
+  media: [],
+  text: { ru: 'Описание.', en: 'Description.' },
+}
+
 describe('validateSpecies', () => {
   it('accepts a well-formed species', () => {
     expect(validateSpecies(valid, 'amanita-muscaria.yaml').id).toBe('amanita-muscaria')
@@ -153,5 +179,16 @@ describe('validateSpecies', () => {
   it('rejects a herb with berry-shaped morphology', () => {
     const bad = { ...validHerb, morphology: validBerry.morphology }
     expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/x\.yaml.*morphology/s)
+  })
+
+  it('accepts a well-formed nut', () => {
+    const s = validateSpecies(validNut, 'x.yaml')
+    expect(s.kind).toBe('nut')
+    expect(s.kind === 'nut' && s.morphology.capCoverage).toEqual([0.4, 0.7])
+  })
+
+  it('rejects a nut capCoverage outside 0..1', () => {
+    const bad = { ...validNut, morphology: { ...validNut.morphology, capCoverage: [0.5, 1.4] } }
+    expect(() => validateSpecies(bad, 'x.yaml')).toThrow(/capCoverage/)
   })
 })

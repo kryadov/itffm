@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { buildMushroom } from '../mushroom/build'
 import { buildBerry } from '../berry/build'
 import { buildHerb } from '../herb/build'
+import { buildNut } from '../nut/build'
 import type { Species } from '../species/schema'
 
 export { toWorldMesh } from './worldMesh'
@@ -21,5 +22,7 @@ export function buildCollectible(species: Species, seed: number, age: number): T
       return buildBerry(species.morphology, seed, age)
     case 'herb':
       return buildHerb(species.morphology, seed, age)
+    case 'nut':
+      return buildNut(species.morphology, seed, age)
   }
 }

@@ -1,0 +1,37 @@
+id: quercus-robur
+gbifKey: 2879094
+name:
+  la: Quercus robur
+  ru: Жёлудь дуба
+  en: English oak acorn
+kind: nut
+edibility: conditional
+lookalikes: []
+morphology:
+  bodyColor: "#9a6a3a"
+  capColor: "#5a4530"
+  size: [15, 25]
+  capCoverage: [0.15, 0.3]
+ecology:
+  mycorrhizal: []
+  substrate: livewood
+  biomes: [forest-broadleaved, forest-mixed, park-urban]
+  season: [9, 10]
+  moisture: [0.3, 0.7]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Продолговатый гладкий орех, лишь на четверть-треть покрытый жёсткой
+    чешуйчатой шапочкой сверху, — заметно меньше, чем обёртка у лещины.
+    Сырые желуди горчат от танинов и требуют долгого вымачивания или
+    прожаривания перед едой — отсюда «условно съедобно». Падают с дуба
+    целыми пригоршнями в конце сентября — октябре, часто с ещё зелёной
+    шапочкой у части плодов.
+  en: >-
+    An elongated smooth nut, only a quarter to a third capped by a hard
+    scaly cup — much less coverage than a hazelnut's husk. Raw acorns are
+    bitter with tannins and need long soaking or roasting before eating —
+    hence "conditionally edible". Drop from the oak by the handful in late
+    September and October, some still wearing a green cap.
