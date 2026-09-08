@@ -3,6 +3,7 @@ import { createForest, HALF_SIZE } from './game/scene'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
 import { stepPlayer, eyeHeight, type PlayerState, type Obstacle } from './game/player'
+import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView } from './game/pick'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
@@ -76,7 +77,10 @@ async function main(): Promise<void> {
   const compass = createCompass(ui)
 
   const obstacles: Obstacle[] = forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
-  let player: PlayerState = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false }
+  const startPose = chooseStartPose(obstacles, HALF_SIZE)
+  let player: PlayerState = {
+    x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false,
+  }
   let aimed: THREE.Object3D | null = null
 
   function toast(text: string): void {
