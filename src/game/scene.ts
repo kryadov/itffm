@@ -7,7 +7,8 @@ import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeShelter, shelterObstacle, buildShelterMesh } from '../world/shelter'
 import { buildSites } from '../ecology/sites'
-import { spawnMushrooms, type Placement } from '../ecology/spawn'
+import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
+import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies, speciesById } from '../species/load'
 import { buildMushroom, toWorldMesh } from '../mushroom/build'
 import type { ElevationProvider } from '../terrain/provider'
@@ -102,6 +103,10 @@ export function createForest(source: ForestSource, seed: number): Forest {
   )
   const month = new Date().getMonth() + 1
   const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })
+
+  for (const marker of fairyRingMarkers(placements)) {
+    scene.add(buildFairyRingMesh(marker, source.ground))
+  }
 
   const mushroomObjects: THREE.Object3D[] = []
   for (const p of placements) {
