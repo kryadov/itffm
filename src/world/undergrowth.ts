@@ -20,18 +20,31 @@ interface CircleObstacle {
 }
 
 const MIN_GAP = 2
+/** Spatial scale of one undergrowth patch, metres — smaller-grained than a
+ *  whole clearing (world/clearings.ts's 55), so a wood gets many thickets,
+ *  not one big pocket of them. */
+const PATCH_SCALE = 22
+/** Above this the noise reads as a patch of undergrowth; below it, open floor
+ *  a forager can actually walk across. Zero splits the plot roughly in half —
+ *  thickets and gaps in comparable measure, not a lawn with rare bushes. */
+const PATCH_THRESHOLD = 0
 
 /**
  * Scatters undergrowth across the plot: not there to be found or foraged, only
  * to stand in the way. A wood without it is a wood you can see straight
  * through — walking becomes a choice of which gap to thread rather than a
  * choice of route.
+ *
+ * Clustered by a noise field, the same principle already used for tree
+ * genera (world/trees.ts) and clearings (world/clearings.ts): real
+ * undergrowth is thicker where a gap in the canopy lets light reach the
+ * ground, not spread as an even lawn of rare bushes.
  */
 export function placeBushes(
   ground: ElevationProvider,
   halfSize: number,
   seed: number,
-  density = 0.001,
+  density = 0.002,
 ): Bush[] {
   const rng = mulberry32(seed)
   const area = halfSize * 2 * halfSize * 2
@@ -41,6 +54,7 @@ export function placeBushes(
   for (let i = 0; i < attempts; i++) {
     const x = (rng() * 2 - 1) * halfSize
     const z = (rng() * 2 - 1) * halfSize
+    if (fbm2(x / PATCH_SCALE, z / PATCH_SCALE, seed + 31, 2) < PATCH_THRESHOLD) continue
     if (bushes.some((b) => Math.hypot(b.x - x, b.z - z) < MIN_GAP)) continue
     bushes.push({
       x,
