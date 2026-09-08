@@ -86,6 +86,11 @@ export interface Forest {
   setWeather: (w: Weather) => void
   /** Animates rain/snow and keeps them centred on the camera — call every frame. */
   updateWeather: (camPos: THREE.Vector3, dt: number) => void
+  /** Toggles the flashlight — cheap, call only on change (the `F` key). */
+  setFlashlight: (on: boolean) => void
+  /** Aims the flashlight from the camera along its view direction — call
+   *  every frame while it is on. */
+  updateFlashlight: (camPos: THREE.Vector3, camDir: THREE.Vector3) => void
 }
 
 /**
@@ -157,6 +162,23 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     weather.update(camPos, dt)
   }
 
+  // Off by default: only worth reaching for once night exists (v0.16.0), and
+  // even then only when the player wants it.
+  // Intensity looks small next to the sun's ~1.1, but three's physically
+  // correct lighting (default since r150) has a spot/point light's candela
+  // fall off with the square of distance — 150 here is roughly a torch's
+  // worth of light a few metres out, not a runaway floodlight.
+  const flashlight = new THREE.SpotLight(0xfff2cc, 600, 30, 0.35, 0.4, 2)
+  flashlight.visible = false
+  scene.add(flashlight, flashlight.target)
+  const setFlashlight = (on: boolean): void => {
+    flashlight.visible = on
+  }
+  const updateFlashlight = (camPos: THREE.Vector3, camDir: THREE.Vector3): void => {
+    flashlight.position.copy(camPos)
+    flashlight.target.position.copy(camPos).add(camDir)
+  }
+
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground))
   scene.add(buildWaterMeshes(source.water ?? [], source.ground))
@@ -221,6 +243,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather,
+    setWeather, updateWeather, setFlashlight, updateFlashlight,
   }
 }

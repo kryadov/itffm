@@ -288,6 +288,10 @@ async function main(): Promise<void> {
     if (e.code === 'KeyQ') showTally()
     if (e.code === 'KeyM') openSettings()
     if (e.code === 'Escape') openExitConfirm()
+    if (e.code === 'KeyF') {
+      flashlightOn = !flashlightOn
+      forest.setFlashlight(flashlightOn)
+    }
   })
 
   if (!save.disclaimerSeen) showDisclaimer()
@@ -298,6 +302,10 @@ async function main(): Promise<void> {
   // (see world/daynight.ts's timeFor), starting at noon so a first frame
   // rendered before this ever advances still matches the old fixed look.
   let cycleT = DAY_TIME
+  // Off at the start of every walk — a session preference, not a saved one:
+  // there is no reason a flashlight left on should surprise the next visit.
+  let flashlightOn = false
+  const camDir = new THREE.Vector3()
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.05, (now - last) / 1000)
@@ -322,6 +330,7 @@ async function main(): Promise<void> {
     forest.updateDayNight(timeFor(save.prefs.timeMode, cycleT), camera.position)
     forest.updateClouds(camera.position, dt)
     forest.updateWeather(camera.position, dt)
+    if (flashlightOn) forest.updateFlashlight(camera.position, camera.getWorldDirection(camDir))
 
     cullDistantMushrooms()
     updateAim()
