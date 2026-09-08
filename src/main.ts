@@ -90,7 +90,9 @@ async function main(): Promise<void> {
   // place-picker interaction takes far longer than the IndexedDB round trip.
   const controls = createControls(renderer.domElement, save.prefs.mouseSensitivity)
   const basket = createBasket(BASKET_CAPACITY)
-  const hud = createHud(ui)
+  const hud = createHud(ui, () => {
+    if (!modalOpen()) openSettings()
+  })
   hud.setBasket(0, BASKET_CAPACITY)
   const compass = createCompass(ui)
 

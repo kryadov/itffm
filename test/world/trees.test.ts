@@ -1,4 +1,4 @@
-import { placeTrees } from '../../src/world/trees'
+import { placeTrees, treePerches } from '../../src/world/trees'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 
 const terrain = proceduralTerrain(5)
@@ -77,5 +77,26 @@ describe('placeTrees', () => {
       if (bestGenus === t.genus) same++
     }
     expect(same / trees.length).toBeGreaterThan(0.6)
+  })
+})
+
+describe('treePerches', () => {
+  it('gives one perch per tree, at the tree’s own position', () => {
+    const trees = placeTrees(terrain, 60, 3, ['betula'])
+    const perches = treePerches(trees)
+    expect(perches).toHaveLength(trees.length)
+    for (let i = 0; i < trees.length; i++) {
+      expect(perches[i].x).toBe(trees[i].x)
+      expect(perches[i].z).toBe(trees[i].z)
+    }
+  })
+
+  it('sits up in the crown, not on the ground or above the treetop', () => {
+    const trees = placeTrees(terrain, 60, 3, ['betula', 'picea'])
+    for (const p of treePerches(trees)) {
+      const t = trees.find((o) => o.x === p.x && o.z === p.z)!
+      expect(p.y).toBeGreaterThan(t.y)
+      expect(p.y).toBeLessThan(t.y + t.height)
+    }
   })
 })

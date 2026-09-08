@@ -125,6 +125,26 @@ export function placeTrees(
   return trees
 }
 
+/** A landing spot in a tree's crown, for world/birds.ts. */
+export interface TreePerch {
+  x: number
+  z: number
+  y: number
+}
+
+/** How far up the trunk the crown sits, as a fraction of total height — a
+ *  bird lands in the leaves, not at the very top or down among the branches. */
+const PERCH_HEIGHT_FRAC = 0.72
+
+/**
+ * Every tree's crown as a place a bird could land, derived straight from the
+ * same height each tree was actually drawn at — not a separate guess that
+ * could drift from what the canopy looks like.
+ */
+export function treePerches(trees: Tree[]): TreePerch[] {
+  return trees.map((t) => ({ x: t.x, z: t.z, y: t.y + t.height * PERCH_HEIGHT_FRAC }))
+}
+
 /** How many distinct broadleaf crown shapes exist. */
 const BROADLEAF_VARIANT_COUNT = 3
 
