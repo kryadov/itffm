@@ -71,30 +71,14 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const depth = 2.2
   const wallHeight = 1.7
 
-  // Log-course ripple: a plain box reads as smooth siding, not stacked logs.
-  // Bump depends on height alone, never on the vertex's own normal — the
-  // first version mixed in nx/nz too, which put a different bump on each
-  // face at the very edge two faces share, splitting the corner into a
-  // visible crack. Height-only bump moves both faces at a shared edge by the
-  // same amount, so the corner stays a clean line. Never negative, either:
-  // each course only bulges outward, the way a real round log does, rather
-  // than alternately bulging and pinching in like a wavy sheet.
-  const COURSES = 8
-  const wallGeo = new THREE.BoxGeometry(width, wallHeight, depth, 1, COURSES, 1)
-  const wpos = wallGeo.attributes.position
-  const wnorm = wallGeo.attributes.normal
-  for (let i = 0; i < wpos.count; i++) {
-    const y = wpos.getY(i)
-    const nx = wnorm.getX(i)
-    const nz = wnorm.getZ(i)
-    if (nx === 0 && nz === 0) continue // the flat roof-line and floor caps
-    const coursePhase = ((y + wallHeight / 2) / wallHeight) * COURSES * Math.PI * 2
-    const bump = 0.05 * (0.5 + 0.5 * Math.cos(coursePhase))
-    wpos.setXYZ(i, wpos.getX(i) + nx * bump, y, wpos.getZ(i) + nz * bump)
-  }
-  wallGeo.computeVertexNormals()
-
-  const walls = new THREE.Mesh(wallGeo, wallMat)
+  // A plain box: an earlier attempt at a log-course ripple displaced each
+  // face's vertices along that face's own normal, which at any corner points
+  // two adjacent faces in different directions — pulling them apart and
+  // opening a real gap letting the background show through the seam. Fixing
+  // that properly needs vertices that fade to zero displacement right at the
+  // edge, which needs more subdivision than a one-off hut earns; a flat wall
+  // reads as plain, not broken, and broken is worse.
+  const walls = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMat)
   walls.position.y = wallHeight / 2
   group.add(walls)
 
