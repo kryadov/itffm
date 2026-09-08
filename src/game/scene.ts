@@ -1,7 +1,16 @@
 import * as THREE from 'three'
 import { buildGround } from '../world/ground'
 import { buildTreeMeshes, type Tree } from '../world/trees'
-import { placeLogs, placeStumps, logObstacles, logSpawnPoints, buildDeadwoodMeshes } from '../world/deadwood'
+import {
+  placeLogs,
+  placeStumps,
+  placeLeaningTrees,
+  logObstacles,
+  leaningTreeObstacle,
+  logSpawnPoints,
+  buildDeadwoodMeshes,
+  buildLeaningTreeMeshes,
+} from '../world/deadwood'
 import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } from '../world/boulders'
 import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth'
 import { placeFlora, buildFloraMeshes } from '../world/flora'
@@ -191,6 +200,10 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     ...logs.flatMap((l) => logObstacles(l)),
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius, topHeight: s.height })),
   ]
+
+  const leaningTrees = placeLeaningTrees(source.ground, halfSize, seed + 13)
+  scene.add(buildLeaningTreeMeshes(leaningTrees))
+  extraObstacles.push(...leaningTrees.map(leaningTreeObstacle))
 
   const boulders = placeBoulders(source.ground, halfSize, seed + 7)
   scene.add(buildBoulderMeshes(boulders))

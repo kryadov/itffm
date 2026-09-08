@@ -30,6 +30,25 @@ export interface Stump {
   height: number
 }
 
+/**
+ * A tree still rooted in the ground but leaning at an angle — windthrow, or a
+ * bank washed out from under it — geometrically distinct from a `Log`: the
+ * root stays exactly where the trunk always stood, and `tilt` plus `height`
+ * decide where the crown ends up hanging, not a separate fallen position.
+ */
+export interface LeaningTree {
+  x: number
+  z: number
+  /** Ground height at the root. */
+  y: number
+  /** Compass heading the tree leans toward, radians. */
+  heading: number
+  /** How far from vertical the trunk leans, radians — 0 upright, π/2 flat. */
+  tilt: number
+  height: number
+  radius: number
+}
+
 const MIN_GAP = 3
 
 /** Scattered candidate points, spaced apart, each stood on the ground beneath it. */
@@ -79,6 +98,30 @@ export function placeLogs(
   }))
 }
 
+/**
+ * Scatters trees still rooted but leaning hard enough to read as storm damage
+ * rather than a normal trunk's lean — rarer than logs or stumps, since a wood
+ * this dramatic-looking should stay the exception.
+ */
+export function placeLeaningTrees(
+  ground: ElevationProvider,
+  halfSize: number,
+  seed: number,
+  density = 0.00015,
+): LeaningTree[] {
+  const scattered = scatter(ground, halfSize, seed, density)
+  const rng = mulberry32(seed + 71)
+  return scattered.map((p) => ({
+    ...p,
+    heading: rng() * Math.PI * 2,
+    // A believable windthrow lean: noticeably off vertical, never fully down
+    // (that would just be a Log with extra steps).
+    tilt: (Math.PI / 6) * (0.6 + rng() * 0.8),
+    height: 5 + rng() * 6,
+    radius: 0.15 + rng() * 0.15,
+  }))
+}
+
 /** Scatters the stubs left where a trunk has broken off close to the ground. */
 export function placeStumps(
   ground: ElevationProvider,
@@ -115,6 +158,15 @@ export function logObstacles(log: Log, beadSpacing = 1): CircleObstacle[] {
     beads.push({ x: log.x + dx * t, z: log.z + dz * t, radius: log.radius, topHeight: log.radius * 2 })
   }
   return beads
+}
+
+/**
+ * A leaning tree's collision shape: one circle at the root, same as a
+ * standing tree's — tall enough that MAX_STEP_HEIGHT never makes it
+ * climbable, so it blocks the way exactly like the trunk it still is.
+ */
+export function leaningTreeObstacle(t: LeaningTree): CircleObstacle {
+  return { x: t.x, z: t.z, radius: t.radius * 1.5 }
 }
 
 /**
@@ -183,5 +235,48 @@ export function buildDeadwoodMeshes(logs: Log[], stumps: Stump[]): THREE.Group {
     group.add(mesh)
   }
 
+  return group
+}
+
+/**
+ * Meshes for leaning trees: a tilted trunk rooted where `buildTreeMeshes`
+ * would root a standing one, with a rough foliage clump hanging at the top —
+ * simple geometry deliberately, the same "cheap enough for dozens" trade
+ * `buildDeadwoodMeshes` already makes for logs and stumps, not the detailed
+ * per-genus crowns `world/trees.ts` builds for trees still standing straight.
+ */
+export function buildLeaningTreeMeshes(trees: LeaningTree[]): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'leaning-trees'
+  if (trees.length === 0) return group
+
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a4a36, roughness: 1 })
+  const trunkMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 8), trunkMat, trees.length)
+  const crownMat = new THREE.MeshStandardMaterial({ color: 0x3a5030, roughness: 1 })
+  const crownMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), crownMat, trees.length)
+
+  const up = new THREE.Vector3(0, 1, 0)
+  const dummy = new THREE.Object3D()
+  trees.forEach((t, i) => {
+    const dir = new THREE.Vector3(
+      Math.sin(t.tilt) * Math.cos(t.heading),
+      Math.cos(t.tilt),
+      Math.sin(t.tilt) * Math.sin(t.heading),
+    )
+    dummy.quaternion.setFromUnitVectors(up, dir)
+    dummy.position.set(t.x + (dir.x * t.height) / 2, t.y + (dir.y * t.height) / 2, t.z + (dir.z * t.height) / 2)
+    dummy.scale.set(t.radius, t.height, t.radius)
+    dummy.updateMatrix()
+    trunkMesh.setMatrixAt(i, dummy.matrix)
+
+    const crownRadius = t.height * 0.22
+    dummy.position.set(t.x + dir.x * t.height, t.y + dir.y * t.height, t.z + dir.z * t.height)
+    dummy.quaternion.identity()
+    dummy.scale.setScalar(crownRadius)
+    dummy.updateMatrix()
+    crownMesh.setMatrixAt(i, dummy.matrix)
+  })
+
+  group.add(trunkMesh, crownMesh)
   return group
 }

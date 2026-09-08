@@ -1,4 +1,11 @@
-import { placeLogs, placeStumps, logObstacles, logSpawnPoints } from '../../src/world/deadwood'
+import {
+  placeLogs,
+  placeStumps,
+  placeLeaningTrees,
+  logObstacles,
+  leaningTreeObstacle,
+  logSpawnPoints,
+} from '../../src/world/deadwood'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 
 const ground = proceduralTerrain(5)
@@ -49,6 +56,46 @@ describe('placeStumps', () => {
       expect(s.height).toBeGreaterThan(0)
       expect(s.height).toBeLessThan(1)
     }
+  })
+})
+
+describe('placeLeaningTrees', () => {
+  it('is deterministic and bounded', () => {
+    expect(placeLeaningTrees(ground, 90, 4)).toEqual(placeLeaningTrees(ground, 90, 4))
+    for (const t of placeLeaningTrees(ground, 90, 4)) {
+      expect(Math.abs(t.x)).toBeLessThanOrEqual(90)
+      expect(Math.abs(t.z)).toBeLessThanOrEqual(90)
+    }
+  })
+
+  it('gives a real lean, never upright and never fully down', () => {
+    for (const t of placeLeaningTrees(ground, 90, 4)) {
+      expect(t.tilt).toBeGreaterThan(0)
+      expect(t.tilt).toBeLessThan(Math.PI / 2)
+    }
+  })
+
+  it('gives plausible trunk dimensions', () => {
+    for (const t of placeLeaningTrees(ground, 90, 4)) {
+      expect(t.height).toBeGreaterThan(3)
+      expect(t.height).toBeLessThan(12)
+      expect(t.radius).toBeGreaterThan(0.1)
+      expect(t.radius).toBeLessThan(0.35)
+    }
+  })
+
+  it('is rarer than logs or stumps at the same seed', () => {
+    expect(placeLeaningTrees(ground, 90, 4).length).toBeLessThan(placeLogs(ground, 90, 4).length)
+  })
+})
+
+describe('leaningTreeObstacle', () => {
+  it('sits at the root, not the crown', () => {
+    const t = { x: 5, z: -3, y: 0, heading: 0, tilt: 0.4, height: 8, radius: 0.2 }
+    const o = leaningTreeObstacle(t)
+    expect(o.x).toBe(5)
+    expect(o.z).toBe(-3)
+    expect(o.topHeight).toBeUndefined()
   })
 })
 
