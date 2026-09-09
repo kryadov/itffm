@@ -3,6 +3,8 @@ import { buildGround } from '../world/ground'
 import { buildTreeMeshes, treePerches, type Tree } from '../world/trees'
 import { createBirds } from '../world/birds'
 import { createHares, createSquirrels, createSnakes, placeCritterHomes } from '../world/critters'
+import { placeHive, hiveObstacle, buildHiveMesh } from '../world/hive'
+import { createBees, createDragonflies } from '../world/insects'
 import { mulberry32 } from '../util/rng'
 import {
   placeLogs,
@@ -29,7 +31,7 @@ import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
 import { buildPathMeshes } from '../world/paths'
-import { buildWaterMeshes, placeSprings, buildSpringMeshes } from '../world/water'
+import { buildWaterMeshes, placeSprings, buildSpringMeshes, classifyWater, waterLevel } from '../world/water'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -130,6 +132,10 @@ export interface Forest {
   /** Steps hares and squirrels — call every frame with the player's own
    *  position, same as `updateBirds`. */
   updateCritters: (dt: number, playerX: number, playerZ: number) => void
+  /** Drifts bees around the hive and dragonflies over the water, if either
+   *  exists in this wood — call every frame. Ambient: unlike `updateCritters`,
+   *  it needs no player position. */
+  updateInsects: (dt: number) => void
   /** Ripples every stream, breathes every waterfall's spray and bobs every
    *  spring — call every frame. */
   updateWater: (dt: number) => void
@@ -333,6 +339,30 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     snakes.update(dt, playerX, playerZ)
   }
 
+  // Insects: ambient, no state machine — see docs/superpowers/specs/
+  // 2026-09-10-wildlife-design.md. A wild hive against a real tree (or none,
+  // honestly, same as the fisherman's hut with no water); dragonflies only
+  // where the wood actually has a pond to hover over.
+  const hive = placeHive(source.trees, seed + 26)
+  let bees: ReturnType<typeof createBees> | null = null
+  if (hive) {
+    scene.add(buildHiveMesh(hive))
+    extraObstacles.push(hiveObstacle(hive))
+    bees = createBees(scene, mulberry32(seed + 27), 10, hive)
+  }
+  const pondAnchors = (source.water ?? [])
+    .filter((ring) => ring.length >= 2 && classifyWater(ring) === 'pond')
+    .flatMap((ring) => {
+      const y = waterLevel(ring, source.ground) + 0.15
+      const picks = [ring[0], ring[Math.floor(ring.length / 2)]]
+      return picks.map((p) => ({ x: p.x, y, z: p.z }))
+    })
+  const dragonflies = pondAnchors.length > 0 ? createDragonflies(scene, mulberry32(seed + 28), 6, pondAnchors) : null
+  const updateInsects = (dt: number): void => {
+    bees?.update(dt)
+    dragonflies?.update(dt)
+  }
+
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
   const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
@@ -382,7 +412,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds,
-    updateCritters, updateWater,
+    updateCritters, updateInsects, updateWater,
     updateMushroomLod,
   }
 }
