@@ -69,6 +69,7 @@ export function placeTrees(
   seed: number,
   mix: TreeGenus[],
   density = 0.06,
+  origin: { x: number; z: number } = { x: 0, z: 0 },
 ): Tree[] {
   const rng = mulberry32(seed)
   const area = halfSize * 2 * halfSize * 2
@@ -81,8 +82,8 @@ export function placeTrees(
   const grid = new Map<string, Tree[]>()
 
   for (let i = 0; i < attempts; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
+    const x = origin.x + (rng() * 2 - 1) * halfSize
+    const z = origin.z + (rng() * 2 - 1) * halfSize
 
     const gx = Math.floor(x / cell)
     const gz = Math.floor(z / cell)

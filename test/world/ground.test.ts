@@ -73,4 +73,19 @@ describe('buildGround', () => {
     const b = buildGround(flat, 40, 20, () => 'forest-mixed', 5)
     expect(a.geometry.getAttribute('color').array).toEqual(b.geometry.getAttribute('color').array)
   })
+
+  it('places an off-centre chunk tile at its own origin, sampling the real world point', () => {
+    const origin = { x: 1000, z: -500 }
+    const slope: ElevationProvider = { heightAt: (x) => x * 0.1 }
+    const mesh = buildGround(slope, 20, 4, undefined, 0, origin)
+    expect(mesh.position.x).toBe(origin.x)
+    expect(mesh.position.z).toBe(origin.z)
+    // The vertex at local (0,0) sits at world (1000, -500) — heightAt(1000) = 100.
+    const pos = mesh.geometry.getAttribute('position')
+    let centreY: number | null = null
+    for (let i = 0; i < pos.count; i++) {
+      if (pos.getX(i) === 0 && pos.getZ(i) === 0) centreY = pos.getY(i)
+    }
+    expect(centreY).toBeCloseTo(100, 5)
+  })
 })

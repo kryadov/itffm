@@ -42,6 +42,21 @@ describe('placeTrees', () => {
     expect(trees.length).toBeLessThan(3000)
   })
 
+  it('keeps every tree inside an off-centre chunk when given an origin', () => {
+    const origin = { x: 1000, z: -500 }
+    for (const t of placeTrees(terrain, 60, 3, ['betula', 'picea'], 0.06, origin)) {
+      expect(Math.abs(t.x - origin.x)).toBeLessThanOrEqual(60)
+      expect(Math.abs(t.z - origin.z)).toBeLessThanOrEqual(60)
+    }
+  })
+
+  it('is deterministic for the same chunk origin', () => {
+    const origin = { x: 1000, z: -500 }
+    expect(placeTrees(terrain, 60, 3, ['betula'], 0.06, origin)).toEqual(
+      placeTrees(terrain, 60, 3, ['betula'], 0.06, origin),
+    )
+  })
+
   it('never grows two trees inside each other', () => {
     const trees = placeTrees(terrain, 60, 3, ['betula'])
     for (let i = 0; i < trees.length; i++) {

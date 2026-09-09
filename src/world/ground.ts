@@ -48,18 +48,22 @@ export function buildGround(
   segments: number,
   biomeAt?: (x: number, z: number) => Biome,
   seed = 0,
+  origin: { x: number; z: number } = { x: 0, z: 0 },
 ): THREE.Mesh {
   const geo = new THREE.PlaneGeometry(halfSize * 2, halfSize * 2, segments, segments)
   geo.rotateX(-Math.PI / 2)
   const pos = geo.getAttribute('position') as THREE.BufferAttribute
   const colors = biomeAt ? new Float32Array(pos.count * 3) : null
   for (let i = 0; i < pos.count; i++) {
+    // Vertices stay in the mesh's own local space (mesh.position carries the
+    // chunk's world offset, set below) — heightAt/biomeAt still need the
+    // real world point, hence the origin added only for those two calls.
     const x = pos.getX(i)
     const z = pos.getZ(i)
-    pos.setY(i, provider.heightAt(x, z))
+    pos.setY(i, provider.heightAt(x + origin.x, z + origin.z))
     if (colors && biomeAt) {
-      const biome = biomeAt(x, z)
-      const c = BIOME_COLOR[biome] ?? litterColor(x, z, seed)
+      const biome = biomeAt(x + origin.x, z + origin.z)
+      const c = BIOME_COLOR[biome] ?? litterColor(x + origin.x, z + origin.z, seed)
       colors[i * 3] = c.r
       colors[i * 3 + 1] = c.g
       colors[i * 3 + 2] = c.b
@@ -78,6 +82,7 @@ export function buildGround(
     }),
   )
   mesh.name = 'ground'
+  mesh.position.set(origin.x, 0, origin.z)
   // Lets the shelter's hearth light (world/shelter.ts) leave a real shadow
   // under its own walls instead of shining straight through them — the only
   // shadow-casting light in the wood, so this costs nothing anywhere else.
