@@ -205,7 +205,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     flashlight.target.position.copy(camPos).add(camDir)
   }
 
-  scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt))
+  scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt, seed + 17))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground, halfSize))
   const water = buildWaterMeshes(source.water ?? [], source.ground)
   scene.add(water.group)

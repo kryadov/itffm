@@ -45,4 +45,32 @@ describe('buildGround', () => {
     expect(wetColor).not.toEqual(forestColor)
     expect(duneColor).not.toEqual(wetColor)
   })
+
+  it('breaks the default forest floor into litter patches, not one flat green', () => {
+    const mesh = buildGround(flat, 40, 20, () => 'forest-mixed', 5)
+    const color = mesh.geometry.getAttribute('color')
+    const seen = new Set<string>()
+    for (let i = 0; i < color.count; i++) {
+      seen.add(`${color.getX(i).toFixed(4)},${color.getY(i).toFixed(4)},${color.getZ(i).toFixed(4)}`)
+    }
+    expect(seen.size).toBeGreaterThan(1)
+  })
+
+  it('leaves dunes and wetland free of litter mottling', () => {
+    const a = buildGround(flat, 20, 8, () => 'dunes-coast', 1)
+    const b = buildGround(flat, 20, 8, () => 'dunes-coast', 2)
+    const colorA = a.geometry.getAttribute('color')
+    const colorB = b.geometry.getAttribute('color')
+    for (let i = 0; i < colorA.count; i++) {
+      expect(colorA.getX(i)).toBeCloseTo(colorB.getX(i), 5)
+      expect(colorA.getY(i)).toBeCloseTo(colorB.getY(i), 5)
+      expect(colorA.getZ(i)).toBeCloseTo(colorB.getZ(i), 5)
+    }
+  })
+
+  it('keeps the litter pattern deterministic for the same seed', () => {
+    const a = buildGround(flat, 40, 20, () => 'forest-mixed', 5)
+    const b = buildGround(flat, 40, 20, () => 'forest-mixed', 5)
+    expect(a.geometry.getAttribute('color').array).toEqual(b.geometry.getAttribute('color').array)
+  })
 })
