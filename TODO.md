@@ -221,6 +221,11 @@
       на экране. Когда дойдём до календаря (см. «Игра»), стоит завязать
       видимую погоду на то же значение, что двигает спавн, а не держать их
       двумя независимыми ручками.
+- [ ] **Moon phases.** `world/sky.ts`'s shader moon is always a plain lit
+      disc (`moonDisc`/`moonGlow`) regardless of date — no waxing/waning, no
+      crescent. A real phase (from the calendar, once that exists — see
+      "Игра" below) should render as an actual crescent/gibbous shape, not
+      just a dimmer full disc.
 - [x] **Ручей, водопад, источники рядом с водоёмами.** Готово (v0.40.0):
       `world/water.ts` теперь различает пруд и ручей по форме кольца
       (`classifyWater` — замкнутое и компактное значит пруд, вытянутое или
@@ -272,6 +277,22 @@
       своей орбиты вокруг якоря) — сама сцена с прудом кадрировалась хуже
       из-за плотного леса вокруг воды, решено считать тестовое покрытие
       достаточным. Все три части живности из этого пункта TODO закрыты.
+- [ ] **Wildlife reads as a couple of oddly-coloured shapes, not animals.**
+      Live feedback, 2026-09-10: the hare/squirrel/snake low-poly geometry in
+      `world/critters.ts` (stretched octahedron bodies, flat sandy-brown
+      0x9a8468/rust-red 0xa8542e/olive 0x5a6b3c fills) doesn't read as
+      "hare"/"squirrel"/"snake" from a normal walking distance — it needs
+      actual silhouette and colour work, not just a bigger polygon budget.
+      Same likely applies to the bees/dragonflies in `world/insects.ts`.
+      Worth a "look at it" pass with real reference silhouettes before
+      touching the geometry code again.
+- [ ] **Railway and a train.** A low-priority addition — a rail line and a
+      passing train through the wood, ported from `race-the-city`
+      (`kryadov/race-the-city` already has train/rail rendering for its own
+      city scale; per CLAUDE.md's own donor-code lesson, the class of
+      problem there is a car chasing traffic through a city, not a walk
+      through a wood — expect to take the rendering/track-following idea,
+      not the code as-is).
 
 ## 🚶 Ходьба и ориентирование
 
