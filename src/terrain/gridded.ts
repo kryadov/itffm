@@ -16,6 +16,7 @@ export function gridProviderFromArray(
   h: ArrayLike<number>,
   halfSize: number,
   segments: number,
+  origin: { x: number; z: number } = { x: 0, z: 0 },
 ): ElevationProvider {
   const step = (halfSize * 2) / segments
   const n = segments + 1
@@ -28,8 +29,8 @@ export function gridProviderFromArray(
 
   return {
     heightAt(x: number, z: number): number {
-      const gx = (x + halfSize) / step
-      const gz = (z + halfSize) / step
+      const gx = (x - origin.x + halfSize) / step
+      const gz = (z - origin.z + halfSize) / step
       const i = Math.floor(gx)
       const j = Math.floor(gz)
       const fx = gx - i
@@ -63,14 +64,15 @@ export function griddedProvider(
   src: ElevationProvider,
   halfSize: number,
   segments: number,
+  origin: { x: number; z: number } = { x: 0, z: 0 },
 ): ElevationProvider {
   const step = (halfSize * 2) / segments
   const n = segments + 1
   const h = new Float32Array(n * n)
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      h[j * n + i] = src.heightAt(-halfSize + i * step, -halfSize + j * step)
+      h[j * n + i] = src.heightAt(origin.x - halfSize + i * step, origin.z - halfSize + j * step)
     }
   }
-  return gridProviderFromArray(h, halfSize, segments)
+  return gridProviderFromArray(h, halfSize, segments, origin)
 }
