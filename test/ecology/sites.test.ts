@@ -42,6 +42,14 @@ describe('buildSites', () => {
     }
   })
 
+  it('keeps sites inside an off-centre chunk when given an origin', () => {
+    const origin = { x: 1000, z: -500 }
+    for (const s of buildSites(terrain, trees, 60, 11, () => 'forest-mixed', 100, [], [], [], origin)) {
+      expect(Math.abs(s.x - origin.x)).toBeLessThanOrEqual(60)
+      expect(Math.abs(s.z - origin.z)).toBeLessThanOrEqual(60)
+    }
+  })
+
   it('sorts hosts by distance', () => {
     for (const s of buildSites(terrain, trees, 60, 11, () => 'forest-mixed', 100)) {
       for (let i = 1; i < s.hosts.length; i++) {

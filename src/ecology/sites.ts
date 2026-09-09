@@ -83,6 +83,7 @@ export function buildSites(
   deadwoodPoints: { x: number; z: number }[] = [],
   mossPoints: { x: number; z: number }[] = [],
   water: Vec2[][] = [],
+  origin: { x: number; z: number } = { x: 0, z: 0 },
 ): Site[] {
   const rng = mulberry32(seed)
   const sites: Site[] = []
@@ -116,8 +117,8 @@ export function buildSites(
   })
 
   for (let i = 0; i < count; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
+    const x = origin.x + (rng() * 2 - 1) * halfSize
+    const z = origin.z + (rng() * 2 - 1) * halfSize
     sites.push(siteAt(x, z, rng() < 0.3 ? 'litter' : 'soil'))
   }
 
