@@ -6,7 +6,7 @@ import { buildNut } from '../nut/build'
 import { buildFind } from '../find/build'
 import type { Species } from '../species/schema'
 
-export { toWorldMesh, withPickHitbox, HITBOX_RADIUS } from './worldMesh'
+export { toWorldMesh, withPickHitbox, HITBOX_RADIUS, buildCollectibleLod, LOD_DISTANCE } from './worldMesh'
 
 /**
  * The detailed model for any species, dispatched by `kind` — the one place

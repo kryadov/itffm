@@ -62,6 +62,68 @@ export function toWorldMesh(group: THREE.Group): THREE.Mesh {
   return merged
 }
 
+/** Beyond this distance from the camera, a collectible switches from its own
+ *  detailed geometry (`toWorldMesh`'s baked-colour mesh) to `buildLodProxy`'s
+ *  cheap stand-in — see `buildCollectibleLod`. Close enough that a mushroom's
+ *  fine detail (cap shape, gill colour) is still what a player actually sees
+ *  while they can tell one species from another by eye; a wood-worth of
+ *  specks at this range no longer needs their real geometry to read right. */
+export const LOD_DISTANCE = 18
+
+/**
+ * A cheap stand-in for a built-and-merged collectible: one low-poly cone,
+ * sized and centred to the same bounding box, in one flat colour averaged
+ * from the real mesh's own baked vertex colours (not a fixed placeholder —
+ * a chanterelle's proxy should still read yellow, a russula's still red).
+ *
+ * Kind-agnostic on purpose, the same way `toWorldMesh` is: it never looks at
+ * what species or kind the mesh came from, only at the geometry and colours
+ * `toWorldMesh` already produced, so one function covers every kind's LOD.
+ */
+export function buildLodProxy(mesh: THREE.Mesh): THREE.Mesh {
+  mesh.geometry.computeBoundingBox()
+  const box = mesh.geometry.boundingBox!
+  const center = box.getCenter(new THREE.Vector3())
+  const size = box.getSize(new THREE.Vector3())
+
+  const colorAttr = mesh.geometry.getAttribute('color')
+  const avg = new THREE.Color(0, 0, 0)
+  if (colorAttr) {
+    for (let i = 0; i < colorAttr.count; i++) {
+      avg.r += colorAttr.getX(i)
+      avg.g += colorAttr.getY(i)
+      avg.b += colorAttr.getZ(i)
+    }
+    avg.r /= colorAttr.count
+    avg.g /= colorAttr.count
+    avg.b /= colorAttr.count
+  }
+
+  // A 6-sided cone: cheap (roughly a dozen triangles) and still reads as a
+  // capped, stemmed silhouette at a glance, close enough for the range it is
+  // shown at.
+  const geo = new THREE.ConeGeometry(Math.max(size.x, size.z) / 2, Math.max(size.y, 0.01), 6)
+  const proxy = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: avg }))
+  proxy.position.copy(center)
+  proxy.name = 'collectible-lod'
+  return proxy
+}
+
+/**
+ * Wraps a built collectible mesh (`toWorldMesh`'s output) in a two-level
+ * `THREE.LOD`: the real mesh up close, `buildLodProxy`'s cheap silhouette
+ * beyond `lodDistance`. `game/scene.ts` adds the LOD itself to the scene in
+ * the mesh's place; whatever calls this must still call `.update(camera)`
+ * on it every frame (three.js's own LOD does not update itself) — see
+ * `Forest.updateMushroomLod`.
+ */
+export function buildCollectibleLod(mesh: THREE.Mesh, lodDistance: number = LOD_DISTANCE): THREE.LOD {
+  const lod = new THREE.LOD()
+  lod.addLevel(mesh, 0)
+  lod.addLevel(buildLodProxy(mesh), lodDistance)
+  return lod
+}
+
 /** Floor on the radius of the invisible pick target `withPickHitbox` adds,
  *  metres — on the order of a small mushroom cap, the one thing in the wood
  *  the crosshair's exact ray already lands on reliably. A model taller or

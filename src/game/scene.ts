@@ -28,7 +28,7 @@ import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies, speciesById } from '../species/load'
-import { buildCollectible, toWorldMesh, withPickHitbox } from '../collectible/build'
+import { buildCollectible, toWorldMesh, withPickHitbox, buildCollectibleLod } from '../collectible/build'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
 import type { Vec2 } from '../geo/types'
@@ -116,6 +116,10 @@ export interface Forest {
   /** Ripples every stream, breathes every waterfall's spray and bobs every
    *  spring — call every frame. */
   updateWater: (dt: number) => void
+  /** Picks each collectible's own THREE.LOD level by distance from the
+   *  camera — three.js's LOD does not do this on its own. Call every frame;
+   *  cheap (one pass over the placements, no rebuilding). */
+  updateMushroomLod: (camera: THREE.Camera) => void
 }
 
 /**
@@ -279,6 +283,11 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   }
 
   const mushroomObjects: THREE.Object3D[] = []
+  // Every placement's own THREE.LOD, kept apart from mushroomObjects (which
+  // for a berry/nut/find is the withPickHitbox wrapper, not the LOD itself)
+  // — three.js's LOD does not update itself, so updateMushroomLod below
+  // needs the exact objects to call .update(camera) on every frame.
+  const lods: THREE.LOD[] = []
   for (const p of placements) {
     const species = speciesById(p.speciesId)
     if (!species) continue
@@ -288,7 +297,9 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     // withPickHitbox) the moment it is built. A mushroom needs none of this:
     // its own cap is already big enough for the exact ray in game/pick.ts to
     // land on reliably (see TODO.md, 2026-09-09).
-    let mesh: THREE.Object3D = toWorldMesh(buildCollectible(species, p.seed, p.age))
+    const lod = buildCollectibleLod(toWorldMesh(buildCollectible(species, p.seed, p.age)))
+    lods.push(lod)
+    let mesh: THREE.Object3D = lod
     if (species.kind !== 'mushroom') mesh = withPickHitbox(mesh)
     mesh.position.set(p.x, source.ground.heightAt(p.x, p.z), p.z)
     mesh.rotateY(p.rotationY)
@@ -296,10 +307,14 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     scene.add(mesh)
     mushroomObjects.push(mesh)
   }
+  const updateMushroomLod = (camera: THREE.Camera): void => {
+    for (const lod of lods) lod.update(camera)
+  }
 
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateBirds, updateWater,
+    updateMushroomLod,
   }
 }

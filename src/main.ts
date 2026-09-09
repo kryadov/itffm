@@ -584,6 +584,7 @@ async function main(): Promise<void> {
     if (flashlightOn) forest.updateFlashlight(camera.position, camera.getWorldDirection(camDir))
 
     cullDistantMushrooms()
+    forest.updateMushroomLod(camera)
     updateAim()
     updateDebugOverlay()
     renderer.render(forest.scene, camera)

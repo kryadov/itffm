@@ -1,5 +1,20 @@
 import * as THREE from 'three'
-import { withPickHitbox, HITBOX_RADIUS } from '../../src/collectible/worldMesh'
+import { withPickHitbox, HITBOX_RADIUS, buildLodProxy, buildCollectibleLod, LOD_DISTANCE } from '../../src/collectible/worldMesh'
+
+/** A stand-in for a toWorldMesh() output: baked per-vertex colour, roughly
+ *  mushroom-cap-sized, with enough geometry that a cheap proxy is worth it. */
+function coloredMesh(color: THREE.Color, radius = 0.05, height = 0.08): THREE.Mesh {
+  const geo = new THREE.CylinderGeometry(radius, radius, height, 12, 4)
+  const count = geo.getAttribute('position').count
+  const colors = new Float32Array(count * 3)
+  for (let i = 0; i < count; i++) {
+    colors[i * 3] = color.r
+    colors[i * 3 + 1] = color.g
+    colors[i * 3 + 2] = color.b
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+  return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true }))
+}
 
 describe('withPickHitbox', () => {
   it('wraps the given mesh as a child of a new group', () => {
@@ -55,5 +70,86 @@ describe('withPickHitbox', () => {
     const sphere = hitbox.geometry as THREE.SphereGeometry
     expect(sphere.parameters.radius).toBeGreaterThan(HITBOX_RADIUS)
     expect(hitbox.position.y).toBeCloseTo(0.2, 5)
+  })
+})
+
+describe('buildLodProxy', () => {
+  it('is far cheaper than the mesh it stands in for', () => {
+    const full = coloredMesh(new THREE.Color(0.8, 0.6, 0.2))
+    const proxy = buildLodProxy(full)
+    const fullCount = full.geometry.getAttribute('position').count
+    const proxyCount = proxy.geometry.getAttribute('position').count
+    expect(proxyCount).toBeLessThan(fullCount)
+    expect(proxyCount).toBeLessThanOrEqual(40)
+  })
+
+  it('fills roughly the same footprint as the mesh it replaces', () => {
+    // Both built at local origin — game/scene.ts places the LOD wrapper in
+    // the world, not the mesh inside it, the same way it always placed the
+    // plain merged mesh before LOD existed.
+    const full = coloredMesh(new THREE.Color(1, 1, 1), 0.05, 0.08)
+    full.updateMatrixWorld(true)
+    const proxy = buildLodProxy(full)
+
+    const fullBox = new THREE.Box3().setFromObject(full)
+    const proxyBox = new THREE.Box3().setFromObject(proxy)
+    const fullCenter = fullBox.getCenter(new THREE.Vector3())
+    const proxyCenter = proxyBox.getCenter(new THREE.Vector3())
+    expect(proxyCenter.distanceTo(fullCenter)).toBeLessThan(0.03)
+
+    const fullSize = fullBox.getSize(new THREE.Vector3())
+    const proxySize = proxyBox.getSize(new THREE.Vector3())
+    expect(proxySize.y).toBeGreaterThan(fullSize.y * 0.7)
+    expect(proxySize.y).toBeLessThan(fullSize.y * 1.3)
+  })
+
+  it('takes on the mesh\'s own baked colour rather than a fixed placeholder', () => {
+    const red = coloredMesh(new THREE.Color(0.9, 0.1, 0.1))
+    const redProxy = buildLodProxy(red)
+    const redMat = redProxy.material as THREE.MeshLambertMaterial
+    expect(redMat.color.r).toBeGreaterThan(redMat.color.g)
+    expect(redMat.color.r).toBeGreaterThan(redMat.color.b)
+
+    const green = coloredMesh(new THREE.Color(0.1, 0.9, 0.1))
+    const greenProxy = buildLodProxy(green)
+    const greenMat = greenProxy.material as THREE.MeshLambertMaterial
+    expect(greenMat.color.g).toBeGreaterThan(greenMat.color.r)
+    expect(greenMat.color.g).toBeGreaterThan(greenMat.color.b)
+  })
+
+  it('does not paint per vertex — a proxy this small is not worth the attribute', () => {
+    const proxy = buildLodProxy(coloredMesh(new THREE.Color(0.5, 0.5, 0.5)))
+    const mat = proxy.material as THREE.MeshLambertMaterial
+    expect(mat.vertexColors).toBe(false)
+  })
+})
+
+describe('buildCollectibleLod', () => {
+  it('shows the real mesh up close and the cheap proxy beyond LOD_DISTANCE', () => {
+    const full = coloredMesh(new THREE.Color(0.4, 0.7, 0.3))
+    const lod = buildCollectibleLod(full)
+    expect(lod).toBeInstanceOf(THREE.LOD)
+    expect(lod.levels).toHaveLength(2)
+    expect(lod.levels[0].object).toBe(full)
+    expect(lod.levels[0].distance).toBe(0)
+    expect(lod.levels[1].object).not.toBe(full)
+    expect(lod.levels[1].distance).toBe(LOD_DISTANCE)
+  })
+
+  it('actually swaps which child is visible as the camera moves away', () => {
+    const full = coloredMesh(new THREE.Color(0.4, 0.7, 0.3))
+    const lod = buildCollectibleLod(full)
+    lod.updateMatrixWorld(true)
+
+    const camera = new THREE.PerspectiveCamera(70, 1, 0.02, 300)
+    camera.position.set(0, 0, 0)
+    camera.updateMatrixWorld(true)
+    lod.update(camera)
+    expect(full.visible).toBe(true)
+
+    camera.position.set(0, 0, LOD_DISTANCE + 5)
+    camera.updateMatrixWorld(true)
+    lod.update(camera)
+    expect(full.visible).toBe(false)
   })
 })
