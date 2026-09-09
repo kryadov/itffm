@@ -18,20 +18,26 @@ const ANGLES_PER_RING = 12
  * searchable area is somehow blocked.
  *
  * Lives in util/ rather than game/ or world/ because both need it: a
- * player's start (game/startPose.ts) and the wood's one shelter
- * (world/shelter.ts) are the same question — "where is there room?" — asked
- * with a different `clearance`.
+ * player's start (game/startPose.ts) and the wood's fixed features
+ * (`world/shelter.ts`, `world/campfire.ts`) are the same question — "where
+ * is there room?" — asked with a different `clearance`.
+ *
+ * @param extra an additional condition a candidate point must satisfy beyond
+ *   clearance — `world/campfire.ts` uses it to also require an actual
+ *   clearing (`world/clearings.ts`'s `isClearing`), not just open ground.
  */
 export function findOpenSpot(
   obstacles: Circle[],
   halfSize: number,
   origin: Point,
   clearance: number,
+  extra?: (x: number, z: number) => boolean,
 ): Point {
   const isOpen = (x: number, z: number): boolean =>
     Math.abs(x) <= halfSize &&
     Math.abs(z) <= halfSize &&
-    obstacles.every((o) => Math.hypot(x - o.x, z - o.z) >= o.radius + clearance)
+    obstacles.every((o) => Math.hypot(x - o.x, z - o.z) >= o.radius + clearance) &&
+    (!extra || extra(x, z))
 
   if (isOpen(origin.x, origin.z)) return origin
 

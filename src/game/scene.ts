@@ -18,6 +18,7 @@ import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import { placeShelter, shelterObstacle, buildShelterMesh, type ShelterFx } from '../world/shelter'
+import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
@@ -111,6 +112,8 @@ export interface Forest {
   updateFlashlight: (camPos: THREE.Vector3, camDir: THREE.Vector3) => void
   /** Drifts the shelter's chimney smoke — call every frame. */
   updateShelter: (dt: number) => void
+  /** Drifts the campfire's smoke and flickers its embers — call every frame. */
+  updateCampfire: (dt: number) => void
   /** Drifts the flock — call every frame with the player's own position. */
   updateBirds: (dt: number, playerX: number, playerZ: number) => void
   /** Ripples every stream, breathes every waterfall's spray and bobs every
@@ -265,6 +268,14 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   extraObstacles.push(shelterObstacle(shelter))
   const updateShelter = (dt: number): void => shelterFx!.update(dt)
 
+  // A second everyday fixture, deliberately apart from the hut — see
+  // world/campfire.ts's own doc comment for why (a live request, 2026-09-09).
+  const campfire = placeCampfire(source.ground, halfSize, seed + 18, [...treeCircles, ...extraObstacles], shelter)
+  const campfireFx = buildCampfireMesh(campfire)
+  scene.add(campfireFx.group)
+  extraObstacles.push(campfireObstacle(campfire))
+  const updateCampfire = (dt: number): void => campfireFx.update(dt)
+
   const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))
   const updateBirds = (dt: number, playerX: number, playerZ: number): void => birds.update(dt, playerX, playerZ)
 
@@ -314,7 +325,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateBirds, updateWater,
+    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds, updateWater,
     updateMushroomLod,
   }
 }
