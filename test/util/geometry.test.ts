@@ -1,4 +1,4 @@
-import { pointInPolygon, boundsOf, densify, distanceToRing } from '../../src/util/geometry'
+import { pointInPolygon, boundsOf, densify, distanceToRing, distanceToPolyline } from '../../src/util/geometry'
 
 const square = [
   { x: -10, z: -10 }, { x: 10, z: -10 },
@@ -59,6 +59,33 @@ describe('distanceToRing', () => {
   it('returns Infinity for a degenerate ring', () => {
     expect(distanceToRing(0, 0, [])).toBe(Infinity)
     expect(distanceToRing(0, 0, [{ x: 1, z: 1 }])).toBe(Infinity)
+  })
+})
+
+describe('distanceToPolyline', () => {
+  const line = [{ x: -10, z: 0 }, { x: 10, z: 0 }]
+
+  it('is zero on the line itself', () => {
+    expect(distanceToPolyline(0, 0, line)).toBe(0)
+  })
+
+  it('measures the perpendicular gap to the nearest segment', () => {
+    expect(distanceToPolyline(0, 3, line)).toBeCloseTo(3, 5)
+  })
+
+  it('never closes the line back to its own start, unlike a ring', () => {
+    // A "V" whose two open ends sit at z=0 — a ring would draw a closing
+    // edge straight between them; an open polyline must not.
+    const v = [{ x: -10, z: 0 }, { x: 0, z: 10 }, { x: 10, z: 0 }]
+    // Just below the open ends: a wrongly-closed ring would measure ~5 to
+    // its invented base edge; the real, open polyline is much further away,
+    // since the nearest real segment is one of the two diagonal legs.
+    expect(distanceToPolyline(0, -5, v)).toBeGreaterThan(10)
+  })
+
+  it('returns Infinity for a degenerate line', () => {
+    expect(distanceToPolyline(0, 0, [])).toBe(Infinity)
+    expect(distanceToPolyline(0, 0, [{ x: 1, z: 1 }])).toBe(Infinity)
   })
 })
 

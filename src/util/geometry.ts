@@ -62,6 +62,20 @@ export function distanceToRing(x: number, z: number, ring: Vec2[]): number {
   return min
 }
 
+/**
+ * Distance from a point to an open polyline — a trail, not a pond's outline:
+ * unlike `distanceToRing`, the last point never closes back to the first,
+ * and there is no "inside" to short-circuit to zero.
+ */
+export function distanceToPolyline(x: number, z: number, line: Vec2[]): number {
+  if (line.length < 2) return Infinity
+  let min = Infinity
+  for (let i = 1; i < line.length; i++) {
+    min = Math.min(min, distanceToSegment(x, z, line[i - 1], line[i]))
+  }
+  return min
+}
+
 /** The axis-aligned bounds of a ring, or null if it has no points. */
 export function boundsOf(poly: Vec2[]): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
   if (poly.length === 0) return null

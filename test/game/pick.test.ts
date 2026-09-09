@@ -124,12 +124,22 @@ describe('nearestInView', () => {
       expect(nearestInView(camera, [], 10, [grassBlade], [b])).toBe(b)
     })
 
-    it('still stays hidden when a real mushroom truly sits behind the occluder on the exact ray', () => {
-      const m = mushroom(-3)
+    it('still finds an off-axis berry when a different real specimen from the same clustered colony sits further along the exact ray', () => {
+      // A clustered colony packs several real specimens within centimetres
+      // of each other (ecology/spawn.ts's COLONY_SPREAD). Grass at z=-1
+      // blocks the exact ray first; a DIFFERENT real berry from the same
+      // colony (real geometry, not the one being aimed at) happens to sit
+      // further along that same ray at z=-3 — neither should stop the
+      // off-axis target from being found through the cone (2026-09-09 live
+      // report: this exact shape of scene made almost every berry
+      // unreachable except when it happened to be alone).
+      const grazed = mushroom(-3)
+      grazed.userData.placement = item('vaccinium-myrtillus')
       const grassBlade = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
       grassBlade.position.set(0, 0, -1)
       grassBlade.updateMatrixWorld(true)
-      expect(nearestInView(camera, [m], 10, [grassBlade], [m])).toBe(null)
+      const target = tinyBerry(0.3, -3)
+      expect(nearestInView(camera, [grazed], 10, [grassBlade], [target])).toBe(target)
     })
 
     it('picks the nearer of two tiny objects both inside the cone', () => {

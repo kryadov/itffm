@@ -82,15 +82,30 @@ function nearestSmallInCone(
  * looks at what they are reaching for, so aim decides the pick, not proximity.
  *
  * `occluders` — grass, undergrowth — are cast against too but never returned:
- * they exist here only so a mushroom truly hidden behind one is hidden from
- * the ray as well as the eye. That falls out of the geometry for free — the
- * closest hit wins, and if it is a tuft of grass rather than a mushroom, the
- * walk up to `userData.placement` below runs out of parents and returns null.
+ * a big mushroom truly hidden behind one is hidden from the ray as well as
+ * the eye. That falls out of the geometry for free — the closest hit wins,
+ * and if it is a tuft of grass rather than a mushroom, the walk up to
+ * `userData.placement` below runs out of parents and returns null, so a
+ * regular mushroom (never in `smallObjects`, see game/scene.ts) never gets a
+ * second chance through the cone below.
  *
- * `smallObjects` — berries, herbs, nuts, finds — get a second chance if the
- * exact ray missed: real enough at their real size to subtend only a few
- * pixels, which made a mushroom-grade exact aim effectively broken for them
- * (see TODO.md, 2026-09-08).
+ * `smallObjects` — berries, herbs, nuts, finds — get that second chance
+ * whenever the exact ray did not land on a real placement: they are real
+ * enough at their real size to subtend only a few pixels, which made a
+ * mushroom-grade exact aim effectively broken for them (see TODO.md,
+ * 2026-09-08). This is deliberately unconditional once the exact ray misses
+ * — an earlier version only tried the cone when NOTHING real lay anywhere
+ * along the exact ray, meant to keep a mushroom genuinely hidden behind a
+ * bush hidden. In practice a `clustered` colony (ecology/spawn.ts's
+ * COLONY_SPREAD) packs several real specimens within centimetres of each
+ * other, so the exact ray very often grazes some OTHER berry in the same
+ * clump on its way past — a real placement, just not the one the cone was
+ * about to find — and that alone silently swallowed the fallback for almost
+ * every berry (2026-09-09 live report: "works for mushrooms, but the
+ * berry's name never shows, except once"). A genuine big mushroom staying
+ * hidden behind an occluder is still exactly right — it is simply never a
+ * concern here, because a regular mushroom is never added to `smallObjects`
+ * in the first place (see game/scene.ts).
  */
 export function nearestInView(
   camera: THREE.Camera,
@@ -104,27 +119,12 @@ export function nearestInView(
   const hits = raycaster.intersectObjects(occluders.length > 0 ? [...objects, ...occluders] : objects, true)
   if (hits.length > 0) {
     // The ray hit something — a cap, a stipe, or an occluder in front of one.
-    // Walk up to the mushroom it belongs to.
+    // Walk up to the mushroom it belongs to; an occluder (or some other real
+    // specimen not on this exact ray's intended target) with no placement of
+    // its own falls through to the small-object cone below.
     let o: THREE.Object3D | null = hits[0].object
     while (o && !o.userData.placement) o = o.parent
     if (o) return o
-
-    // The closest hit was bare occluder — grass, undergrowth — with no real
-    // placement on this exact ray at all. That is not the same as a real
-    // mushroom standing behind it: a berry or herb grows IN the grass around
-    // it by design (ecology/sites.ts), so this case is the common one for
-    // them, not the rare one — treating it the same as "truly hidden behind
-    // a bush" defeated the small-object cone below almost every time it was
-    // needed (see TODO.md, 2026-09-08 live report: "works for mushrooms, but
-    // the berry's name never shows"). Only a genuine placement somewhere
-    // along this SAME ray — truly behind the occluder, not just near it —
-    // still counts as hidden.
-    const hidesARealTarget = hits.some((h) => {
-      let p: THREE.Object3D | null = h.object
-      while (p && !p.userData.placement) p = p.parent
-      return p !== null
-    })
-    if (hidesARealTarget) return null
   }
   return nearestSmallInCone(camera, smallObjects, maxDistance)
 }

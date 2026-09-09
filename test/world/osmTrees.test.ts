@@ -131,4 +131,25 @@ describe('placeOsmTrees', () => {
     }
     expect(same / trees.length).toBeGreaterThan(0.5)
   })
+
+  it('leaves a clear corridor along a path running through the wood', () => {
+    const withPath: WorldData = {
+      ...empty,
+      woods: [{ ring: square(0, 0, 60), leafType: 'needleleaved' }],
+      paths: [{ points: [{ x: -60, z: 0 }, { x: 60, z: 0 }] }],
+    }
+    const trees = placeOsmTrees(withPath, flat, 55, 3, 60)
+    for (const t of trees) expect(Math.abs(t.z)).toBeGreaterThanOrEqual(1.8)
+  })
+
+  it('never moves a mapped, surveyed tree away from a path', () => {
+    const mappedOnPath: WorldData = {
+      ...empty,
+      woods: [{ ring: square(0, 0, 60), leafType: 'needleleaved' }],
+      paths: [{ points: [{ x: -60, z: 0 }, { x: 60, z: 0 }] }],
+      trees: [{ at: { x: 5, z: 0 }, genus: 'betula' }],
+    }
+    const trees = placeOsmTrees(mappedOnPath, flat, 55, 3, 60)
+    expect(trees.some((t) => t.x === 5 && t.z === 0)).toBe(true)
+  })
 })

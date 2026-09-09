@@ -1,6 +1,6 @@
 import { mulberry32 } from '../util/rng'
 import { fbm2 } from '../util/noise'
-import { pointInPolygon, boundsOf } from '../util/geometry'
+import { pointInPolygon, boundsOf, distanceToPolyline } from '../util/geometry'
 import { isClearing } from './clearings'
 import { LOOK, type Tree } from './trees'
 import type { WorldData, LeafType, WoodArea } from '../geo/types'
@@ -15,6 +15,12 @@ const MIN_GAP = 1.6
 const STAND_SCALE = 70
 /** Ceiling on trees per plot: instanced, but not free. */
 const MAX_TREES = 4000
+/** How far a procedurally-grown trunk must stand from a trail's own centre
+ *  line, metres — clear of the path's rendered ribbon (world/paths.ts's
+ *  HALF_WIDTH) with room to actually walk it, not just miss the ribbon by a
+ *  hair. A mapped tree (below) is never moved for this: a real survey beats
+ *  our own guess about where the path runs. */
+const PATH_CLEARANCE = 1.8
 
 /**
  * Which genera grow at this latitude.
@@ -86,6 +92,9 @@ export function placeOsmTrees(
   const cell = MIN_GAP
   const grid = new Map<string, Tree[]>()
 
+  const nearPath = (x: number, z: number): boolean =>
+    world.paths.some((p) => distanceToPolyline(x, z, p.points) < PATH_CLEARANCE)
+
   const tooClose = (x: number, z: number): boolean => {
     const gx = Math.floor(x / cell)
     const gz = Math.floor(z / cell)
@@ -144,6 +153,7 @@ export function placeOsmTrees(
         if (!pointInPolygon(jx, jz, wood.ring)) continue
         if (isClearing(jx, jz, seed)) continue
         if (tooClose(jx, jz)) continue
+        if (nearPath(jx, jz)) continue
 
         // Argmax over one noise field per genus, not a proportional draw: a
         // proportional pick left the interior of a stand mixed even at a
