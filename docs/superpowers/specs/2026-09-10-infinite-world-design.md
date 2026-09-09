@@ -120,6 +120,37 @@ composing with it. Decide its fate (remove, or repurpose as an initial
 load-radius/detail setting) once the chunked path actually ships; noted as
 its own follow-up, not decided here blind.
 
+## Scope actually shipped this pass (narrower than "both modes")
+
+Implementing the above surfaced a real reconciliation problem the original
+brainstorm didn't catch: the home plot's own radius (`ui/worldSize.ts`'s
+60/90/150m half-size choices) doesn't line up with the chunk grid's fixed
+`CHUNK_SIZE/2` (200m) — chunk (0,0) has to be skipped entirely by the
+streaming system (it's already built, the old way, by `createForest`), but
+for every world-size choice smaller than 400m across, that leaves either a
+gap (nothing generated between the home plot's own edge and the first real
+chunk ring) or, if chunk (0,0) were instead generated too, doubled-up trees
+and mushrooms over the same ground `createForest` already placed.
+
+Real-place mode's `halfSize` is not just cosmetic — it is also the OSM query
+radius, with real network/rate-limit cost — so silently overriding it to
+200m always would change what a player asked for. The offline/demo wood has
+no such cost: its `halfSize` is just a number.
+
+**So, for now:** infinite chunking ships for the offline/demo wood only,
+which always builds its home plot at exactly `CHUNK_SIZE/2` regardless of
+the world-size picker (the picker still governs a *named* place, which is
+unaffected — bounded, as it works today). `game/loadForestData`'s `fellBackTo
+=== 'demo'` is the exact existing signal for "this is the demo wood,"
+whether the player pressed "just show the forest" or a real query failed and
+fell back to it — both get the infinite treatment, consistent with the
+project's honest-fallback principle elsewhere.
+
+Real-place incremental OSM/DEM tiling (the harder half of the original
+ask) is deferred, not abandoned — logged in `TODO.md` as its own item, now
+that the chunk-vs-home-plot reconciliation problem above is understood and
+solved for the tractable case first.
+
 ## Testing
 
 Pure grid/seeding math (`world/chunking.ts`) gets ordinary unit tests. Each

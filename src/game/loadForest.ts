@@ -14,6 +14,7 @@ import { placeOsmTrees } from '../world/osmTrees'
 import { buildBiomeMap } from '../world/biome'
 import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
+import { CHUNK_SIZE } from '../world/chunking'
 import { DEFAULT_HALF_SIZE, groundSegmentsFor, type ForestSource } from './scene'
 import type { WorldData, BBox } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
@@ -166,10 +167,17 @@ export async function loadForestData(
 
   onStage('build')
   const { world, center } = demoForest()
+  // The demo wood is the one that goes on forever (game/worldStream.ts) —
+  // see docs/superpowers/specs/2026-09-10-infinite-world-design.md's "Scope
+  // actually shipped this pass": its home plot is always exactly
+  // CHUNK_SIZE/2, matching the streamed chunk grid's reserved chunk (0, 0),
+  // regardless of the world-size picker (ui/worldSize.ts) — that picker's
+  // choice keeps its old meaning only for a real, bounded, named place.
+  const demoHalfSize = CHUNK_SIZE / 2
   return {
-    source: buildSource(world, proceduralGround(DEMO_SEED, halfSize), center.lat, DEMO_SEED, halfSize),
+    source: buildSource(world, proceduralGround(DEMO_SEED, demoHalfSize), center.lat, DEMO_SEED, demoHalfSize),
     fellBackTo: 'demo',
     seed: DEMO_SEED,
-    halfSize,
+    halfSize: demoHalfSize,
   }
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createForest } from './game/scene'
+import { createWorldStream } from './game/worldStream'
 import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
@@ -86,7 +87,7 @@ async function main(): Promise<void> {
     setLang(save.lang)
   })
 
-  const [query, halfSize] = window.__BOOTCHECK
+  const [query, pickedHalfSize] = window.__BOOTCHECK
     ? [null, DEFAULT_WORLD_SIZE.halfSize]
     : await new Promise<[string | null, number]>((resolve) =>
         openPlacePicker((q, hs) => resolve([q, hs])),
@@ -107,19 +108,39 @@ async function main(): Promise<void> {
   }
 
   const loading = showLoading(t(STAGE_KEY.geocode), stageFraction('geocode'))
-  const { source, fellBackTo, seed } = await loadForestData(
+  const { source, fellBackTo, seed, halfSize } = await loadForestData(
     query,
     (stage) => {
       loading.update(t(STAGE_KEY[stage]), stageFraction(stage))
     },
-    halfSize,
+    pickedHalfSize,
   )
   loading.close()
 
   if (fellBackTo && query) toast(t('fellBackNotice'))
 
+  // The demo wood always builds its own home plot at CHUNK_SIZE/2 (see
+  // game/loadForest.ts and docs/superpowers/specs/2026-09-10-infinite-world-
+  // design.md), regardless of what the world-size picker asked for — this
+  // `halfSize` is what was actually built, not necessarily `pickedHalfSize`,
+  // or the home plot and its streamed surroundings below would disagree
+  // about where the reserved chunk (0, 0) actually ends.
   const forest = createForest(source, seed, halfSize)
   forest.setWeather(save.prefs.weather)
+  // Infinite wilderness beyond the home plot — the demo wood only
+  // (fellBackTo === 'demo' covers both a deliberate "just show the forest"
+  // press and a real query that failed and fell back to it; either way it
+  // is the same wood built the same way, see loadForestData). A named real
+  // place keeps its old, bounded behaviour untouched.
+  const worldStream = fellBackTo === 'demo' ? createWorldStream(forest.scene, seed, forest.ground, halfSize) : null
+  const combinedGround = worldStream ? { heightAt: worldStream.heightAt } : forest.ground
+  const mushroomCandidates = (): THREE.Object3D[] =>
+    worldStream ? [...forest.mushroomObjects, ...worldStream.mushroomObjects()] : forest.mushroomObjects
+  function removeMushroomTarget(target: THREE.Object3D): void {
+    const i = forest.mushroomObjects.indexOf(target)
+    if (i >= 0) forest.mushroomObjects.splice(i, 1)
+    else worldStream?.removeMushroomObject(target)
+  }
   // Far enough that the sky dome (radius 1500, see world/sky.ts) is not
   // clipped away — the fog (scene.ts) still hides the forest floor at 140m
   // regardless, so this only decides whether the sky above it is visible.
@@ -297,7 +318,7 @@ async function main(): Promise<void> {
 
   function cullDistantMushrooms(): void {
     const limit = save.prefs.drawDistance * save.prefs.drawDistance
-    for (const m of forest.mushroomObjects) {
+    for (const m of mushroomCandidates()) {
       const dx = m.position.x - player.x
       const dz = m.position.z - player.z
       m.visible = dx * dx + dz * dz < limit
@@ -311,7 +332,7 @@ async function main(): Promise<void> {
       hud.setTarget(null)
       return
     }
-    aimed = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders)
+    aimed = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders)
     const species = aimed ? speciesById(aimed.userData.placement.speciesId) : undefined
     if (species) {
       nearDoor = false
@@ -338,7 +359,7 @@ async function main(): Promise<void> {
     const mark = new THREE.Mesh(traceGeo, traceMat)
     mark.rotation.x = -Math.PI / 2
     mark.rotation.z = placement.rotationY
-    mark.position.set(placement.x, forest.ground.heightAt(placement.x, placement.z) + 0.003, placement.z)
+    mark.position.set(placement.x, combinedGround.heightAt(placement.x, placement.z) + 0.003, placement.z)
     forest.scene.add(mark)
   }
 
@@ -362,7 +383,7 @@ async function main(): Promise<void> {
         if (!basket.add(placement)) return
         audio.collect()
         target.removeFromParent()
-        forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
+        removeMushroomTarget(target)
         leaveTrace(placement)
         hud.setBasket(basket.items.length, BASKET_CAPACITY)
         const at = Date.now()
@@ -376,11 +397,11 @@ async function main(): Promise<void> {
         // the aim list (game/pick.ts) so it can't be re-examined, but still a
         // real mesh lying where it grew, not vanished like a picked one.
         audio.collect()
-        forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
+        removeMushroomTarget(target)
         const fallAxis = new THREE.Vector3(Math.cos(placement.rotationY), 0, Math.sin(placement.rotationY))
         target.rotateOnWorldAxis(fallAxis, Math.PI / 2)
         const box = new THREE.Box3().setFromObject(target)
-        target.position.y += forest.ground.heightAt(placement.x, placement.z) - box.min.y
+        target.position.y += combinedGround.heightAt(placement.x, placement.z) - box.min.y
       },
     )
     aimed = null
@@ -592,18 +613,24 @@ async function main(): Promise<void> {
 
     // While an overlay is up the player stands still: the mouse/thumb belongs to it.
     if (!modalOpen()) {
-      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(source.biomeAt(player.x, player.z))
+      const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
+      const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
+      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome)
       const input = touch.active ? touch.read(dt) : controls.read(dt)
-      player = stepPlayer(player, input, forest.ground, obstacles, speed)
-      player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
-      player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
+      const stepObstacles = worldStream ? [...obstacles, ...worldStream.obstacles()] : obstacles
+      player = stepPlayer(player, input, combinedGround, stepObstacles, speed)
+      if (!worldStream) {
+        player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
+        player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
+      }
+      worldStream?.update(player.x, player.z)
 
       // A tap stands for "aim at it and press E" in one motion — see
       // game/touchControls.ts's own doc comment for why a crosshair is not
       // the right aim model for a thumb.
       const tap = touch.consumeTap()
       if (tap) {
-        const target = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
+        const target = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
         // A tap that missed every mushroom still opens/closes the door when
         // the player is standing right at it — touch has no separate `E`.
         if (target) examineTarget(target)
@@ -614,7 +641,7 @@ async function main(): Promise<void> {
     const bob = cameraBob(player)
     camera.position.set(
       player.x + Math.cos(player.yaw) * bob.dx,
-      forest.ground.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand + bob.dy,
+      combinedGround.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand + bob.dy,
       player.z - Math.sin(player.yaw) * bob.dx,
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
@@ -636,6 +663,7 @@ async function main(): Promise<void> {
 
     cullDistantMushrooms()
     forest.updateMushroomLod(camera)
+    worldStream?.updateLod(camera)
     updateAim()
     updateDebugOverlay()
     renderer.render(forest.scene, camera)

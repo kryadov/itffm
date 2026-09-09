@@ -85,6 +85,14 @@ export interface WorldStream {
    *  goes through. Live: grows and shrinks as chunks load and unload, so
    *  read it fresh each time rather than holding on to the reference. */
   mushroomObjects(): THREE.Object3D[]
+  /** Removes one collected/cut object from its owning chunk's own pick-
+   *  candidate list (not from the scene — the caller already does that the
+   *  same way it does for a home-plot find, `Object3D.removeFromParent()`).
+   *  Returns false if no loaded chunk owns it (a plain mistake to call this
+   *  on a home-plot object, which never lived in `WorldStream` to begin
+   *  with — `main.ts` only reaches for this once the home plot's own list
+   *  didn't have it). */
+  removeMushroomObject(object: THREE.Object3D): boolean
   /** Every currently-loaded chunk's tree trunks, as collision circles —
    *  feed this into the same obstacle list `stepPlayer` already uses. */
   obstacles(): { x: number; z: number; radius: number }[]
@@ -222,6 +230,16 @@ export function createWorldStream(
     },
     mushroomObjects() {
       return Array.from(chunks.values()).flatMap((c) => c.mushroomObjects)
+    },
+    removeMushroomObject(object) {
+      for (const loaded of chunks.values()) {
+        const i = loaded.mushroomObjects.indexOf(object)
+        if (i >= 0) {
+          loaded.mushroomObjects.splice(i, 1)
+          return true
+        }
+      }
+      return false
     },
     obstacles() {
       return Array.from(chunks.values()).flatMap((c) => c.trees.map((t) => ({ x: t.x, z: t.z, radius: t.radius })))

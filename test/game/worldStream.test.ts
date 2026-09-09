@@ -123,6 +123,17 @@ describe('createWorldStream', () => {
     expect(stream.mushroomObjects().length).toBeGreaterThan(0)
   })
 
+  it('removeMushroomObject removes a placement from its owning chunk, and reports the miss for an unowned one', () => {
+    const scene = new THREE.Scene()
+    const stream = createWorldStream(scene, 7, flatHome, HOME_RADIUS)
+    settle(stream, CHUNK_SIZE * 2, 0)
+    const [first] = stream.mushroomObjects()
+    const before = stream.mushroomObjects().length
+    expect(stream.removeMushroomObject(first)).toBe(true)
+    expect(stream.mushroomObjects().length).toBe(before - 1)
+    expect(stream.removeMushroomObject(new THREE.Object3D())).toBe(false)
+  })
+
   it('updateLod does not throw over every loaded chunk', () => {
     const scene = new THREE.Scene()
     const stream = createWorldStream(scene, 1, flatHome, HOME_RADIUS)
