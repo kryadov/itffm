@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import {
-  stepCritter, nearestPoint, createHares, createSquirrels, placeCritterHomes,
+  stepCritter, nearestPoint, createHares, createSquirrels, createSnakes, placeCritterHomes,
   type Critter, type CritterSpecies,
 } from '../../src/world/critters'
 import { proceduralTerrain } from '../../src/terrain/procedural'
@@ -207,5 +207,70 @@ describe('createHares / createSquirrels', () => {
     expect(scene.getObjectByName('hares')!.visible).toBe(false)
     expect(() => hares.dispose()).not.toThrow()
     expect(scene.getObjectByName('hares')).toBeUndefined()
+  })
+})
+
+describe('createSnakes', () => {
+  const flat = { heightAt: () => 0 }
+  const homes = [{ x: 3, y: 0, z: 3 }, { x: -3, y: 0, z: 3 }]
+
+  it('adds a named group to the scene', () => {
+    const scene = new THREE.Scene()
+    createSnakes(scene, mulberry32(1), 2, flat, homes)
+    expect(scene.getObjectByName('snakes')).toBeDefined()
+  })
+
+  it('is deterministic for the same seed', () => {
+    const sceneA = new THREE.Scene()
+    const sceneB = new THREE.Scene()
+    const a = createSnakes(sceneA, mulberry32(9), 2, flat, homes)
+    const b = createSnakes(sceneB, mulberry32(9), 2, flat, homes)
+    a.update(1 / 30, 0, 0)
+    b.update(1 / 30, 0, 0)
+    const segA = sceneA.getObjectByName('snakes')!.children[0] as THREE.InstancedMesh
+    const segB = sceneB.getObjectByName('snakes')!.children[0] as THREE.InstancedMesh
+    expect(segA.instanceMatrix.array).toEqual(segB.instanceMatrix.array)
+  })
+
+  it('creeps away slowly rather than bolting — much slower than a hare', () => {
+    const scene = new THREE.Scene()
+    const snakes = createSnakes(scene, mulberry32(3), 1, flat, [{ x: 0, y: 0, z: 0 }])
+    // Walk the player right up to it and hold position through alert+flee.
+    for (let i = 0; i < 300; i++) snakes.update(1 / 20, 1, 0)
+    const seg = scene.getObjectByName('snakes')!.children[0] as THREE.InstancedMesh
+    const m = new THREE.Matrix4()
+    const p = new THREE.Vector3()
+    seg.getMatrixAt(0, m)
+    p.setFromMatrixPosition(m)
+    // Over 15s at a hare's fleeSpeed (6.5 m/s) it would be ~90m off; a snake
+    // creeping at under 3 m/s stays close.
+    expect(Math.hypot(p.x, p.z)).toBeLessThan(45)
+  })
+
+  it('keeps every segment finite after a long run', () => {
+    const scene = new THREE.Scene()
+    const snakes = createSnakes(scene, mulberry32(4), 2, flat, homes)
+    for (let i = 0; i < 500; i++) snakes.update(1 / 20, 2, 0)
+    const m = new THREE.Matrix4()
+    const p = new THREE.Vector3()
+    for (const child of scene.getObjectByName('snakes')!.children) {
+      const mesh = child as THREE.InstancedMesh
+      for (let i = 0; i < mesh.count; i++) {
+        mesh.getMatrixAt(i, m)
+        p.setFromMatrixPosition(m)
+        expect(Number.isFinite(p.x)).toBe(true)
+        expect(Number.isFinite(p.y)).toBe(true)
+        expect(Number.isFinite(p.z)).toBe(true)
+      }
+    }
+  })
+
+  it('hides and disposes without throwing', () => {
+    const scene = new THREE.Scene()
+    const snakes = createSnakes(scene, mulberry32(1), 1, flat, homes)
+    snakes.setEnabled(false)
+    expect(scene.getObjectByName('snakes')!.visible).toBe(false)
+    expect(() => snakes.dispose()).not.toThrow()
+    expect(scene.getObjectByName('snakes')).toBeUndefined()
   })
 })

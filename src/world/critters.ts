@@ -179,7 +179,16 @@ export function createCritterGroup(
   provider: ElevationProvider,
   homes: HomeSpot[],
   buildParts: (mat: THREE.Material, n: number) => THREE.InstancedMesh[],
-  pose: (parts: THREE.InstancedMesh[], i: number, coreX: number, coreY: number, coreZ: number, heading: number, wanderPhase: number) => void,
+  pose: (
+    parts: THREE.InstancedMesh[],
+    i: number,
+    coreX: number,
+    coreY: number,
+    coreZ: number,
+    heading: number,
+    wanderPhase: number,
+    time: number,
+  ) => void,
   color: number,
   findFleeTarget?: (x: number, z: number) => { x: number; y: number; z: number } | null,
 ): CritterGroup {
@@ -247,7 +256,7 @@ export function createCritterGroup(
           heading = wp + Math.sin(time * WANDER_SPEED * 0.4 + wp) * 0.8
         }
 
-        pose(parts, i, coreX, coreY, coreZ, heading, wanderPhases[i])
+        pose(parts, i, coreX, coreY, coreZ, heading, wanderPhases[i], time)
       }
       for (const p of parts) p.instanceMatrix.needsUpdate = true
     },
@@ -394,5 +403,75 @@ export function createSquirrels(
     },
     0xa8542e, // rust-red fur
     (x, z) => nearestPoint(x, z, perches, perchSearchRadius),
+  )
+}
+
+const SNAKE_SPECIES: CritterSpecies = {
+  // Small and slow next to the hare/squirrel species above — "creeps away",
+  // not "bolts", per the brainstorm (docs/superpowers/specs/
+  // 2026-09-10-wildlife-design.md). Rests far longer too: rare and
+  // unhurried, not a flighty prey animal.
+  fleeRadius: 4,
+  alertDur: 0.6,
+  fleeSpeed: 2.2,
+  fleeDur: 3.5,
+  restMin: 15,
+  restMax: 40,
+}
+
+/** Head to tail, metres — each bead a touch slimmer than the last. */
+const SNAKE_RADII = [0.09, 0.08, 0.07, 0.055, 0.04]
+const SNAKE_SPACING = 0.22
+const SNAKE_UNDULATE_SPEED = 3.5
+const SNAKE_UNDULATE_AMPLITUDE = 0.11
+const SNAKE_PHASE_STEP = 1.1
+
+/**
+ * A snake: a beaded chain of shrinking segments behind the head, with a
+ * standing sine wave along its length running in time — a cheap slither that
+ * needs no path history, just the head's own current position and heading,
+ * unlike a hare or squirrel's single-body pose. No flee target: it doesn't
+ * climb or bolt, it just creeps (SNAKE_SPECIES's low fleeSpeed) away in a
+ * straight line, same as a hare with the numbers turned down.
+ */
+export function createSnakes(
+  scene: THREE.Scene,
+  rand: () => number,
+  count: number,
+  provider: ElevationProvider,
+  homes: HomeSpot[],
+): CritterGroup {
+  return createCritterGroup(
+    scene,
+    'snakes',
+    rand,
+    count,
+    SNAKE_SPECIES,
+    provider,
+    homes,
+    (mat, n) => SNAKE_RADII.map((r) => new THREE.InstancedMesh(new THREE.IcosahedronGeometry(r, 0), mat, n)),
+    (parts, i, x, _y, z, heading, _wanderPhase, time) => {
+      for (let k = 0; k < parts.length; k++) {
+        // Each bead trails straight back from the head along `heading`, with
+        // a side-to-side wiggle that grows toward the tail (a real snake's
+        // head tracks nearly straight; the whip is in the back half) and
+        // runs with time rather than distance travelled, so it animates even
+        // while the snake is otherwise still.
+        const back = -k * SNAKE_SPACING
+        const wiggle =
+          Math.sin(time * SNAKE_UNDULATE_SPEED - k * SNAKE_PHASE_STEP) *
+          SNAKE_UNDULATE_AMPLITUDE *
+          (k / (parts.length - 1))
+        off.set(back, 0, wiggle).applyAxisAngle(yAxis, heading)
+        const sx = x + off.x
+        const sz = z + off.z
+        const sy = provider.heightAt(sx, sz) + SNAKE_RADII[k] * 0.6
+        q.setFromAxisAngle(yAxis, heading)
+        pos.set(sx, sy, sz)
+        m.compose(pos, q, one)
+        parts[k].setMatrixAt(i, m)
+      }
+    },
+    0x5a6b3c, // olive-green scales
   )
 }

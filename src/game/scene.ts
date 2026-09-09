@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { buildGround } from '../world/ground'
 import { buildTreeMeshes, treePerches, type Tree } from '../world/trees'
 import { createBirds } from '../world/birds'
-import { createHares, createSquirrels, placeCritterHomes } from '../world/critters'
+import { createHares, createSquirrels, createSnakes, placeCritterHomes } from '../world/critters'
 import { mulberry32 } from '../util/rng'
 import {
   placeLogs,
@@ -323,9 +323,14 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   const hares = createHares(scene, mulberry32(seed + 21), 5, source.ground, hareHomes)
   const squirrelHomes = placeCritterHomes(source.ground, halfSize, seed + 22, 5, [...treeCircles, ...extraObstacles])
   const squirrels = createSquirrels(scene, mulberry32(seed + 23), 5, source.ground, squirrelHomes, perches)
+  // Rare, per the brainstorm: two snakes to a wood, not five — same species
+  // count order of magnitude smaller than hares/squirrels.
+  const snakeHomes = placeCritterHomes(source.ground, halfSize, seed + 24, 2, [...treeCircles, ...extraObstacles])
+  const snakes = createSnakes(scene, mulberry32(seed + 25), 2, source.ground, snakeHomes)
   const updateCritters = (dt: number, playerX: number, playerZ: number): void => {
     hares.update(dt, playerX, playerZ)
     squirrels.update(dt, playerX, playerZ)
+    snakes.update(dt, playerX, playerZ)
   }
 
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
