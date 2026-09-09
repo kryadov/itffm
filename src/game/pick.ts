@@ -51,14 +51,19 @@ const centre = new THREE.Vector2(0, 0)
  * worldMesh.ts`'s `withPickHitbox()` gives every small collectible a real,
  * exact-ray-sized target the moment it is built (game/scene.ts) — there is
  * no separate aiming code path left to keep in sync with it.
+ *
+ * @param point where on screen to aim, in NDC (-1..1, default the crosshair
+ *   at the centre) — touch has no crosshair worth centring on
+ *   (game/touchControls.ts): a tap lands wherever the finger actually is.
  */
 export function nearestInView(
   camera: THREE.Camera,
   objects: THREE.Object3D[],
   maxDistance: number,
   occluders: THREE.Object3D[] = [],
+  point: THREE.Vector2 = centre,
 ): THREE.Object3D | null {
-  raycaster.setFromCamera(centre, camera)
+  raycaster.setFromCamera(point, camera)
   raycaster.far = maxDistance
   const hits = raycaster.intersectObjects(occluders.length > 0 ? [...objects, ...occluders] : objects, true)
   if (hits.length === 0) return null

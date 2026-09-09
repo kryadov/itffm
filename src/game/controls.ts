@@ -35,7 +35,14 @@ export function createControls(
   const click = () => {
     // Overlays (inspection, the encyclopedia) take the mouse for themselves.
     if (document.querySelector('#ui > div[data-modal]')) return
-    dom.requestPointerLock()
+    // A touch tap fires this same click (game/touchControls.ts owns actual
+    // touch look/aim), and Pointer Lock has no touch equivalent — every tap
+    // would otherwise throw an unhandled "user gesture required" rejection.
+    if (window.matchMedia?.('(pointer: coarse)').matches) return
+    // Even on a mouse device the browser can refuse this (a click too soon
+    // after the tab regained focus, say) — a rejection here has nothing
+    // useful to do about it, so it is swallowed rather than left unhandled.
+    dom.requestPointerLock().catch(() => {})
   }
 
   addEventListener('keydown', down)

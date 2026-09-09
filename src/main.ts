@@ -3,6 +3,7 @@ import { createForest } from './game/scene'
 import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
+import { createTouchControls } from './game/touchControls'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
@@ -100,6 +101,11 @@ async function main(): Promise<void> {
   // point, same trade-off `setLang` above already accepts: a real user's
   // place-picker interaction takes far longer than the IndexedDB round trip.
   const controls = createControls(renderer.domElement, save.prefs.mouseSensitivity)
+  // Built unconditionally — it is a no-op on anything without a coarse
+  // pointer — and simply preferred over mouse/keyboard whenever it is
+  // `active`, rather than merging both: a hybrid device summing both inputs
+  // is a far rarer problem than the code to handle it is worth right now.
+  const touch = createTouchControls(renderer.domElement, save.prefs.mouseSensitivity)
   const basket = createBasket(BASKET_CAPACITY)
   // Which save/store.ts Find a basket item's note belongs to — a Placement
   // carries no identity of its own, but it is the very object the collect
@@ -275,8 +281,13 @@ async function main(): Promise<void> {
     forest.scene.add(mark)
   }
 
-  function examineAimed(): void {
-    const target = aimed
+  /**
+   * Opens the inspect card for a target the player is reaching for — the
+   * crosshair's own aim on desktop (`examineAimed`), or whatever a touch tap
+   * landed on directly (see the animation loop below): the same flow either
+   * way, since a tap already stands for "aim at it and press E" in one motion.
+   */
+  function examineTarget(target: THREE.Object3D | null): void {
     if (!target) return
     const placement = target.userData.placement
     const species = speciesById(placement.speciesId)
@@ -313,6 +324,8 @@ async function main(): Promise<void> {
     hud.setTarget(null)
   }
 
+  const examineAimed = (): void => examineTarget(aimed)
+
   function openSettings(): void {
     openSettingsMenu(save.prefs, {
       onLangChange: (lang) => {
@@ -322,6 +335,7 @@ async function main(): Promise<void> {
       onPrefsChange: (prefs) => {
         save = { ...save, prefs }
         controls.setSensitivity(prefs.mouseSensitivity)
+        touch.setSensitivity(prefs.mouseSensitivity)
         forest.setWeather(prefs.weather)
         minimap.setVisible(prefs.minimap)
         void persistSave(save)
@@ -498,12 +512,22 @@ async function main(): Promise<void> {
     const dt = Math.min(0.05, (now - last) / 1000)
     last = now
 
-    // While an overlay is up the player stands still: the mouse belongs to it.
+    // While an overlay is up the player stands still: the mouse/thumb belongs to it.
     if (!modalOpen()) {
       const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(source.biomeAt(player.x, player.z))
-      player = stepPlayer(player, controls.read(dt), forest.ground, obstacles, speed)
+      const input = touch.active ? touch.read(dt) : controls.read(dt)
+      player = stepPlayer(player, input, forest.ground, obstacles, speed)
       player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
       player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
+
+      // A tap stands for "aim at it and press E" in one motion — see
+      // game/touchControls.ts's own doc comment for why a crosshair is not
+      // the right aim model for a thumb.
+      const tap = touch.consumeTap()
+      if (tap) {
+        const target = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
+        examineTarget(target)
+      }
     }
 
     const bob = cameraBob(player)

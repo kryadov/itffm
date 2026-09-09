@@ -128,4 +128,26 @@ describe('nearestInView', () => {
       expect(nearestInView(camera, [target, neighbour], 10)).toBe(target)
     })
   })
+
+  // Touch has no crosshair worth centring on (game/touchControls.ts) — a tap
+  // lands wherever the player's own finger is, not the middle of the screen.
+  describe('an off-centre screen point (touch tap)', () => {
+    it('finds nothing at screen centre when the object sits off to one side', () => {
+      const m = mushroom(-3)
+      m.position.x = 2
+      m.updateMatrixWorld(true)
+      expect(nearestInView(camera, [m], 10)).toBe(null)
+    })
+
+    it('finds that same off-centre object once the ray is aimed at its own screen point', () => {
+      const m = mushroom(-3)
+      m.position.x = 2
+      m.updateMatrixWorld(true)
+      // Where a mushroom 2m right of the camera, 3m out, actually projects in
+      // NDC — worked out from the same projection nearestInView itself uses,
+      // not guessed: project the world point through the camera.
+      const ndc = new THREE.Vector3(2, 0, -3).project(camera)
+      expect(nearestInView(camera, [m], 10, [], new THREE.Vector2(ndc.x, ndc.y))).toBe(m)
+    })
+  })
 })
