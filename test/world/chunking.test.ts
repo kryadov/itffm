@@ -7,27 +7,32 @@ describe('chunkCoordAt', () => {
     expect(chunkCoordAt(0, 0)).toEqual({ cx: 0, cz: 0 })
   })
 
-  it('floors toward negative infinity, not toward zero', () => {
-    expect(chunkCoordAt(-1, -1, 200)).toEqual({ cx: -1, cz: -1 })
-    expect(chunkCoordAt(-200.001, 0, 200)).toEqual({ cx: -2, cz: 0 })
+  it('chunk (0, 0) is centred on the origin, spanning half the chunk size either way', () => {
+    expect(chunkCoordAt(99, -99, 200)).toEqual({ cx: 0, cz: 0 })
+    expect(chunkCoordAt(-99, 99, 200)).toEqual({ cx: 0, cz: 0 })
   })
 
-  it('is exact at a chunk boundary', () => {
-    expect(chunkCoordAt(200, 0, 200)).toEqual({ cx: 1, cz: 0 })
+  it('crosses into the next chunk exactly at the half-size boundary', () => {
+    expect(chunkCoordAt(100, 0, 200)).toEqual({ cx: 1, cz: 0 })
+    expect(chunkCoordAt(-100, 0, 200)).toEqual({ cx: 0, cz: 0 })
+    expect(chunkCoordAt(-100.001, 0, 200)).toEqual({ cx: -1, cz: 0 })
   })
 
-  it('stays in the same chunk anywhere strictly inside it', () => {
-    expect(chunkCoordAt(150, 150, 200)).toEqual({ cx: 0, cz: 0 })
+  it('keeps a 300m-wide home plot entirely inside chunk (0, 0) at the real CHUNK_SIZE', () => {
+    for (const p of [150, -150, 149.999, -149.999]) {
+      expect(chunkCoordAt(p, 0)).toEqual({ cx: 0, cz: 0 })
+      expect(chunkCoordAt(0, p)).toEqual({ cx: 0, cz: 0 })
+    }
   })
 })
 
 describe('chunkOrigin', () => {
-  it('is the centre of chunk (0, 0)', () => {
-    expect(chunkOrigin({ cx: 0, cz: 0 }, 200)).toEqual({ x: 100, z: 100 })
+  it('is the world origin for chunk (0, 0)', () => {
+    expect(chunkOrigin({ cx: 0, cz: 0 }, 200)).toEqual({ x: 0, z: 0 })
   })
 
-  it('is the centre of a negative chunk', () => {
-    expect(chunkOrigin({ cx: -1, cz: -1 }, 200)).toEqual({ x: -100, z: -100 })
+  it('is one chunk size over for a neighbour', () => {
+    expect(chunkOrigin({ cx: 1, cz: -2 }, 200)).toEqual({ x: 200, z: -400 })
   })
 
   it('round-trips with chunkCoordAt: the origin is always inside its own chunk', () => {
@@ -79,5 +84,9 @@ describe('chunkKey', () => {
 describe('CHUNK_SIZE', () => {
   it('is comfortably larger than the fog draw distance (140m, game/scene.ts)', () => {
     expect(CHUNK_SIZE).toBeGreaterThan(140)
+  })
+
+  it('is at least twice the largest home-plot half-size (150m, ui/worldSize.ts)', () => {
+    expect(CHUNK_SIZE).toBeGreaterThanOrEqual(300)
   })
 })

@@ -7,29 +7,36 @@ import { hashString } from '../util/rng'
  * chunk at a time, keyed by its own `(cx, cz)` and seeded independently of
  * every other chunk — so revisiting one regenerates the same tile without
  * replaying the whole world's random draws first.
+ *
+ * The grid is centred on the world origin, not cornered at it: chunk (0, 0)
+ * spans `[-CHUNK_SIZE/2, CHUNK_SIZE/2)` on both axes. That is what lets the
+ * existing home plot (the hut, campfire, wildlife, all still built the old,
+ * unchunked way — see the design doc) sit entirely inside that one chunk for
+ * every plot size on offer (`ui/worldSize.ts`'s largest is 300m across), so
+ * the streamed chunks never have to reconcile straddling the home plot's own
+ * edge on more than one side.
  */
 
-/** Metres per side. Comfortably bigger than the fog draw distance
- *  (`game/scene.ts`'s `Fog(...,30,140)`), so a chunk seam is never the
- *  reason something pops in mid-view. */
-export const CHUNK_SIZE = 200
+/** Metres per side. Comfortably bigger than both the fog draw distance
+ *  (`game/scene.ts`'s `Fog(...,30,140)`) and the largest home-plot choice
+ *  (300m, `ui/worldSize.ts`), so chunk (0, 0) alone can hold the whole home
+ *  plot and a chunk seam is never the reason something pops in mid-view. */
+export const CHUNK_SIZE = 400
 
 export interface ChunkCoord {
   cx: number
   cz: number
 }
 
-/** Which chunk a world point falls in. Floors toward negative infinity (not
- *  toward zero), so a chunk's own coordinate always identifies the square
- *  it actually occupies, on either side of the origin. */
+/** Which chunk a world point falls in. */
 export function chunkCoordAt(x: number, z: number, chunkSize = CHUNK_SIZE): ChunkCoord {
-  return { cx: Math.floor(x / chunkSize), cz: Math.floor(z / chunkSize) }
+  return { cx: Math.floor(x / chunkSize + 0.5), cz: Math.floor(z / chunkSize + 0.5) }
 }
 
 /** A chunk's own centre, in world metres — every chunk-local placement
  *  function's `origin`. */
 export function chunkOrigin(coord: ChunkCoord, chunkSize = CHUNK_SIZE): { x: number; z: number } {
-  return { x: (coord.cx + 0.5) * chunkSize, z: (coord.cz + 0.5) * chunkSize }
+  return { x: coord.cx * chunkSize, z: coord.cz * chunkSize }
 }
 
 /** A chunk's own seed: a pure function of its coordinate and the world's
