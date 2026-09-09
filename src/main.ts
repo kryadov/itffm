@@ -401,10 +401,19 @@ async function main(): Promise<void> {
     const el = document.createElement('div')
     el.id = id
     el.dataset.modal = 'true'
+    // `overflow-y:auto` on THIS element, not on the one that also centers —
+    // a mobile browser's own chrome (address bar) eats real screen space
+    // that `position:fixed;inset:0` doesn't know about, so a `100vh`-sized
+    // box can be taller than what's actually visible; centering AND
+    // scrolling the same element clips the unreachable part instead of
+    // letting it scroll into view (a known flexbox+overflow quirk). The
+    // inner wrapper does the centering; this element only ever scrolls.
     el.style.cssText =
-      'position:fixed;inset:0;background:rgba(15,19,14,.95);pointer-events:auto;display:flex;' +
-      'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee'
-    el.innerHTML = html
+      'position:fixed;inset:0;overflow-y:auto;background:rgba(15,19,14,.95);pointer-events:auto;' +
+      'font-family:system-ui,sans-serif;color:#eee'
+    el.innerHTML =
+      `<div style="min-height:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center">` +
+      `${html}</div>`
     ui.appendChild(el)
 
     const close = (e: KeyboardEvent) => {
