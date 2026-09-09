@@ -31,6 +31,10 @@ export interface Prefs {
   /** 0..1 — the collect/cut sound (audio/audio.ts). 0 is silent; there is no
    *  separate on/off toggle for one short effect. */
   soundVolume: number
+  /** Off by default — flips the sign of vertical look (game/controls.ts's
+   *  and game/touchControls.ts's own dPitch), for players who read "up" on
+   *  the stick/mouse as "look down" (a common flight-sim-style preference). */
+  invertMouseY: boolean
 }
 
 export interface SaveData {
@@ -53,6 +57,7 @@ export function defaultPrefs(): Prefs {
     weather: 'clear',
     minimap: false,
     soundVolume: 0.7,
+    invertMouseY: false,
   }
 }
 

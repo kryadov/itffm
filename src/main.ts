@@ -118,6 +118,8 @@ async function main(): Promise<void> {
   // `active`, rather than merging both: a hybrid device summing both inputs
   // is a far rarer problem than the code to handle it is worth right now.
   const touch = createTouchControls(renderer.domElement, save.prefs.mouseSensitivity)
+  controls.setInvertY(save.prefs.invertMouseY)
+  touch.setInvertY(save.prefs.invertMouseY)
   // resume() needs a user gesture (autoplay policy) — the place-picker click
   // just above is the earliest one every player, new or returning, always
   // makes before gameplay starts.
@@ -368,6 +370,8 @@ async function main(): Promise<void> {
         save = { ...save, prefs }
         controls.setSensitivity(prefs.mouseSensitivity)
         touch.setSensitivity(prefs.mouseSensitivity)
+        controls.setInvertY(prefs.invertMouseY)
+        touch.setInvertY(prefs.invertMouseY)
         audio.setVolume(prefs.soundVolume)
         forest.setWeather(prefs.weather)
         minimap.setVisible(prefs.minimap)

@@ -48,6 +48,7 @@ export interface TouchControls {
   readonly active: boolean
   read(dt: number): PlayerInput
   setSensitivity(v: number): void
+  setInvertY(v: boolean): void
   /** The screen point (NDC) of a tap completed since the last call, or null.
    *  Consuming clears it — a tap fires the interact it stands for exactly
    *  once, the same as the edge-triggered jump key in game/controls.ts. */
@@ -87,10 +88,18 @@ interface LookTouch {
 export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchControls {
   const active = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
   if (!active) {
-    return { active: false, read: () => NEUTRAL, setSensitivity: () => {}, consumeTap: () => null, dispose: () => {} }
+    return {
+      active: false,
+      read: () => NEUTRAL,
+      setSensitivity: () => {},
+      setInvertY: () => {},
+      consumeTap: () => null,
+      dispose: () => {},
+    }
   }
 
   let sens = sensitivity
+  let invertY = false
   let stick: StickTouch | null = null
   let look: LookTouch | null = null
   let dYaw = 0
@@ -177,7 +186,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
     }
     if (look && e.pointerId === look.id) {
       dYaw -= (e.clientX - look.lastX) * BASE_SENSITIVITY * sens
-      dPitch -= (e.clientY - look.lastY) * BASE_SENSITIVITY * sens
+      dPitch -= (e.clientY - look.lastY) * BASE_SENSITIVITY * sens * (invertY ? -1 : 1)
       look.lastX = e.clientX
       look.lastY = e.clientY
       if (!look.moved && Math.hypot(e.clientX - look.startX, e.clientY - look.startY) >= TAP_MOVE_THRESHOLD) {
@@ -218,6 +227,9 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
     },
     setSensitivity(v: number): void {
       sens = v
+    },
+    setInvertY(v: boolean): void {
+      invertY = v
     },
     consumeTap(): { x: number; y: number } | null {
       const t = pendingTap

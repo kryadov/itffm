@@ -13,12 +13,18 @@ const BASE_SENSITIVITY = 0.0022
 export function createControls(
   dom: HTMLElement,
   sensitivity = 1,
-): { read(dt: number): PlayerInput; setSensitivity(v: number): void; dispose(): void } {
+): {
+  read(dt: number): PlayerInput
+  setSensitivity(v: number): void
+  setInvertY(v: boolean): void
+  dispose(): void
+} {
   const keys = new Set<string>()
   let dYaw = 0
   let dPitch = 0
   let jumpPending = false
   let sens = sensitivity
+  let invertY = false
 
   const down = (e: KeyboardEvent) => {
     // Edge-triggered: the browser repeats keydown while a key is held, but a
@@ -30,7 +36,7 @@ export function createControls(
   const move = (e: MouseEvent) => {
     if (document.pointerLockElement !== dom) return
     dYaw -= e.movementX * BASE_SENSITIVITY * sens
-    dPitch -= e.movementY * BASE_SENSITIVITY * sens
+    dPitch -= e.movementY * BASE_SENSITIVITY * sens * (invertY ? -1 : 1)
   }
   const click = () => {
     // Overlays (inspection, the encyclopedia) take the mouse for themselves.
@@ -72,6 +78,9 @@ export function createControls(
     },
     setSensitivity(v: number) {
       sens = v
+    },
+    setInvertY(v: boolean) {
+      invertY = v
     },
     dispose() {
       removeEventListener('keydown', down)
