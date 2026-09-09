@@ -14,8 +14,10 @@ export interface Shelter {
 /** How far the hut needs from anything already standing, metres — wider than
  *  a player needs, since a structure is bigger than one pair of shoulders. */
 const SHELTER_CLEARANCE = 2.5
-/** Its own footprint, for other things (including the player) to avoid. */
-const SHELTER_RADIUS = 1.8
+/** Its own footprint, for other things (including the player) to avoid — a
+ *  circle wide enough to clear the box's own far corner (half-diagonal
+ *  ~1.99m at the wall dimensions below), not just its centre. */
+const SHELTER_RADIUS = 2.1
 
 /**
  * Sites the wood's one shelter — a hut, not a decoration. It exists to be
@@ -84,9 +86,13 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x5a4429, roughness: 1 })
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x3c2f1c, roughness: 1 })
 
-  const width = 2.6
-  const depth = 2.2
-  const wallHeight = 1.7
+  const width = 3.0
+  const depth = 2.6
+  // A live report (2026-09-09) found the hut reading as toy-sized, with the
+  // player's own eye level (game/player.ts's STAND_EYE, 1.65m) sitting above
+  // the door — the old 1.7m wall was barely taller than the player, let alone
+  // the door cut into it. Tall enough now for real headroom above STAND_EYE.
+  const wallHeight = 2.3
 
   // A plain box: an earlier attempt at a log-course ripple displaced each
   // face's vertices along that face's own normal, which at any corner points
@@ -120,19 +126,24 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   // without it the slab alone is easy to mistake for a shadow or a stain.
   const doorGroup = new THREE.Group()
   const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 })
-  const doorFace = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.25, 0.06), doorMat)
+  // A real human doorway, not the 0.7x1.25m child-sized slab a live report
+  // (2026-09-09) caught — that made the player's own eye level sit above the
+  // door entirely, part of the same "toy house" bug as the wall height above.
+  const doorWidth = 0.95
+  const doorHeight = 2.0
+  const doorFace = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, doorHeight, 0.06), doorMat)
   doorGroup.add(doorFace)
   const grooveMat = new THREE.MeshStandardMaterial({ color: 0x1f150c, roughness: 1 })
-  for (const gx of [-0.17, 0.17]) {
-    const groove = new THREE.Mesh(new THREE.BoxGeometry(0.02, 1.2, 0.01), grooveMat)
+  for (const gx of [-0.23, 0.23]) {
+    const groove = new THREE.Mesh(new THREE.BoxGeometry(0.02, doorHeight * 0.96, 0.01), grooveMat)
     groove.position.set(gx, 0, 0.035)
     doorGroup.add(groove)
   }
   const handleMat = new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 0.4, metalness: 0.3 })
   const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), handleMat)
-  handle.position.set(0.24, -0.05, 0.05)
+  handle.position.set(doorWidth * 0.34, -0.05, 0.05)
   doorGroup.add(handle)
-  doorGroup.position.set(0, 0.625, -depth / 2 - 0.08)
+  doorGroup.position.set(0, doorHeight / 2, -depth / 2 - 0.08)
   group.add(doorGroup)
 
   // Two windows, one per side wall — a pale, faintly blue "glass" pane on a
@@ -222,14 +233,23 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
     const y = logRadius + row * logRadius * 2
     for (let i = 0; i < count; i++) {
       const log = new THREE.Mesh(logGeo, firewoodMat)
+      // rotation.z lays each log on its side, its own length now running
+      // along local X — a live report (2026-09-09) found logs visibly
+      // poking through the wall, because the row itself was ALSO spaced
+      // along that same X: a 0.5m log offset only ~0.2m from its neighbour
+      // overlaps almost its whole length, and the pile as a whole reached
+      // back across the wall face despite its own anchor point (below)
+      // sitting outside it. The row now spaces along Z instead — side by
+      // side along the wall, each log still the same fixed distance out
+      // from it, none reaching back any further than the others.
       log.rotation.z = Math.PI / 2
-      log.position.set((i - offset) * (logRadius * 2 + 0.015), y, 0)
+      log.position.set(0, y, (i - offset) * (logRadius * 2 + 0.015))
       firewood.add(log)
       // The cylinder's own caps carry the trunk colour; a paler disc facing
       // the viewer is what actually reads as "cut log end" from outside.
       const endCap = new THREE.Mesh(logEndGeo, logEndMat)
       endCap.rotation.y = Math.PI / 2
-      endCap.position.set(log.position.x + logLength / 2 + 0.001, y, 0)
+      endCap.position.set(logLength / 2 + 0.001, y, log.position.z)
       firewood.add(endCap)
     }
   }
@@ -244,8 +264,14 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const bucketMat = new THREE.MeshStandardMaterial({ color: 0x5a4a30, roughness: 0.6, metalness: 0.15 })
   const well = new THREE.Group()
   well.name = 'well'
-  const wellRadius = 0.42
-  const wellWallHeight = 0.32
+  const wellRadius = 0.45
+  // A live report (2026-09-09) found this "not looking like a well" — at the
+  // old 0.32m the stone ring sat barely knee-high, dwarfed by the posts and
+  // roof above it, and read as two sticks over a stone puddle rather than a
+  // wellhead. Waist-high now, the way a real one needs to be to lean a
+  // bucket on the rim without falling in. postHeight below is a formula off
+  // this, so the posts/beam/roof/rope/bucket stay in proportion to it.
+  const wellWallHeight = 0.55
   // Open-ended — a capped cylinder would read as a solid stone drum, not a
   // shaft with anything down it.
   const wellWall = new THREE.Mesh(
@@ -254,7 +280,7 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   )
   wellWall.position.y = wellWallHeight / 2
   well.add(wellWall)
-  const postHeight = 0.85
+  const postHeight = 1.05
   const postGeo = new THREE.BoxGeometry(0.06, postHeight, 0.06)
   for (const side of [-1, 1]) {
     const post = new THREE.Mesh(postGeo, wellWoodMat)

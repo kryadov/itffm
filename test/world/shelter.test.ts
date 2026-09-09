@@ -111,4 +111,25 @@ describe('buildShelterMesh', () => {
     expect(Math.hypot(firewood.position.x, firewood.position.z)).toBeGreaterThan(1)
     expect(Math.hypot(well.position.x, well.position.z)).toBeGreaterThan(1)
   })
+
+  it('keeps every log of the firewood pile clear of the wall it leans against', () => {
+    // The pile's own origin sits outside the wall (the test above), but each
+    // log's own body extends further out from that origin — a live report
+    // (2026-09-09) found logs visually poking through the wall despite the
+    // origin check passing, because the row-spacing axis and each log's own
+    // length axis were the same axis: a log 0.5m long, offset only ~0.2m from
+    // its neighbour, reaches back well past where the pile's own anchor point
+    // already cleared the wall.
+    const { group } = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+    const walls = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.BoxGeometry) as THREE.Mesh
+    walls.updateMatrixWorld(true)
+    const wallBox = new THREE.Box3().setFromObject(walls)
+
+    const firewood = group.getObjectByName('firewood')!
+    firewood.updateMatrixWorld(true)
+    for (const log of firewood.children) {
+      const logBox = new THREE.Box3().setFromObject(log)
+      expect(logBox.intersectsBox(wallBox)).toBe(false)
+    }
+  })
 })
