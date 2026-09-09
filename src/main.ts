@@ -111,9 +111,21 @@ async function main(): Promise<void> {
   // carries no identity of its own, but it is the very object the collect
   // handler already has in hand at the moment it creates that Find.
   const findAtByPlacement = new WeakMap<Placement, number>()
-  const hud = createHud(ui, () => {
-    if (!modalOpen()) openSettings()
-  })
+  const hud = createHud(
+    ui,
+    () => {
+      if (!modalOpen()) openSettings()
+    },
+    {
+      active: touch.active,
+      onEncyclopedia: () => {
+        if (!modalOpen()) openEncyclopedia(save, getLang())
+      },
+      onTally: () => {
+        if (!modalOpen()) showTally()
+      },
+    },
+  )
   hud.setBasket(0, BASKET_CAPACITY)
   const compass = createCompass(ui)
   const minimap = createMinimap(ui)

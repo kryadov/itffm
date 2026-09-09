@@ -96,6 +96,34 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
   let dYaw = 0
   let dPitch = 0
   let pendingTap: { x: number; y: number } | null = null
+  let crouching = false
+
+  // A real button, not a canvas zone — a held press is simpler as its own
+  // element (its own pointerdown/up, no interference with the stick/look
+  // zones it sits outside of) than folding a third gesture into onDown/onUp's
+  // left/right split. Bottom-centre: clear of both the left-half stick and
+  // the right-half look/tap, and of the basket counter in ui/hud.ts's own
+  // bottom-right corner.
+  const crouchBtn = document.createElement('button')
+  crouchBtn.textContent = '⬇'
+  crouchBtn.style.cssText =
+    'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:52px;height:52px;' +
+    'margin:0;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(15,19,14,.55);' +
+    'color:#eee;font-size:20px;line-height:1;pointer-events:auto;touch-action:none;z-index:42'
+  const pressCrouch = (e: PointerEvent): void => {
+    e.preventDefault()
+    crouchBtn.setPointerCapture(e.pointerId)
+    crouchBtn.style.background = 'rgba(126,196,107,.55)'
+    crouching = true
+  }
+  const releaseCrouch = (): void => {
+    crouchBtn.style.background = 'rgba(15,19,14,.55)'
+    crouching = false
+  }
+  crouchBtn.addEventListener('pointerdown', pressCrouch)
+  crouchBtn.addEventListener('pointerup', releaseCrouch)
+  crouchBtn.addEventListener('pointercancel', releaseCrouch)
+  document.body.append(crouchBtn)
 
   // Purely visual: a ring at the thumb's starting point and a knob that
   // follows the drag, so the stick is discoverable at all — nothing else on
@@ -183,7 +211,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       const { forward, strafe } = stick
         ? joystickVector(stick.curX - stick.startX, stick.curY - stick.startY, STICK_RADIUS)
         : { forward: 0, strafe: 0 }
-      const input: PlayerInput = { forward, strafe, dYaw, dPitch, crouching: false, jumping: false, dt }
+      const input: PlayerInput = { forward, strafe, dYaw, dPitch, crouching, jumping: false, dt }
       dYaw = 0
       dPitch = 0
       return input
@@ -201,8 +229,12 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       dom.removeEventListener('pointermove', onMove)
       dom.removeEventListener('pointerup', onUp)
       dom.removeEventListener('pointercancel', onUp)
+      crouchBtn.removeEventListener('pointerdown', pressCrouch)
+      crouchBtn.removeEventListener('pointerup', releaseCrouch)
+      crouchBtn.removeEventListener('pointercancel', releaseCrouch)
       ring.remove()
       knob.remove()
+      crouchBtn.remove()
     },
   }
 }
