@@ -16,7 +16,9 @@ a real place name via OpenStreetMap and AWS Terrain Tiles, with an offline demo
 wood as an honest fallback on any failure. Next: expanding the species database
 past three, and the ETL pipeline for photos (see TODO.md).
 
-Documents are in Russian; the code is in English (see Conventions).
+Everything in the project is in English — code, documents, commit messages,
+this file. Russian exists only inside the game itself, as one of the two
+player-facing languages (see Conventions).
 
 - Design doc: `docs/superpowers/specs/2026-09-07-mushroom-game-design.md` —
   section 0 lists where the implementation taught us better than the spec.
@@ -112,10 +114,14 @@ buildings, carriageways and lanes is dropped on the way.
 
 ## Conventions
 
-- **Language.** Code is English: identifiers, comments, error messages, test
-  names. Documents, specs and commit messages are Russian. `README.md` and this
-  file are English. Player-facing strings are data: they live in `src/i18n/` in
-  both languages and are never hardcoded in modules.
+- **Language.** Everything in the project is English: code, comments, error
+  messages, test names, documents, specs, `TODO.md`, `CHANGELOG.md`, commit
+  messages, this file. The one exception is the game's own player-facing
+  localization: strings live in `src/i18n/` as parallel `RU`/`EN` data and are
+  never hardcoded in modules — Russian belongs there and nowhere else in the
+  project. (`TODO.md`, `CHANGELOG.md` and the specs under
+  `docs/superpowers/specs/` predate this rule and stay Russian where they
+  already are — write new entries in English, don't translate old ones.)
 - **Determinism.** No `Math.random` anywhere in `src/`. Everything generated
   draws from `mulberry32` (`src/util/rng.ts`), and every generator has a test
   asserting one seed gives one result. The wood must look the same for everyone
