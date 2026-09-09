@@ -18,7 +18,8 @@ import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import {
-  placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, doorPosition, type ShelterFx,
+  placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, interiorObstacles, doorPosition,
+  type ShelterFx,
 } from '../world/shelter'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { buildSky } from '../world/sky'
@@ -280,7 +281,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // campfire, next) still wants the whole footprint kept clear, so that
   // stays a one-off argument to its own findOpenSpot call instead.
   const shelterFootprint = shelterObstacle(shelter)
-  extraObstacles.push(...wallObstacles(shelter), shelterFx.doorObstacle)
+  extraObstacles.push(...wallObstacles(shelter), shelterFx.doorObstacle, ...interiorObstacles(shelter))
   const updateShelter = (dt: number): void => shelterFx!.update(dt)
 
   // A second everyday fixture, deliberately apart from the hut — see

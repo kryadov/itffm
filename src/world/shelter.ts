@@ -184,6 +184,36 @@ export function doorPosition(s: Shelter): { x: number; z: number } {
   return toWorld(s, 0, -DEPTH / 2)
 }
 
+// Interior furniture layout — local (pre-rotation) coordinates, worked out
+// once and shared between the mesh (below) and the two collision circles a
+// player can actually bump into. Both pieces hug a side wall, leaving the
+// straight line from the doorway to the back wall (x≈0) clear to walk.
+const BED_WIDTH = 0.9
+const BED_LENGTH = 1.9
+const BED_X = WIDTH / 2 - WALL_THICKNESS - BED_WIDTH / 2 - 0.03
+const BED_Z = -0.15
+const BED_OBSTACLE_RADIUS = 0.55
+const TABLE_SIZE = 0.6
+const TABLE_X = -(WIDTH / 2 - WALL_THICKNESS - TABLE_SIZE / 2 - 0.15)
+const TABLE_Z = 0.35
+const TABLE_OBSTACLE_RADIUS = 0.4
+const PAINTING_X = -0.7
+const PAINTING_Y = 1.55
+const PAINTING_Z = DEPTH / 2 - WALL_THICKNESS - 0.02
+
+/** The bed and table a player can actually bump into — the painting (flat
+ *  against the wall) and the cup (a few centimetres, on the table) need
+ *  none of their own; `wallObstacles`' own ring already keeps the walls
+ *  themselves solid. */
+export function interiorObstacles(s: Shelter): Circle[] {
+  const bed = toWorld(s, BED_X, BED_Z)
+  const table = toWorld(s, TABLE_X, TABLE_Z)
+  return [
+    { x: bed.x, z: bed.z, radius: BED_OBSTACLE_RADIUS },
+    { x: table.x, z: table.z, radius: TABLE_OBSTACLE_RADIUS },
+  ]
+}
+
 export interface ShelterFx {
   group: THREE.Group
   /** The doorway's own collision circle, closed by default —
@@ -269,6 +299,100 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   floor.position.y = 0.02
   floor.receiveShadow = true
   group.add(floor)
+
+  // A bed, a table with a cup on it, and a painting on the back wall — the
+  // first look inside now that a player can actually walk in (a live
+  // request, 2026-09-09). Everyday enough that a room with none of it would
+  // read as abandoned, not lived-in.
+  const bedFrameMat = new THREE.MeshStandardMaterial({ color: 0x4a3624, roughness: 1 })
+  const mattressMat = new THREE.MeshStandardMaterial({ color: 0xcbb98a, roughness: 0.9 })
+  const pillowMat = new THREE.MeshStandardMaterial({ color: 0xe8ddc0, roughness: 0.9 })
+  const bed = new THREE.Group()
+  bed.name = 'bed'
+  const bedLegHeight = 0.22
+  const bedFrame = new THREE.Mesh(new THREE.BoxGeometry(BED_WIDTH, 0.1, BED_LENGTH), bedFrameMat)
+  bedFrame.position.y = bedLegHeight
+  bed.add(bedFrame)
+  const mattress = new THREE.Mesh(
+    new THREE.BoxGeometry(BED_WIDTH - 0.06, 0.14, BED_LENGTH - 0.06),
+    mattressMat,
+  )
+  mattress.position.y = bedLegHeight + 0.05 + 0.07
+  bed.add(mattress)
+  const pillow = new THREE.Mesh(new THREE.BoxGeometry(BED_WIDTH - 0.2, 0.08, 0.28), pillowMat)
+  pillow.position.set(0, bedLegHeight + 0.05 + 0.14 + 0.04, -BED_LENGTH / 2 + 0.22)
+  bed.add(pillow)
+  for (const lx of [-BED_WIDTH / 2 + 0.05, BED_WIDTH / 2 - 0.05]) {
+    for (const lz of [-BED_LENGTH / 2 + 0.1, BED_LENGTH / 2 - 0.1]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, bedLegHeight, 0.06), bedFrameMat)
+      leg.position.set(lx, bedLegHeight / 2, lz)
+      bed.add(leg)
+    }
+  }
+  bed.position.set(BED_X, 0, BED_Z)
+  group.add(bed)
+
+  const tableMat = new THREE.MeshStandardMaterial({ color: 0x5a4530, roughness: 1 })
+  const cupMat = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.5 })
+  const table = new THREE.Group()
+  table.name = 'table'
+  const tableHeight = 0.45
+  const tableTop = new THREE.Mesh(new THREE.BoxGeometry(TABLE_SIZE, 0.04, TABLE_SIZE), tableMat)
+  tableTop.position.y = tableHeight
+  table.add(tableTop)
+  const tableLegGeo = new THREE.BoxGeometry(0.045, tableHeight - 0.04, 0.045)
+  for (const lx of [-TABLE_SIZE / 2 + 0.06, TABLE_SIZE / 2 - 0.06]) {
+    for (const lz of [-TABLE_SIZE / 2 + 0.06, TABLE_SIZE / 2 - 0.06]) {
+      const leg = new THREE.Mesh(tableLegGeo, tableMat)
+      leg.position.set(lx, (tableHeight - 0.04) / 2, lz)
+      table.add(leg)
+    }
+  }
+  // A cup, off-centre — dead centre on the table would read as placed by a
+  // level, not left there.
+  const cup = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.06, 10), cupMat)
+  cup.name = 'cup'
+  cup.position.set(0.12, tableHeight + 0.02 + 0.03, -0.08)
+  table.add(cup)
+  table.position.set(TABLE_X, 0, TABLE_Z)
+  group.add(table)
+
+  // A small painted scene on the back wall — the whole project draws without
+  // pictures (see CLAUDE.md's Conventions), so this is a handful of flat
+  // shapes, not an image: sky, a strip of ground, a sun, two stylised
+  // conifers. DoubleSide throughout, the same defensive choice the windows
+  // already made — a live-reported "invisible from one side" bug is not
+  // worth risking twice for a plane this small to eyeball the correct
+  // rotation sign on.
+  const painting = new THREE.Group()
+  painting.name = 'painting'
+  const paintingFrameMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1, side: THREE.DoubleSide })
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.4, 0.03), paintingFrameMat)
+  painting.add(frame)
+  const skyMat = new THREE.MeshBasicMaterial({ color: 0xbfe0e6, side: THREE.DoubleSide })
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.24), skyMat)
+  sky.position.set(0, 0.05, 0.02)
+  painting.add(sky)
+  const groundMatSmall = new THREE.MeshBasicMaterial({ color: 0x4a7a3a, side: THREE.DoubleSide })
+  const groundStrip = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.1), groundMatSmall)
+  groundStrip.position.set(0, -0.12, 0.021)
+  painting.add(groundStrip)
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xf2d060, side: THREE.DoubleSide })
+  const sun = new THREE.Mesh(new THREE.CircleGeometry(0.04, 10), sunMat)
+  sun.position.set(0.13, 0.09, 0.022)
+  painting.add(sun)
+  const treeMatSmall = new THREE.MeshBasicMaterial({ color: 0x2e5a28, side: THREE.DoubleSide })
+  const treeSpots: [number, number, number][] = [
+    [-0.12, -0.04, 0.1],
+    [-0.05, -0.055, 0.08],
+  ]
+  for (const [tx, ty, size] of treeSpots) {
+    const tree = new THREE.Mesh(new THREE.ConeGeometry(size * 0.3, size, 3), treeMatSmall)
+    tree.position.set(tx, ty, 0.022)
+    painting.add(tree)
+  }
+  painting.position.set(PAINTING_X, PAINTING_Y, PAINTING_Z)
+  group.add(painting)
 
   const roofSpan = Math.hypot(width, depth) * 0.62
   const roof = new THREE.Mesh(new THREE.ConeGeometry(roofSpan, 1.1, 4), roofMat)

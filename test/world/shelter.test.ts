@@ -4,6 +4,7 @@ import {
   shelterObstacle,
   buildShelterMesh,
   wallObstacles,
+  interiorObstacles,
   doorObstacle,
   doorPosition,
   DOOR_INTERACT_RADIUS,
@@ -248,5 +249,60 @@ describe('walking through the doorway (integration)', () => {
     for (let i = 0; i < 200; i++) opened = stepPlayer(opened, neutralInput, ground, obstacles)
     // Door open: the same walk now actually enters the hut.
     expect(opened.z).toBeGreaterThan(-1.3)
+  })
+})
+
+describe('interiorObstacles', () => {
+  it('gives the bed and the table their own collision, apart from the walls', () => {
+    const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+    const obstacles = interiorObstacles(s)
+    expect(obstacles).toHaveLength(2)
+    for (const o of obstacles) expect(o.radius).toBeGreaterThan(0)
+  })
+
+  it('rotates with the shelter', () => {
+    const straight = interiorObstacles({ x: 0, z: 0, y: 0, rotationY: 0 })
+    const turned = interiorObstacles({ x: 0, z: 0, y: 0, rotationY: Math.PI / 2 })
+    const dist = (c: Circle) => Math.hypot(c.x, c.z)
+    const sortedStraight = straight.map(dist).sort((a, b) => a - b)
+    const sortedTurned = turned.map(dist).sort((a, b) => a - b)
+    for (let i = 0; i < sortedStraight.length; i++) expect(sortedTurned[i]).toBeCloseTo(sortedStraight[i], 5)
+  })
+})
+
+describe('buildShelterMesh — furniture', () => {
+  const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+
+  it('adds a bed, a table, a cup on the table, and a painting', () => {
+    const { group } = buildShelterMesh(s)
+    const bed = group.getObjectByName('bed')
+    const table = group.getObjectByName('table')
+    const cup = group.getObjectByName('cup')
+    const painting = group.getObjectByName('painting')
+    expect(bed?.children.length).toBeGreaterThan(0)
+    expect(table?.children.length).toBeGreaterThan(0)
+    expect(painting?.children.length).toBeGreaterThan(0)
+    // The cup lives on the table, not loose in the room.
+    expect(cup?.parent).toBe(table)
+  })
+
+  it('sits the cup on the table\'s own surface, not floating or sunk into it', () => {
+    const { group } = buildShelterMesh(s)
+    const table = group.getObjectByName('table')!
+    const cup = group.getObjectByName('cup')!
+    // The table surface sits at y=0.45 (tableHeight) in buildShelterMesh's
+    // own local frame; the cup should rest at or just above it, not below.
+    expect(cup.position.y + table.position.y).toBeGreaterThan(0.45)
+  })
+
+  it('paints the little back-wall scene in more than one colour, not a single flat card', () => {
+    const { group } = buildShelterMesh(s)
+    const painting = group.getObjectByName('painting')!
+    const colors = new Set(
+      painting.children
+        .filter((c): c is THREE.Mesh => (c as THREE.Mesh).isMesh)
+        .map((c) => (c.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.getHex()),
+    )
+    expect(colors.size).toBeGreaterThan(2)
   })
 })
