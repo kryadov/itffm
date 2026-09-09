@@ -168,8 +168,26 @@
       менее честным, а не более живым. **Это сердце игры (по словам
       пользователя) — стоит отдельно побрейнштормить подход (superpowers:
       brainstorming), а не имплементировать с ходу.**
-
-## 🚧 Ближайшее
+- [x] **Mouse-look needed an extra click after "Go".** Live report,
+      2026-09-10: `game/controls.ts`'s Pointer Lock request only ever fires
+      from a `click` on the canvas itself, but the click that actually picks
+      a place lands on the place-picker's own button
+      (`ui/placePicker.ts`) — a different element — so the very first
+      `requestPointerLock()` never happened at all, and mouse-look stayed
+      dead until the player clicked the game world a second time by hand.
+      Fixed in `main.ts`: ask for pointer lock right where the picker's
+      promise resolves, still within that click's transient user-activation
+      window (a resolved promise's `.then` continuation runs as a
+      microtask, not after a real delay — `loadForestData` right after it
+      can take several real seconds over the network, long enough to burn
+      through that window, so the request can't wait until after it
+      finishes). Couldn't get a clean headless proof either way: Pointer
+      Lock in headless Chrome rejects with `WrongDocumentError` regardless
+      of which click asks for it or when (confirmed both the new early
+      request and the old on-canvas one fail identically there) — a
+      headless/CDP-specific limitation, the same class of "can't verify this
+      one thing outside a real browser" already accepted for touch-emulation
+      artifacts elsewhere in this file. Verify live on next real playtest.
 
 - [x] **Экран загрузки — вращающийся гриб и прогресс-бар.** Готово: `showLoading`
       (`ui/placePicker.ts`) крутит мухомор (`buildCollectible`) в WebGL-канвасе

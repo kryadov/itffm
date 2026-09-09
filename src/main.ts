@@ -92,6 +92,20 @@ async function main(): Promise<void> {
         openPlacePicker((q, hs) => resolve([q, hs])),
       )
 
+  // The click that just picked a place is the only user gesture Pointer Lock
+  // ever gets to work with here — `game/controls.ts`'s own click handler on
+  // the canvas would ask again, but only once the player clicks a SECOND
+  // time, since this first click landed on the place-picker's own button, not
+  // on the canvas. Asking again right here, still inside that gesture's
+  // transient-activation window (a `resolve()`d promise's continuation runs
+  // as a microtask, not after a real delay), means mouse-look already works
+  // the moment the wood appears. `loadForestData` below can take several
+  // real seconds — long enough to burn through that window — so this cannot
+  // wait until after it.
+  if (!window.matchMedia?.('(pointer: coarse)').matches) {
+    renderer.domElement.requestPointerLock().catch(() => {})
+  }
+
   const loading = showLoading(t(STAGE_KEY.geocode), stageFraction('geocode'))
   const { source, fellBackTo, seed } = await loadForestData(
     query,
