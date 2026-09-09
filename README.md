@@ -1,11 +1,15 @@
 # itffm 🍄
 
-A quiet first-person game about picking mushrooms — and a mushroom encyclopedia
-in the same breath.
+A quiet first-person walk through a real wood. A mushroom encyclopedia is its
+heart — pick a mushroom, take it in your hands, turn it over, look underneath
+the cap and read why it is the one it is — but the wood has grown a life of
+its own around that: a hut you can actually walk into, a campfire, wildlife
+that flees or ignores you depending on what it is, weather, a day and night.
 
-You walk through a wood, find a mushroom, take it in your hands, turn it over,
-look underneath the cap and read why it is the one it is. Everything you pick
-stays in your own encyclopedia for good. No timers, no enemies, nothing to lose.
+You walk through the wood and find something — a mushroom, a berry, a curious
+stone, a bird's nest, whatever the ecology of that spot actually grows.
+Everything you pick stays in your own encyclopedia for good. No timers, no
+enemies, nothing to lose.
 
 The species are real. So are their field marks, their edibility, their season
 and their ecology. Mushrooms do not grow just anywhere — they grow where they
@@ -23,11 +27,11 @@ start finding more.
 
 ## How it works
 
-There is no such thing as a library of 3D models "by mushroom species" — not
-free, not for money — and hand-modelling hundreds of species is not possible.
-So there are no models here. Every mushroom is **generated on the spot** from
-its species parameters: cap shape, hymenium type, whether it has a ring or a
-volva, colours, size ranges.
+There is no such thing as a library of 3D models "by species" — not free, not
+for money — and hand-modelling hundreds of them is not possible. So there are
+no models here. Everything you can pick — mushroom, berry, herb, nut, or a
+plain forest find like a bird's nest — is **generated on the spot** from its
+own species parameters: shape, colours, size ranges, whatever makes it itself.
 
 One YAML file per species feeds three subsystems at once:
 
@@ -39,13 +43,29 @@ data/species/*.yaml
 ```
 
 A new species is a line of data, not a job for a 3D artist. That is exactly why
-this scales to hundreds of them.
+this scales to dozens of them, across five different kinds of find.
 
 The same approach has a second consequence: ecology is a generator, not
 decoration. The terrain decides moisture — hollows are damp, rises are dry.
 Trees grow in stands of one genus. From there every point knows its biome, its
 nearest partner tree, its substrate and its moisture, and the species is chosen
 by real rules.
+
+## A wood, not just a spawn table
+
+The wood has grown a life of its own around the finding:
+
+- A **hut** with a working door — walk in, and there's a bed, a table, a
+  painting on the wall, a cup on it.
+- A **campfire** with a pot on a tripod and a bench, apart from the hut, out
+  on its own clearing.
+- Where the wood actually has water, a **fisherman's hut and a boat** at the
+  shore.
+- **Weather and a day/night cycle** — rain, snow, fog, a real sun and moon.
+- **Wildlife**: birds nesting and flying between the trees, hares and
+  squirrels that bolt when you get close, snakes that quietly slip away,
+  bees around a wild hive, dragonflies over the water.
+- Streams, ponds, waterfalls and springs, each animated, not a flat panel.
 
 ## Running it
 
@@ -69,9 +89,16 @@ npm run dev
 |---|---|
 | `W` `A` `S` `D` | Walk |
 | `Shift` | Crouch — to look under a cap |
-| `E` | Examine a mushroom |
+| `Space` | Jump |
+| `E` | Examine a find, or open/close a door |
+| `F` | Flashlight |
 | `Tab` | Encyclopedia |
 | `Q` | Sort the basket |
+| `M` | Settings |
+| `H` | This same control list, in-game |
+
+On a phone or tablet, the same actions come from an on-screen stick, a
+swipe-to-look zone, and a tap.
 
 ## Where it stands
 
@@ -83,13 +110,15 @@ reserve, a national park. Any failure along the way — the place not found, the
 map bare, the network down — falls back honestly to a baked-in demo wood rather
 than an error screen.
 
-Left to do: the species database still holds three mushrooms, not the twenty or
-so a proper walk deserves, and their photographs are not wired up yet. See
-`TODO.md` for the rest — atmosphere, sound, wildlife, and everything else a
-wood is missing.
+Works offline once it has loaded once, and installs to your home screen like
+an app.
 
-Design documents and plans live in `docs/superpowers/` and are written in
-Russian. The backlog is `TODO.md`.
+Left to do: photographs for the species aren't wired up yet (the taxonomy,
+names and edibility are all curated by hand already), and the season is
+stuck on a permanent September after rain. See `TODO.md` for the rest.
+
+Design documents and plans live in `docs/superpowers/`. The backlog is
+`TODO.md`.
 
 ## Technology and data
 
