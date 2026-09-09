@@ -79,6 +79,28 @@ describe('parseWorld', () => {
     expect(w.caves).toHaveLength(1)
   })
 
+  it('takes a mapped hut/shelter/tower as a point, node or way alike', () => {
+    const hutNode: OverpassElement = {
+      type: 'node', id: 7, lat: 55.7507, lon: 37.6207, tags: { tourism: 'wilderness_hut' },
+    }
+    const shelterNode: OverpassElement = {
+      type: 'node', id: 8, lat: 55.7508, lon: 37.6208, tags: { amenity: 'shelter' },
+    }
+    const towerNode: OverpassElement = {
+      type: 'node', id: 9, lat: 55.7509, lon: 37.6209, tags: { man_made: 'tower' },
+    }
+    const hutWay: OverpassElement = { ...wood, id: 18, tags: { building: 'hut' } }
+    const w = parseWorld({ elements: [...nodes, hutNode, shelterNode, towerNode, hutWay] }, proj)
+    expect(w.shelters).toHaveLength(4)
+  })
+
+  it('does not read an ordinary building as a shelter', () => {
+    const house: OverpassElement = {
+      type: 'node', id: 21, lat: 55.7502, lon: 37.6202, tags: { building: 'house' },
+    }
+    expect(parseWorld({ elements: [...nodes, house] }, proj).shelters).toHaveLength(0)
+  })
+
   it('reads a multipolygon relation through its outer ways', () => {
     const rel: OverpassElement = {
       type: 'relation',

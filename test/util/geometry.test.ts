@@ -1,4 +1,4 @@
-import { pointInPolygon, boundsOf, densify, distanceToRing, distanceToPolyline } from '../../src/util/geometry'
+import { pointInPolygon, boundsOf, densify, distanceToRing, distanceToPolyline, centroidOf } from '../../src/util/geometry'
 
 const square = [
   { x: -10, z: -10 }, { x: 10, z: -10 },
@@ -109,5 +109,24 @@ describe('densify', () => {
   it('returns a degenerate line unchanged rather than throwing', () => {
     expect(densify([], 5)).toEqual([])
     expect(densify([{ x: 1, z: 2 }], 5)).toEqual([{ x: 1, z: 2 }])
+  })
+})
+
+describe('centroidOf', () => {
+  it('averages a ring of points to its middle', () => {
+    expect(centroidOf(square)).toEqual({ x: 0, z: 0 })
+  })
+
+  it('is not thrown off by an off-centre footprint', () => {
+    const hut = [{ x: 10, z: 20 }, { x: 14, z: 20 }, { x: 14, z: 24 }, { x: 10, z: 24 }]
+    expect(centroidOf(hut)).toEqual({ x: 12, z: 22 })
+  })
+
+  it('returns the single point for a one-point line', () => {
+    expect(centroidOf([{ x: 3, z: 4 }])).toEqual({ x: 3, z: 4 })
+  })
+
+  it('returns the origin for an empty line rather than throwing', () => {
+    expect(centroidOf([])).toEqual({ x: 0, z: 0 })
   })
 })

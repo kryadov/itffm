@@ -76,6 +76,23 @@ export function distanceToPolyline(x: number, z: number, line: Vec2[]): number {
   return min
 }
 
+/**
+ * The plain average of a way's own nodes — good enough to turn a mapped
+ * building footprint into the one point a shelter/tower needs, not a proper
+ * area-weighted polygon centroid. A hut's outline is small and close to
+ * convex, so the difference is not worth the extra math.
+ */
+export function centroidOf(points: Vec2[]): Vec2 {
+  if (points.length === 0) return { x: 0, z: 0 }
+  let sx = 0
+  let sz = 0
+  for (const p of points) {
+    sx += p.x
+    sz += p.z
+  }
+  return { x: sx / points.length, z: sz / points.length }
+}
+
 /** The axis-aligned bounds of a ring, or null if it has no points. */
 export function boundsOf(poly: Vec2[]): { minX: number; maxX: number; minZ: number; maxZ: number } | null {
   if (poly.length === 0) return null

@@ -23,8 +23,18 @@ describe('forestQuery', () => {
   })
 
   it('does not ask for the city: buildings and carriageways are not our business', () => {
-    expect(q).not.toContain('"building"')
+    // The one exception: a real forest hut is worth a survey position over a
+    // procedural guess (see world/shelter.ts) — every OTHER building stays out,
+    // so the tag only ever appears pinned to that one value.
+    expect(q).not.toContain('["building"]')
     expect(q).not.toContain('motorway')
+  })
+
+  it('asks for a real hut, shelter or lookout tower', () => {
+    expect(q).toContain('"tourism"="wilderness_hut"')
+    expect(q).toContain('"amenity"="shelter"')
+    expect(q).toContain('"building"="hut"')
+    expect(q).toContain('"man_made"="tower"')
   })
 
   it('covers the bbox and carries a server-side timeout', () => {

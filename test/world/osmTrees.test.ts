@@ -8,7 +8,7 @@ const square = (cx: number, cz: number, r: number) => [
   { x: cx - r, z: cz - r }, { x: cx + r, z: cz - r },
   { x: cx + r, z: cz + r }, { x: cx - r, z: cz + r },
 ]
-const empty: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [] }
+const empty: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [], shelters: [] }
 const CONIFERS = ['picea', 'pinus', 'abies', 'larix']
 
 describe('regionalMix', () => {

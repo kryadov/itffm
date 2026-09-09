@@ -1,7 +1,8 @@
 import type {
-  CaveEntrance, LatLon, LeafType, MappedTree, OpenArea, OpenKind, Path, Vec2, WoodArea, WorldData,
+  CaveEntrance, LatLon, LeafType, MappedShelter, MappedTree, OpenArea, OpenKind, Path, Vec2, WoodArea, WorldData,
 } from './types'
 import type { Projector } from './project'
+import { centroidOf } from '../util/geometry'
 
 export interface OverpassMember {
   type: string
@@ -79,6 +80,22 @@ function isCave(tags: Record<string, string>): boolean {
 }
 
 /**
+ * A real forest hut, shelter or lookout tower — see `forestQuery`'s doc
+ * comment for why this is the one building-shaped tag ever asked for.
+ * `building=hut` is deliberately not `tags.building !== undefined`: an
+ * ordinary house mapped inside the query's margin (odd, but OSM tagging is
+ * other people's data) must not be read as our one shelter.
+ */
+export function isShelterTag(tags: Record<string, string>): boolean {
+  return (
+    tags.tourism === 'wilderness_hut' ||
+    tags.amenity === 'shelter' ||
+    tags.building === 'hut' ||
+    tags.man_made === 'tower'
+  )
+}
+
+/**
  * Turns an Overpass answer into the wood, in local metres.
  *
  * Nothing here throws. OpenStreetMap is other people's data, edited by hand:
@@ -87,7 +104,7 @@ function isCave(tags: Record<string, string>): boolean {
  * the player staring at a blank screen. Anything unreadable is skipped.
  */
 export function parseWorld(res: OverpassResponse, projector: Projector): WorldData {
-  const world: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [] }
+  const world: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [], shelters: [] }
   const elements = Array.isArray(res?.elements) ? res.elements : []
 
   const nodes = new Map<number, LatLon>()
@@ -142,6 +159,8 @@ export function parseWorld(res: OverpassResponse, projector: Projector): WorldDa
         world.trees.push(tree)
       } else if (isCave(tags)) {
         world.caves.push({ at } satisfies CaveEntrance)
+      } else if (isShelterTag(tags)) {
+        world.shelters.push({ at } satisfies MappedShelter)
       }
       continue
     }
@@ -151,6 +170,12 @@ export function parseWorld(res: OverpassResponse, projector: Projector): WorldDa
       if (!line) continue
       if (isPath(tags)) {
         world.paths.push({ points: line } satisfies Path)
+        continue
+      }
+      if (isShelterTag(tags)) {
+        // A building outline has no single "position" of its own — its
+        // footprint's plain average is the one point world/shelter.ts needs.
+        world.shelters.push({ at: centroidOf(line) } satisfies MappedShelter)
         continue
       }
       addArea(line, tags)

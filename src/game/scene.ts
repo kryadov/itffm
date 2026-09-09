@@ -68,6 +68,10 @@ export interface ForestSource {
   paths?: Vec2[][]
   /** Ponds and streams, in local metres — empty for a source that has none. */
   water?: Vec2[][]
+  /** A real hut/shelter/tower a surveyor actually found, in local metres —
+   *  empty for a source with none, which is every source before plan 2 and
+   *  most real woods since huts are rarely mapped at all. */
+  shelters?: Vec2[]
 }
 
 export interface Forest {
@@ -249,7 +253,9 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   // One hut per wood, sited clear of everything already standing.
   const treeCircles = source.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius }))
-  const shelter = placeShelter(source.ground, halfSize, seed + 10, [...treeCircles, ...extraObstacles])
+  const shelter = placeShelter(
+    source.ground, halfSize, seed + 10, [...treeCircles, ...extraObstacles], source.shelters ?? [],
+  )
   shelterFx = buildShelterMesh(shelter)
   scene.add(shelterFx.group)
   extraObstacles.push(shelterObstacle(shelter))

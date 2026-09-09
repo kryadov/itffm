@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { findOpenSpot, type Circle } from '../util/openSpot'
 import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
+import type { Vec2 } from '../geo/types'
 
 export interface Shelter {
   x: number
@@ -22,19 +23,35 @@ const SHELTER_RADIUS = 1.8
  * (game/startPose.ts), given more room to ask for, finds it a clearing of its
  * own. Placed once per wood, so it reads as something you came upon rather
  * than something scattered like a tree.
+ *
+ * A real survey position (`mapped`, from `geo/parse.ts`'s `isShelterTag`)
+ * always wins over the procedural search, the same rule `world/osmTrees.ts`
+ * already follows for mapped trees: a surveyor finding an actual hut in this
+ * wood outranks our own guess at where a clearing ought to be. Orientation is
+ * still seeded, since OSM tagging essentially never records which way a hut
+ * faces.
  */
 export function placeShelter(
   ground: ElevationProvider,
   halfSize: number,
   seed: number,
   obstacles: Circle[],
+  mapped: Vec2[] = [],
 ): Shelter {
   const rng = mulberry32(seed)
-  // The search starts from a seed-chosen point, not always the world centre —
-  // otherwise an open wood with nothing crowding it would plant the hut dead
-  // centre every single time, seed or no seed.
-  const origin = { x: (rng() * 2 - 1) * halfSize * 0.5, z: (rng() * 2 - 1) * halfSize * 0.5 }
-  const { x, z } = findOpenSpot(obstacles, halfSize, origin, SHELTER_CLEARANCE)
+  const real = mapped.find((m) => Math.abs(m.x) <= halfSize && Math.abs(m.z) <= halfSize)
+  let x: number
+  let z: number
+  if (real) {
+    x = real.x
+    z = real.z
+  } else {
+    // The search starts from a seed-chosen point, not always the world centre
+    // — otherwise an open wood with nothing crowding it would plant the hut
+    // dead centre every single time, seed or no seed.
+    const origin = { x: (rng() * 2 - 1) * halfSize * 0.5, z: (rng() * 2 - 1) * halfSize * 0.5 }
+    ;({ x, z } = findOpenSpot(obstacles, halfSize, origin, SHELTER_CLEARANCE))
+  }
   const rotationY = rng() * Math.PI * 2
   return { x, z, y: ground.heightAt(x, z), rotationY }
 }

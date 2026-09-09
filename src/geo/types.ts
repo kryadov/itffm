@@ -46,11 +46,20 @@ export interface CaveEntrance {
   at: Vec2
 }
 
+/** A real forest hut, shelter or lookout tower — see `geo/parse.ts`'s
+ *  `isShelterTag` for exactly which OSM tags count. */
+export interface MappedShelter {
+  at: Vec2
+}
+
 /**
  * Everything we ask OpenStreetMap for, in local metres.
  *
  * Deliberately narrow: this is a wood, not a city. Buildings, carriageways and
- * railways are not part of the game and are never parsed.
+ * railways are not part of the game and are never parsed — the one exception
+ * is a real forest hut/shelter/tower (`shelters` below), because the wood's
+ * own shelter should stand where a surveyor actually found one rather than
+ * wherever `world/shelter.ts`'s procedural search happens to land it.
  */
 export interface WorldData {
   woods: WoodArea[]
@@ -59,4 +68,5 @@ export interface WorldData {
   paths: Path[]
   trees: MappedTree[]
   caves: CaveEntrance[]
+  shelters: MappedShelter[]
 }

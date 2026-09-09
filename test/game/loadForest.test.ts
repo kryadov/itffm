@@ -1,7 +1,7 @@
 import { chooseFallback } from '../../src/game/loadForest'
 import type { WorldData } from '../../src/geo/types'
 
-const empty: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [] }
+const empty: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [], shelters: [] }
 
 describe('chooseFallback', () => {
   it('uses real data when the wood has polygons', () => {

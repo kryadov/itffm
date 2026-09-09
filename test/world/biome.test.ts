@@ -7,7 +7,7 @@ const square = (cx: number, cz: number, r: number) => [
   { x: cx - r, z: cz - r }, { x: cx + r, z: cz - r },
   { x: cx + r, z: cz + r }, { x: cx - r, z: cz + r },
 ]
-const empty: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [] }
+const empty: WorldData = { woods: [], open: [], water: [], paths: [], trees: [], caves: [], shelters: [] }
 
 describe('treelineAt', () => {
   it('falls as you go north', () => {

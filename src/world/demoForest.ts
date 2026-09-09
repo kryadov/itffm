@@ -40,6 +40,7 @@ export function demoForest(): { world: WorldData; center: LatLon } {
     ],
     trees: [],
     caves: [],
+    shelters: [],
   }
 
   return { world, center: { lat: 55.87, lon: 37.77 } }

@@ -104,7 +104,10 @@ function buildSource(
   // dune stands on the same bump the player later walks over.
   const ground = withBiomeRelief(baseGround, biomeAt, seed + 4)
   const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize)
-  return { ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water }
+  return {
+    ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water,
+    shelters: world.shelters.map((s) => s.at),
+  }
 }
 
 export interface LoadResult {

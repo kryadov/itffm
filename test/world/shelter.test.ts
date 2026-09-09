@@ -30,6 +30,23 @@ describe('placeShelter', () => {
     expect(Math.abs(s.x)).toBeLessThanOrEqual(5)
     expect(Math.abs(s.z)).toBeLessThanOrEqual(5)
   })
+
+  it('stands where a surveyor actually mapped one, not wherever the search would land it', () => {
+    const s = placeShelter(ground, 90, 3, [], [{ x: 12, z: -7 }])
+    expect(s.x).toBe(12)
+    expect(s.z).toBe(-7)
+    expect(s.y).toBeCloseTo(ground.heightAt(12, -7), 5)
+  })
+
+  it('ignores a mapped hut that falls outside this plot', () => {
+    const withoutMapped = placeShelter(ground, 90, 3, [])
+    const withOffPlot = placeShelter(ground, 90, 3, [], [{ x: 500, z: 500 }])
+    expect(withOffPlot).toEqual(withoutMapped)
+  })
+
+  it('falls back to the procedural search with no mapped hut at all', () => {
+    expect(placeShelter(ground, 90, 3, [], [])).toEqual(placeShelter(ground, 90, 3, []))
+  })
 })
 
 describe('shelterObstacle', () => {

@@ -28,7 +28,9 @@ const REQUEST_TIMEOUT_MS = 30_000
  * does not need splitting into separate requests the way buildings did. What we
  * ask for is exactly what the ecology needs: the leaf type decides which
  * mushrooms can grow at all, water and terrain decide the moisture, and the
- * open-ground types are the other biomes we will grow into.
+ * open-ground types are the other biomes we will grow into. The hut/shelter/
+ * tower tags are the one deliberate exception to "no buildings" — see
+ * `geo/types.ts`'s `WorldData` doc comment.
  */
 export function forestQuery(b: BBox): string {
   const box = `${b.south},${b.west},${b.north},${b.east}`
@@ -51,6 +53,13 @@ export function forestQuery(b: BBox): string {
   node["natural"="tree"](${box});
   node["natural"="cave_entrance"](${box});
   node["man_made"~"adit|mineshaft"](${box});
+  node["tourism"="wilderness_hut"](${box});
+  way["tourism"="wilderness_hut"](${box});
+  node["amenity"="shelter"](${box});
+  way["amenity"="shelter"](${box});
+  way["building"="hut"](${box});
+  node["man_made"="tower"](${box});
+  way["man_made"="tower"](${box});
 );
 out body;
 >;
