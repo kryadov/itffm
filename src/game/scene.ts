@@ -22,6 +22,7 @@ import {
   type ShelterFx,
 } from '../world/shelter'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
+import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { buildClouds } from '../world/clouds'
@@ -293,6 +294,18 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   scene.add(campfireFx.group)
   extraObstacles.push(campfireObstacle(campfire))
   const updateCampfire = (dt: number): void => campfireFx.update(dt)
+
+  // A fishing shack and its boat, but only where the wood actually has water
+  // to fish in — a live request, 2026-09-09. placeFisherHut returns null
+  // outright rather than a hut standing in dry woods.
+  const fisherHut = placeFisherHut(
+    source.water ?? [], source.ground, halfSize, seed + 19, [...treeCircles, ...extraObstacles, shelterFootprint],
+  )
+  if (fisherHut) {
+    scene.add(buildFisherHutMesh(fisherHut))
+    scene.add(buildBoatMesh(fisherHut.boat))
+    extraObstacles.push(fisherHutObstacle(fisherHut))
+  }
 
   const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))
   const updateBirds = (dt: number, playerX: number, playerZ: number): void => birds.update(dt, playerX, playerZ)
