@@ -304,15 +304,24 @@
       своей орбиты вокруг якоря) — сама сцена с прудом кадрировалась хуже
       из-за плотного леса вокруг воды, решено считать тестовое покрытие
       достаточным. Все три части живности из этого пункта TODO закрыты.
-- [ ] **Wildlife reads as a couple of oddly-coloured shapes, not animals.**
-      Live feedback, 2026-09-10: the hare/squirrel/snake low-poly geometry in
-      `world/critters.ts` (stretched octahedron bodies, flat sandy-brown
-      0x9a8468/rust-red 0xa8542e/olive 0x5a6b3c fills) doesn't read as
-      "hare"/"squirrel"/"snake" from a normal walking distance — it needs
-      actual silhouette and colour work, not just a bigger polygon budget.
-      Same likely applies to the bees/dragonflies in `world/insects.ts`.
-      Worth a "look at it" pass with real reference silhouettes before
-      touching the geometry code again.
+- [x] **Wildlife reads as a couple of oddly-coloured shapes, not animals
+      (hare/squirrel).** Live feedback, 2026-09-10. Root cause: no head —
+      ears were glued straight onto the body, so both read as a legless
+      lump rather than an animal, whatever the colour. `world/critters.ts`
+      gained a real `headGeometry()` (a squashed icosahedron, forward and
+      above the body centre) that the ears now attach to instead of the
+      body directly, plus a small tail nub for the hare (the squirrel
+      already had its own bushy one). Same fixed-tilt-through-a-quaternion
+      trick `world/birds.ts` already uses for a grounded bird's neck/tail
+      leans the ears back off the head. Verified by the existing test
+      suite (unaffected — index 0 is still the body mesh) and a live
+      headless screenshot of each: both now show a clearly separate
+      head-with-ears silhouette instead of a blob. Colour itself
+      (sandy-brown hare, rust-red squirrel) was left alone — the shape was
+      the actual problem. Not revisited: the snake (already reads as a
+      segmented chain, see its own screenshot from v0.64.0) and the bees/
+      dragonflies (ambient background detail, not scrutinised up close the
+      way a hare/squirrel is).
 - [ ] **Railway and a train.** A low-priority addition — a rail line and a
       passing train through the wood, ported from `race-the-city`
       (`kryadov/race-the-city` already has train/rail rendering for its own

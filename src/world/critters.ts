@@ -273,6 +273,7 @@ const q = new THREE.Quaternion()
 const pos = new THREE.Vector3()
 const one = new THREE.Vector3(1, 1, 1)
 const yAxis = new THREE.Vector3(0, 1, 0)
+const zAxis = new THREE.Vector3(0, 0, 1)
 const off = new THREE.Vector3()
 
 function bodyGeometry(sx: number, sy: number, sz: number): THREE.BufferGeometry {
@@ -285,6 +286,26 @@ function earGeometry(len: number): THREE.BufferGeometry {
   return new THREE.ConeGeometry(0.08, len, 5)
 }
 
+/** A small head, distinct from the body — without one, both the hare and
+ *  the squirrel read as a legless lump with ears glued straight onto it
+ *  rather than an animal (live feedback, 2026-09-10). */
+function headGeometry(r: number): THREE.BufferGeometry {
+  const geo = new THREE.IcosahedronGeometry(r, 0)
+  geo.scale(1.1, 0.95, 0.9) // a touch longer than round — a muzzle, not a marble
+  return geo
+}
+
+function tailNubGeometry(r: number): THREE.BufferGeometry {
+  return new THREE.IcosahedronGeometry(r, 0)
+}
+
+/** A fixed lean, reused for an ear or a tail hinging back off its own root —
+ *  the same fixed-tilt-through-a-quaternion trick `world/birds.ts` already
+ *  uses for a grounded bird's neck/tail. */
+function tiltQuat(axis: THREE.Vector3, angle: number): THREE.Quaternion {
+  return new THREE.Quaternion().setFromAxisAngle(axis, angle)
+}
+
 const HARE_SPECIES: CritterSpecies = {
   fleeRadius: 9,
   alertDur: 0.3,
@@ -294,9 +315,16 @@ const HARE_SPECIES: CritterSpecies = {
   restMax: 16,
 }
 
+const HARE_EAR_TILT = tiltQuat(zAxis, -0.3) // leaning back off the head, not straight up
+const HARE_HEAD_Y = 0.08 // above body centre, in body-local metres
+const HARE_HEAD_FWD = 0.5
+
 /**
- * A hare: long body, long ears laid back, a small tail nub. Ground-only —
- * no flee target, it just bolts away from the player in a straight line.
+ * A hare: an elongated body, a distinct head carrying long ears leant back
+ * and a tail nub at the rear — a head glued straight onto a body with no
+ * neck read as a legless lump, not an animal (live feedback, 2026-09-10).
+ * Ground-only — no flee target, it just bolts away from the player in a
+ * straight line.
  */
 export function createHares(
   scene: THREE.Scene,
@@ -314,26 +342,43 @@ export function createHares(
     provider,
     homes,
     (mat, n) => {
-      const body = new THREE.InstancedMesh(bodyGeometry(0.5, 0.28, 0.32), mat, n)
-      const earL = new THREE.InstancedMesh(earGeometry(0.6), mat, n)
-      const earR = new THREE.InstancedMesh(earGeometry(0.6), mat, n)
-      return [body, earL, earR]
+      const body = new THREE.InstancedMesh(bodyGeometry(0.42, 0.24, 0.28), mat, n)
+      const head = new THREE.InstancedMesh(headGeometry(0.2), mat, n)
+      const earL = new THREE.InstancedMesh(earGeometry(0.58), mat, n)
+      const earR = new THREE.InstancedMesh(earGeometry(0.58), mat, n)
+      const tail = new THREE.InstancedMesh(tailNubGeometry(0.11), mat, n)
+      return [body, head, earL, earR, tail]
     },
-    ([body, earL, earR], i, x, y, z, heading) => {
+    ([body, head, earL, earR, tail], i, x, y, z, heading) => {
       q.setFromAxisAngle(yAxis, heading)
-      pos.set(x, y + 0.3, z)
+      const bodyY = y + 0.26
+      pos.set(x, bodyY, z)
       m.compose(pos, q, one)
       body.setMatrixAt(i, m)
 
-      off.set(0.35, 0.35, 0.08).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, y + 0.3 + off.y, z + off.z)
+      off.set(HARE_HEAD_FWD, HARE_HEAD_Y, 0).applyAxisAngle(yAxis, heading)
+      const headX = x + off.x
+      const headY = bodyY + off.y
+      const headZ = z + off.z
+      pos.set(headX, headY, headZ)
       m.compose(pos, q, one)
+      head.setMatrixAt(i, m)
+
+      const qEar = q.clone().multiply(HARE_EAR_TILT)
+      off.set(0.05, 0.28, 0.08).applyAxisAngle(yAxis, heading)
+      pos.set(headX + off.x, headY + off.y, headZ + off.z)
+      m.compose(pos, qEar, one)
       earL.setMatrixAt(i, m)
 
-      off.set(0.35, 0.35, -0.08).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, y + 0.3 + off.y, z + off.z)
-      m.compose(pos, q, one)
+      off.set(0.05, 0.28, -0.08).applyAxisAngle(yAxis, heading)
+      pos.set(headX + off.x, headY + off.y, headZ + off.z)
+      m.compose(pos, qEar, one)
       earR.setMatrixAt(i, m)
+
+      off.set(-0.42, 0.02, 0).applyAxisAngle(yAxis, heading)
+      pos.set(x + off.x, bodyY + off.y, z + off.z)
+      m.compose(pos, q, one)
+      tail.setMatrixAt(i, m)
     },
     0x9a8468, // sandy grey-brown fur
   )
@@ -348,10 +393,14 @@ const SQUIRREL_SPECIES: CritterSpecies = {
   restMax: 20,
 }
 
+const SQUIRREL_TAIL_TILT = tiltQuat(zAxis, -1.3)
+const SQUIRREL_HEAD_Y = 0.06
+const SQUIRREL_HEAD_FWD = 0.34
+
 /**
- * A squirrel: smaller body, short ears, one bushy tail arched up over the
- * back. Flees to the nearest tree perch when one is close enough, else
- * bolts across the ground like a hare.
+ * A squirrel: a small body, a distinct head carrying short upright ears, one
+ * bushy tail arched up over the back. Flees to the nearest tree perch when
+ * one is close enough, else bolts across the ground like a hare.
  */
 export function createSquirrels(
   scene: THREE.Scene,
@@ -371,33 +420,43 @@ export function createSquirrels(
     provider,
     homes,
     (mat, n) => {
-      const body = new THREE.InstancedMesh(bodyGeometry(0.4, 0.24, 0.26), mat, n)
-      const earL = new THREE.InstancedMesh(earGeometry(0.22), mat, n)
-      const earR = new THREE.InstancedMesh(earGeometry(0.22), mat, n)
+      const body = new THREE.InstancedMesh(bodyGeometry(0.32, 0.2, 0.22), mat, n)
+      const head = new THREE.InstancedMesh(headGeometry(0.15), mat, n)
+      const earL = new THREE.InstancedMesh(earGeometry(0.2), mat, n)
+      const earR = new THREE.InstancedMesh(earGeometry(0.2), mat, n)
       const tail = new THREE.InstancedMesh(new THREE.ConeGeometry(0.1, 0.42, 6), mat, n)
-      return [body, earL, earR, tail]
+      return [body, head, earL, earR, tail]
     },
-    ([body, earL, earR, tail], i, x, y, z, heading) => {
+    ([body, head, earL, earR, tail], i, x, y, z, heading) => {
       q.setFromAxisAngle(yAxis, heading)
-      pos.set(x, y + 0.24, z)
+      const bodyY = y + 0.2
+      pos.set(x, bodyY, z)
       m.compose(pos, q, one)
       body.setMatrixAt(i, m)
 
-      off.set(0.28, 0.24, 0.07).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, y + 0.24 + off.y, z + off.z)
+      off.set(SQUIRREL_HEAD_FWD, SQUIRREL_HEAD_Y, 0).applyAxisAngle(yAxis, heading)
+      const headX = x + off.x
+      const headY = bodyY + off.y
+      const headZ = z + off.z
+      pos.set(headX, headY, headZ)
+      m.compose(pos, q, one)
+      head.setMatrixAt(i, m)
+
+      off.set(0.04, 0.16, 0.06).applyAxisAngle(yAxis, heading)
+      pos.set(headX + off.x, headY + off.y, headZ + off.z)
       m.compose(pos, q, one)
       earL.setMatrixAt(i, m)
 
-      off.set(0.28, 0.24, -0.07).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, y + 0.24 + off.y, z + off.z)
+      off.set(0.04, 0.16, -0.06).applyAxisAngle(yAxis, heading)
+      pos.set(headX + off.x, headY + off.y, headZ + off.z)
       m.compose(pos, q, one)
       earR.setMatrixAt(i, m)
 
       // The tail arches up and back over the body — a fixed local offset and
       // tilt, carried along by heading the same way a bird's own tail is.
       off.set(-0.3, 0.42, 0).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, y + 0.24 + off.y, z + off.z)
-      const qTail = q.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -1.3))
+      pos.set(x + off.x, bodyY + off.y, z + off.z)
+      const qTail = q.clone().multiply(SQUIRREL_TAIL_TILT)
       m.compose(pos, qTail, one)
       tail.setMatrixAt(i, m)
     },
