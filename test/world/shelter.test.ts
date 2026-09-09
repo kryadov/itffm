@@ -1,6 +1,15 @@
 import * as THREE from 'three'
-import { placeShelter, shelterObstacle, buildShelterMesh } from '../../src/world/shelter'
+import {
+  placeShelter,
+  shelterObstacle,
+  buildShelterMesh,
+  wallObstacles,
+  doorObstacle,
+  doorPosition,
+  DOOR_INTERACT_RADIUS,
+} from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
+import { stepPlayer, type PlayerState } from '../../src/game/player'
 import type { Circle } from '../../src/util/openSpot'
 
 const ground = proceduralTerrain(5)
@@ -50,7 +59,10 @@ describe('placeShelter', () => {
 })
 
 describe('shelterObstacle', () => {
-  it('blocks walking through the structure itself', () => {
+  // The whole-footprint circle used only to site something else (the
+  // campfire) clear of the hut — NOT what the player collides with any
+  // more, or the doorway (below) would be blocked along with the walls.
+  it('covers the whole footprint, corner included', () => {
     const s = { x: 4, z: -2, y: 0, rotationY: 0.5 }
     const o = shelterObstacle(s)
     expect(o.x).toBe(4)
@@ -87,9 +99,12 @@ describe('buildShelterMesh', () => {
 
   it('shadows its own hearth light off its own walls, so night light does not leak through the floor', () => {
     const { group } = buildShelterMesh(s)
-    const walls = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.BoxGeometry) as THREE.Mesh
-    expect(walls.castShadow).toBe(true)
-    expect(walls.receiveShadow).toBe(true)
+    const walls = group.getObjectByName('walls') as THREE.Group
+    expect(walls.children.length).toBeGreaterThan(0)
+    for (const panel of walls.children as THREE.Mesh[]) {
+      expect(panel.castShadow).toBe(true)
+      expect(panel.receiveShadow).toBe(true)
+    }
     const light = group.children.find((c) => c instanceof THREE.PointLight) as THREE.PointLight
     expect(light.castShadow).toBe(true)
   })
@@ -121,7 +136,7 @@ describe('buildShelterMesh', () => {
     // its neighbour, reaches back well past where the pile's own anchor point
     // already cleared the wall.
     const { group } = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
-    const walls = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.BoxGeometry) as THREE.Mesh
+    const walls = group.getObjectByName('walls') as THREE.Group
     walls.updateMatrixWorld(true)
     const wallBox = new THREE.Box3().setFromObject(walls)
 
@@ -131,5 +146,107 @@ describe('buildShelterMesh', () => {
       const logBox = new THREE.Box3().setFromObject(log)
       expect(logBox.intersectsBox(wallBox)).toBe(false)
     }
+  })
+})
+
+describe('wallObstacles', () => {
+  const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+
+  it('leaves the doorway gap open — no wall circle sits in front of it', () => {
+    // The door faces local -Z; with rotationY 0 that is world -Z too.
+    for (const c of wallObstacles(s)) {
+      if (c.z > -1.4 && c.z < -1.2) expect(Math.abs(c.x)).toBeGreaterThan(0.4)
+    }
+  })
+
+  it('rotates with the shelter, not just the mesh', () => {
+    const rotated = { ...s, rotationY: Math.PI / 2 }
+    const straight = wallObstacles(s)
+    const turned = wallObstacles(rotated)
+    // Same number of circles, same distances from the hut's own centre —
+    // only which world axis they line up with changes.
+    expect(turned).toHaveLength(straight.length)
+    const dist = (c: Circle) => Math.hypot(c.x, c.z)
+    const sortedStraight = straight.map(dist).sort((a, b) => a - b)
+    const sortedTurned = turned.map(dist).sort((a, b) => a - b)
+    for (let i = 0; i < sortedStraight.length; i++) {
+      expect(sortedTurned[i]).toBeCloseTo(sortedStraight[i], 5)
+    }
+  })
+})
+
+describe('doorObstacle / doorPosition', () => {
+  const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+
+  it('sits exactly at the doorway', () => {
+    expect(doorObstacle(s).x).toBeCloseTo(doorPosition(s).x, 5)
+    expect(doorObstacle(s).z).toBeCloseTo(doorPosition(s).z, 5)
+  })
+
+  it('is wide enough to block the whole doorway gap', () => {
+    expect(doorObstacle(s).radius).toBeGreaterThan(0.95 / 2)
+  })
+
+  it('is within interacting distance of the hut it belongs to', () => {
+    const p = doorPosition(s)
+    expect(Math.hypot(p.x - s.x, p.z - s.z)).toBeLessThan(DOOR_INTERACT_RADIUS)
+  })
+})
+
+describe('buildShelterMesh — door state', () => {
+  const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+
+  it('starts closed', () => {
+    const { isDoorOpen, doorObstacle: obstacle } = buildShelterMesh(s)
+    expect(isDoorOpen()).toBe(false)
+    expect(obstacle.radius).toBeGreaterThan(0)
+  })
+
+  it('opens and closes on toggleDoor(), clearing/restoring the shared obstacle', () => {
+    const { isDoorOpen, toggleDoor, doorObstacle: obstacle } = buildShelterMesh(s)
+    toggleDoor()
+    expect(isDoorOpen()).toBe(true)
+    expect(obstacle.radius).toBe(0)
+    toggleDoor()
+    expect(isDoorOpen()).toBe(false)
+    expect(obstacle.radius).toBeGreaterThan(0)
+  })
+
+  it('swings the visible door leaf toward open over time, not instantly', () => {
+    const { group, toggleDoor, update } = buildShelterMesh(s)
+    const hinge = group.getObjectByName('doorHinge')!
+    toggleDoor()
+    expect(hinge.rotation.y).toBe(0)
+    for (let i = 0; i < 30; i++) update(1 / 30)
+    expect(hinge.rotation.y).not.toBe(0)
+  })
+})
+
+describe('walking through the doorway (integration)', () => {
+  it('is blocked by the closed door, then can walk through once it opens', () => {
+    const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+    const { toggleDoor, doorObstacle: obstacle } = buildShelterMesh(s)
+    const obstacles: Circle[] = [...wallObstacles(s), obstacle]
+
+    const neutralInput = { forward: 1, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 30 }
+    // yaw Math.PI walks toward +Z in game/player.ts's own convention (rawZ =
+    // -cos(yaw)*forward) — the doorway sits at z=-1.3, the hut interior at
+    // z>-1.3, so this walks from outside straight at the door.
+    let player: PlayerState = {
+      x: 0, z: -3, yaw: Math.PI, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0, bobPhase: 0,
+    }
+    for (let i = 0; i < 200; i++) player = stepPlayer(player, neutralInput, ground, obstacles)
+    // Door closed: actually walked up to the doorway's own blocker (not just
+    // sitting wherever it started) but never through it, into the hut.
+    expect(player.z).toBeGreaterThan(-2.5)
+    expect(player.z).toBeLessThan(-1.3)
+
+    toggleDoor()
+    let opened: PlayerState = {
+      x: 0, z: -3, yaw: Math.PI, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0, bobPhase: 0,
+    }
+    for (let i = 0; i < 200; i++) opened = stepPlayer(opened, neutralInput, ground, obstacles)
+    // Door open: the same walk now actually enters the hut.
+    expect(opened.z).toBeGreaterThan(-1.3)
   })
 })

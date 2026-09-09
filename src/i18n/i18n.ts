@@ -7,6 +7,7 @@ export type Lang = 'ru' | 'en'
  * they belong to the species data, which carries both languages of its own.
  */
 export const RU = {
+  shelterDoor: 'Дверь',
   collect: 'В корзину',
   leave: 'Оставить расти',
   cut: 'Срезать',
@@ -118,6 +119,7 @@ export const RU = {
 } as const
 
 export const EN: Record<keyof typeof RU, string> = {
+  shelterDoor: 'Door',
   collect: 'Into the basket',
   leave: 'Leave it growing',
   cut: 'Cut it',

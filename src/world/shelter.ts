@@ -14,10 +14,56 @@ export interface Shelter {
 /** How far the hut needs from anything already standing, metres — wider than
  *  a player needs, since a structure is bigger than one pair of shoulders. */
 const SHELTER_CLEARANCE = 2.5
-/** Its own footprint, for other things (including the player) to avoid — a
- *  circle wide enough to clear the box's own far corner (half-diagonal
- *  ~1.99m at the wall dimensions below), not just its centre. */
+/** Its own footprint, for siting anything else (the campfire) well clear of
+ *  it — a circle wide enough to cover the box's own far corner (half-diagonal
+ *  ~1.99m at the wall dimensions below). NOT what the player collides with
+ *  any more (see `wallObstacles`/`doorObstacle` below) — a circle this size
+ *  would block the doorway along with everything else. */
 const SHELTER_RADIUS = 2.1
+
+// Wall/door dimensions, shared between the mesh (buildShelterMesh) and the
+// player's own collision (wallObstacles/doorObstacle) — kept as one set of
+// module constants rather than two copies, so the two can never drift apart
+// the way the firewood pile once quietly did (see TODO.md, 2026-09-09).
+const WIDTH = 3.0
+const DEPTH = 2.6
+// A live report (2026-09-09) found the hut reading as toy-sized, with the
+// player's own eye level (game/player.ts's STAND_EYE, 1.65m) sitting above
+// the door — the old 1.7m wall was barely taller than the player, let alone
+// the door cut into it. Tall enough now for real headroom above STAND_EYE.
+const WALL_HEIGHT = 2.3
+const WALL_THICKNESS = 0.12
+// A real human doorway, not the 0.7x1.25m child-sized slab a live report
+// (2026-09-09) caught — that made the player's own eye level sit above the
+// door entirely, part of the same "toy house" bug as the wall height above.
+const DOOR_WIDTH = 0.95
+const DOOR_HEIGHT = 2.0
+
+/** Spacing of the small circles standing in for a real (thin, straight) wall
+ *  in the player's own circle-based collision (game/player.ts's `Obstacle`
+ *  has no notion of a line or a box) — close enough together that a player's
+ *  own radius (`PLAYER_RADIUS`, 0.3m) can never slip between two of them. */
+const WALL_CIRCLE_SPACING = 0.3
+const WALL_CIRCLE_RADIUS = 0.16
+/** The doorway's own blocker when closed — reaches exactly to where the
+ *  nearest wall circle's own blocking surface already starts
+ *  (`gapHalf = DOOR_WIDTH/2 + WALL_CIRCLE_RADIUS` in `wallObstacles`), plus a
+ *  hair for a clean overlap rather than a seam a player could catch on. */
+const DOOR_CLOSED_RADIUS = DOOR_WIDTH / 2 + WALL_CIRCLE_RADIUS + 0.05
+/** How far the player can stand from the door and still open/close it —
+ *  generous, the way a real doorway is easy to reach without lining up an
+ *  exact aim (main.ts checks plain distance, not a raycast — a door is a
+ *  fixed, room-sized target, not a mushroom). */
+export const DOOR_INTERACT_RADIUS = 1.8
+/** Radians the door swings open by, negative so the free edge moves toward
+ *  +local-Z — inward, since the doorway sits on the hut's -Z face. Just
+ *  short of a right angle so the open leaf clears the jamb without looking
+ *  like it swung impossibly far. */
+const DOOR_OPEN_ANGLE = -Math.PI * 0.42
+/** How fast the door swings toward whichever way it was last set, 1/seconds
+ *  — a simple exponential ease, not a fixed-duration tween: the swing looks
+ *  the same whether it starts from fully shut or already half-open. */
+const DOOR_SWING_RATE = 6
 
 /**
  * Sites the wood's one shelter — a hut, not a decoration. It exists to be
@@ -58,26 +104,115 @@ export function placeShelter(
   return { x, z, y: ground.heightAt(x, z), rotationY }
 }
 
-/** The shelter's own collision footprint — nobody walks through the wall. */
+/** The shelter's whole footprint, for siting anything ELSE (the campfire)
+ *  well clear of it. Not what the player collides with — see
+ *  `wallObstacles`/`doorObstacle` on `ShelterFx` for that. */
 export function shelterObstacle(s: Shelter): Circle {
   return { x: s.x, z: s.z, radius: SHELTER_RADIUS }
 }
 
-export interface ShelterFx {
-  group: THREE.Group
-  /** 0 by day, 1 at full night — drives the window glow and its light. */
-  setNight(t: number): void
-  /** Drifts the chimney smoke upward and loops it — call every frame. */
-  update(dt: number): void
+/** A local (pre-rotation, pre-translation) point turned into this shelter's
+ *  own world position — every wall circle and the doorway itself are worked
+ *  out in the hut's own local frame (the door always on local -Z) and then
+ *  placed the same way `group.rotation.y`/`group.position` place the mesh,
+ *  via THREE's own rotation matrix rather than a hand-derived one (see
+ *  CLAUDE.md on `orientAlong` for why that trust is not automatic). */
+function toWorld(s: Shelter, localX: number, localZ: number): { x: number; z: number } {
+  const v = new THREE.Vector3(localX, 0, localZ).applyAxisAngle(new THREE.Vector3(0, 1, 0), s.rotationY)
+  return { x: s.x + v.x, z: s.z + v.z }
+}
+
+/** Small circles along one straight run of wall, close enough together that
+ *  `game/player.ts`'s circle-based collision cannot let a player slip
+ *  between two of them — the closest thing to a straight wall that
+ *  `Obstacle` (a circle, nothing else) can represent. */
+function wallRunCircles(s: Shelter, x0: number, z0: number, x1: number, z1: number): Circle[] {
+  const len = Math.hypot(x1 - x0, z1 - z0)
+  const n = Math.max(1, Math.round(len / WALL_CIRCLE_SPACING))
+  const out: Circle[] = []
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    const { x, z } = toWorld(s, x0 + (x1 - x0) * t, z0 + (z1 - z0) * t)
+    out.push({ x, z, radius: WALL_CIRCLE_RADIUS })
+  }
+  return out
 }
 
 /**
- * A small log cabin: a box for the walls, a four-sided pyramid for the roof,
- * plus the details a box on its own never reads as a dwelling without — a
- * door, two windows, a chimney with its own wisp of smoke, and a window glow
- * that only makes sense now that the wood has a day and a night
- * (world/daynight.ts, v0.16.0). One of everything, so none of it needs
- * instancing the way a hundred trees would.
+ * The hut's own walls as the player actually collides with them: a ring of
+ * small circles around the footprint, open at the doorway — unlike
+ * `shelterObstacle`'s single big circle, this is what lets a player actually
+ * walk in. Static (never changes after the hut is built), unlike
+ * `doorObstacle`, which is the one part of this collision that toggles.
+ */
+export function wallObstacles(s: Shelter): Circle[] {
+  const hw = WIDTH / 2
+  const hd = DEPTH / 2
+  const hdoor = DOOR_WIDTH / 2
+  // Each wall circle blocks out to WALL_CIRCLE_RADIUS beyond its own centre
+  // — stopping the front-wall runs exactly at the visual doorway edge
+  // (±hdoor) would put that whole radius INSIDE the opening, on top of the
+  // player's own radius, narrowing a 0.95m doorway to a few centimetres of
+  // actually passable width. Stopping one wall-circle-radius short of the
+  // edge instead keeps the circle's own blocking surface, not its centre, at
+  // the doorway's real edge.
+  const gapHalf = hdoor + WALL_CIRCLE_RADIUS
+  return [
+    // Front wall, split by the doorway gap at its centre.
+    ...wallRunCircles(s, -hw, -hd, -gapHalf, -hd),
+    ...wallRunCircles(s, gapHalf, -hd, hw, -hd),
+    // Back, left and right — no gap.
+    ...wallRunCircles(s, -hw, hd, hw, hd),
+    ...wallRunCircles(s, -hw, -hd, -hw, hd),
+    ...wallRunCircles(s, hw, -hd, hw, hd),
+  ]
+}
+
+/** The doorway's own blocker — closed by default. `ShelterFx.toggleDoor()`
+ *  zeroes its radius when open; `game/scene.ts` adds this SAME object to
+ *  `extraObstacles` once, so the mutation is what `stepPlayer` sees every
+ *  frame after (obstacles are read live, by reference, not copied). */
+export function doorObstacle(s: Shelter): Circle {
+  const { x, z } = toWorld(s, 0, -DEPTH / 2)
+  return { x, z, radius: DOOR_CLOSED_RADIUS }
+}
+
+/** Where the doorway itself is, in world space — `main.ts` checks the
+ *  player's plain distance to this against `DOOR_INTERACT_RADIUS` to decide
+ *  whether `E` should open/close the door rather than examine a mushroom. */
+export function doorPosition(s: Shelter): { x: number; z: number } {
+  return toWorld(s, 0, -DEPTH / 2)
+}
+
+export interface ShelterFx {
+  group: THREE.Group
+  /** The doorway's own collision circle, closed by default —
+   *  `game/scene.ts` adds this SAME object to `extraObstacles` once;
+   *  `toggleDoor()` mutates its `radius` in place, which is what
+   *  `stepPlayer` sees every frame after (obstacles are read live, not
+   *  copied). Identical in shape to the module-level `doorObstacle(s)`
+   *  this is built from — that one is for tests and anyone else who wants
+   *  the shape without building the whole mesh. */
+  doorObstacle: Circle
+  /** 0 by day, 1 at full night — drives the window glow and its light. */
+  setNight(t: number): void
+  /** Drifts the chimney smoke and eases the door toward its target angle —
+   *  call every frame. */
+  update(dt: number): void
+  isDoorOpen(): boolean
+  /** Swings the door and flips `doorObstacle`'s own radius so the player can
+   *  actually walk through once it is open. */
+  toggleDoor(): void
+}
+
+/**
+ * A small log cabin: a hollow box for the walls (not solid — see
+ * Architecture in CLAUDE.md on why the two forms of a mushroom differ; the
+ * same reasoning applies here, a player now actually stands inside this
+ * one), a four-sided pyramid for the roof, plus the details a box on its own
+ * never reads as a dwelling without — a swinging door, two windows, a
+ * chimney with its own wisp of smoke, and a window glow that only makes
+ * sense now that the wood has a day and a night (world/daynight.ts, v0.16.0).
  */
 export function buildShelterMesh(s: Shelter): ShelterFx {
   const group = new THREE.Group()
@@ -86,32 +221,54 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x5a4429, roughness: 1 })
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x3c2f1c, roughness: 1 })
 
-  const width = 3.0
-  const depth = 2.6
-  // A live report (2026-09-09) found the hut reading as toy-sized, with the
-  // player's own eye level (game/player.ts's STAND_EYE, 1.65m) sitting above
-  // the door — the old 1.7m wall was barely taller than the player, let alone
-  // the door cut into it. Tall enough now for real headroom above STAND_EYE.
-  const wallHeight = 2.3
+  const width = WIDTH
+  const depth = DEPTH
+  const wallHeight = WALL_HEIGHT
+  const doorWidth = DOOR_WIDTH
+  const doorHeight = DOOR_HEIGHT
 
-  // A plain box: an earlier attempt at a log-course ripple displaced each
-  // face's vertices along that face's own normal, which at any corner points
-  // two adjacent faces in different directions — pulling them apart and
-  // opening a real gap letting the background show through the seam. Fixing
-  // that properly needs vertices that fade to zero displacement right at the
-  // edge, which needs more subdivision than a one-off hut earns; a flat wall
-  // reads as plain, not broken, and broken is worse.
-  const walls = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMat)
-  walls.position.y = wallHeight / 2
-  // The hearth light below sits inside this box. Without shadow casting a
-  // three.js PointLight ignores geometry entirely and lights the ground
-  // through the floor and walls alike — visible at night as a warm glow
-  // leaking out from under the hut, nowhere near a window (2026-09-09 live
-  // report). One light and one solid box is cheap enough to shadow properly
-  // instead of just dimming the light and hoping the leak stays unnoticed.
-  walls.castShadow = true
-  walls.receiveShadow = true
+  // Four panels plus a lintel over the doorway, not one solid box — a player
+  // can now walk in through the gap the wall ring below leaves for the door,
+  // and a solid box would have shown nothing but its own (culled) inside
+  // face from in there. Each panel's OUTER face lines up with the same
+  // width x depth footprint the single box used to have.
+  const walls = new THREE.Group()
+  walls.name = 'walls'
+  const panel = (sizeX: number, sizeY: number, sizeZ: number, cx: number, cy: number, cz: number): void => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(sizeX, sizeY, sizeZ), wallMat)
+    mesh.position.set(cx, cy, cz)
+    // The hearth light below sits inside these walls. Without shadow casting
+    // a three.js PointLight ignores geometry entirely and lights the ground
+    // through the floor and walls alike — visible at night as a warm glow
+    // leaking out from under the hut, nowhere near a window (2026-09-09 live
+    // report). Every panel casts and receives, so the enclosure holds the
+    // same way the old single box did.
+    mesh.castShadow = true
+    mesh.receiveShadow = true
+    walls.add(mesh)
+  }
+  const hw = width / 2
+  const hd = depth / 2
+  const hdoor = doorWidth / 2
+  const frontSegWidth = hw - hdoor
+  panel(frontSegWidth, wallHeight, WALL_THICKNESS, -(hdoor + frontSegWidth / 2), wallHeight / 2, -hd)
+  panel(frontSegWidth, wallHeight, WALL_THICKNESS, hdoor + frontSegWidth / 2, wallHeight / 2, -hd)
+  panel(doorWidth, wallHeight - doorHeight, WALL_THICKNESS, 0, doorHeight + (wallHeight - doorHeight) / 2, -hd) // lintel
+  panel(width, wallHeight, WALL_THICKNESS, 0, wallHeight / 2, hd) // back
+  panel(WALL_THICKNESS, wallHeight, depth, -hw, wallHeight / 2, 0) // left
+  panel(WALL_THICKNESS, wallHeight, depth, hw, wallHeight / 2, 0) // right
   group.add(walls)
+
+  // A plank floor — bare ground showing through a doorway you can now
+  // actually walk into read as broken, not rustic.
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3624, roughness: 1 })
+  const floor = new THREE.Mesh(
+    new THREE.BoxGeometry(width - WALL_THICKNESS * 2, 0.04, depth - WALL_THICKNESS * 2),
+    floorMat,
+  )
+  floor.position.y = 0.02
+  floor.receiveShadow = true
+  group.add(floor)
 
   const roofSpan = Math.hypot(width, depth) * 0.62
   const roof = new THREE.Mesh(new THREE.ConeGeometry(roofSpan, 1.1, 4), roofMat)
@@ -119,32 +276,34 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   roof.position.y = wallHeight + 0.55
   group.add(roof)
 
-  // The door: a plank slab set into the front face, not a hole — cheaper,
-  // and a hut nobody enters has no need of an actual opening. Two darker
-  // grooves mark it as individual planks rather than one flat monolith, and
-  // a small round handle is what actually reads as "door" at a glance —
-  // without it the slab alone is easy to mistake for a shadow or a stain.
-  const doorGroup = new THREE.Group()
+  // The door: a real swinging leaf, hinged on its own left edge (local x=0),
+  // its body spanning local x 0..doorWidth — swapped from a fixed slab set
+  // into the wall (a live request, 2026-09-09: being able to walk in at
+  // all needs a door that can actually open). Two darker grooves mark it as
+  // individual planks rather than one flat monolith, and a handle near the
+  // free edge (not the hinge) is what actually reads as "door" at a glance.
+  const doorHinge = new THREE.Group()
+  doorHinge.name = 'doorHinge'
+  doorHinge.position.set(-hdoor, doorHeight / 2, -hd - 0.02)
   const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 1 })
-  // A real human doorway, not the 0.7x1.25m child-sized slab a live report
-  // (2026-09-09) caught — that made the player's own eye level sit above the
-  // door entirely, part of the same "toy house" bug as the wall height above.
-  const doorWidth = 0.95
-  const doorHeight = 2.0
   const doorFace = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, doorHeight, 0.06), doorMat)
-  doorGroup.add(doorFace)
+  doorFace.position.x = doorWidth / 2
+  doorHinge.add(doorFace)
   const grooveMat = new THREE.MeshStandardMaterial({ color: 0x1f150c, roughness: 1 })
-  for (const gx of [-0.23, 0.23]) {
+  for (const gx of [doorWidth / 2 - 0.17, doorWidth / 2 + 0.17]) {
     const groove = new THREE.Mesh(new THREE.BoxGeometry(0.02, doorHeight * 0.96, 0.01), grooveMat)
     groove.position.set(gx, 0, 0.035)
-    doorGroup.add(groove)
+    doorHinge.add(groove)
   }
   const handleMat = new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 0.4, metalness: 0.3 })
   const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), handleMat)
-  handle.position.set(doorWidth * 0.34, -0.05, 0.05)
-  doorGroup.add(handle)
-  doorGroup.position.set(0, doorHeight / 2, -depth / 2 - 0.08)
-  group.add(doorGroup)
+  handle.position.set(doorWidth - 0.15, -0.05, 0.05)
+  doorHinge.add(handle)
+  group.add(doorHinge)
+
+  let doorOpen = false
+  let doorAngle = 0
+  let doorTargetAngle = 0
 
   // Two windows, one per side wall — a pale, faintly blue "glass" pane on a
   // darker wooden frame, so it reads as a window by day (not just a same-
@@ -337,9 +496,31 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
       sprite.scale.setScalar(0.15 + t * 0.4)
       ;(sprite.material as THREE.SpriteMaterial).opacity = 0.3 * (1 - t)
     }
+    // Eases toward whichever angle toggleDoor() last set — the same feel
+    // whether the door is swinging fully open or just easing the last bit
+    // shut, since this always closes a fraction of the remaining distance
+    // rather than moving a fixed amount per frame.
+    doorAngle += (doorTargetAngle - doorAngle) * Math.min(1, dt * DOOR_SWING_RATE)
+    doorHinge.rotation.y = doorAngle
   }
+
+  const doorObstacleObj = doorObstacle(s)
 
   group.position.set(s.x, s.y, s.z)
   group.rotation.y = s.rotationY
-  return { group, setNight, update }
+  return {
+    group,
+    doorObstacle: doorObstacleObj,
+    setNight,
+    update,
+    isDoorOpen: () => doorOpen,
+    toggleDoor: () => {
+      doorOpen = !doorOpen
+      doorTargetAngle = doorOpen ? DOOR_OPEN_ANGLE : 0
+      // Collision follows the toggle immediately, not the swing's own ease —
+      // a player pressing E to walk in should never feel blocked by a door
+      // that reads as already open.
+      doorObstacleObj.radius = doorOpen ? 0 : DOOR_CLOSED_RADIUS
+    },
+  }
 }

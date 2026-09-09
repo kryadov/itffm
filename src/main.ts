@@ -20,6 +20,7 @@ import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, DAY_TIME } from './world/daynight'
 import { speciesById } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
+import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 
@@ -162,6 +163,11 @@ async function main(): Promise<void> {
     bobPhase: 0,
   }
   let aimed: THREE.Object3D | null = null
+  // Whether the player is close enough to the shelter's own doorway for `E`
+  // to open/close it instead of examining an aimed mushroom — a plain
+  // distance check (game/pick.ts's crosshair raycast is for a mushroom you
+  // aim at; a doorway is a fixed, room-sized target you just walk up to).
+  let nearDoor = false
 
   // A live readout of what the crosshair actually sees, for exactly the kind
   // of "the label just doesn't show up" report that is otherwise
@@ -287,12 +293,21 @@ async function main(): Promise<void> {
   function updateAim(): void {
     if (modalOpen()) {
       aimed = null
+      nearDoor = false
       hud.setTarget(null)
       return
     }
     aimed = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders)
     const species = aimed ? speciesById(aimed.userData.placement.speciesId) : undefined
-    hud.setTarget(species ? speciesName(species) : null)
+    if (species) {
+      nearDoor = false
+      hud.setTarget(speciesName(species))
+      return
+    }
+    // No mushroom in the crosshair — a mushroom never spawns inside the hut,
+    // so this and an aimed mushroom are not really in tension in practice.
+    nearDoor = Math.hypot(player.x - forest.shelterDoor.x, player.z - forest.shelterDoor.z) < DOOR_INTERACT_RADIUS
+    hud.setTarget(nearDoor ? t('shelterDoor') : null)
   }
 
   const traceGeo = new THREE.CircleGeometry(0.07, 8)
@@ -513,7 +528,10 @@ async function main(): Promise<void> {
 
   addEventListener('keydown', (e) => {
     if (modalOpen()) return
-    if (e.code === 'KeyE') examineAimed()
+    if (e.code === 'KeyE') {
+      if (nearDoor) forest.toggleShelterDoor()
+      else examineAimed()
+    }
     if (e.code === 'Tab') {
       e.preventDefault()
       openEncyclopedia(save, getLang())
@@ -563,7 +581,10 @@ async function main(): Promise<void> {
       const tap = touch.consumeTap()
       if (tap) {
         const target = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
-        examineTarget(target)
+        // A tap that missed every mushroom still opens/closes the door when
+        // the player is standing right at it — touch has no separate `E`.
+        if (target) examineTarget(target)
+        else if (nearDoor) forest.toggleShelterDoor()
       }
     }
 

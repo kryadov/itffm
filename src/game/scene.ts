@@ -17,7 +17,9 @@ import { placeBoulders, boulderObstacle, mossSpawnPoints, buildBoulderMeshes } f
 import { placeBushes, bushObstacle, buildBushMeshes } from '../world/undergrowth'
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
-import { placeShelter, shelterObstacle, buildShelterMesh, type ShelterFx } from '../world/shelter'
+import {
+  placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, doorPosition, type ShelterFx,
+} from '../world/shelter'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
@@ -91,6 +93,12 @@ export interface Forest {
   extraObstacles: { x: number; z: number; radius: number; topHeight?: number }[]
   /** The wood's one hut — game/main.ts starts the player beside it. */
   shelter: { x: number; z: number }
+  /** Where the hut's own doorway is, in world space — main.ts checks the
+   *  player's plain distance to this to decide whether `E` should open/close
+   *  the door instead of examining a mushroom. */
+  shelterDoor: { x: number; z: number }
+  isShelterDoorOpen: () => boolean
+  toggleShelterDoor: () => void
   /** Grass and undergrowth: not pickable, but game/pick.ts casts against them
    *  too, so a mushroom genuinely hidden behind a tuft or a bush is hidden
    *  from the aim ray, not just from the eye. */
@@ -265,12 +273,21 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   )
   shelterFx = buildShelterMesh(shelter)
   scene.add(shelterFx.group)
-  extraObstacles.push(shelterObstacle(shelter))
+  // The player's own collision uses the fine wall ring + door below, so they
+  // can actually walk in through the doorway (a live request, 2026-09-09) —
+  // NOT shelterObstacle's single big circle, which would block the doorway
+  // along with everything else. Siting anything ELSE near the hut (the
+  // campfire, next) still wants the whole footprint kept clear, so that
+  // stays a one-off argument to its own findOpenSpot call instead.
+  const shelterFootprint = shelterObstacle(shelter)
+  extraObstacles.push(...wallObstacles(shelter), shelterFx.doorObstacle)
   const updateShelter = (dt: number): void => shelterFx!.update(dt)
 
   // A second everyday fixture, deliberately apart from the hut — see
   // world/campfire.ts's own doc comment for why (a live request, 2026-09-09).
-  const campfire = placeCampfire(source.ground, halfSize, seed + 18, [...treeCircles, ...extraObstacles], shelter)
+  const campfire = placeCampfire(
+    source.ground, halfSize, seed + 18, [...treeCircles, ...extraObstacles, shelterFootprint], shelter,
+  )
   const campfireFx = buildCampfireMesh(campfire)
   scene.add(campfireFx.group)
   extraObstacles.push(campfireObstacle(campfire))
@@ -324,7 +341,9 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
-    shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
+    shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
+    isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
+    occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds, updateWater,
     updateMushroomLod,
   }
