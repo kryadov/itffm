@@ -4,6 +4,7 @@ import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
 import { createTouchControls } from './game/touchControls'
+import { AudioEngine } from './audio/audio'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
@@ -117,6 +118,12 @@ async function main(): Promise<void> {
   // `active`, rather than merging both: a hybrid device summing both inputs
   // is a far rarer problem than the code to handle it is worth right now.
   const touch = createTouchControls(renderer.domElement, save.prefs.mouseSensitivity)
+  // resume() needs a user gesture (autoplay policy) — the place-picker click
+  // just above is the earliest one every player, new or returning, always
+  // makes before gameplay starts.
+  const audio = new AudioEngine()
+  audio.resume()
+  audio.setVolume(save.prefs.soundVolume)
   const basket = createBasket(BASKET_CAPACITY)
   // Which save/store.ts Find a basket item's note belongs to — a Placement
   // carries no identity of its own, but it is the very object the collect
@@ -322,6 +329,7 @@ async function main(): Promise<void> {
       placement.age,
       () => {
         if (!basket.add(placement)) return
+        audio.collect()
         target.removeFromParent()
         forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
         leaveTrace(placement)
@@ -336,6 +344,7 @@ async function main(): Promise<void> {
         // Cut but not carried: it stays a mushroom, just a felled one — off
         // the aim list (game/pick.ts) so it can't be re-examined, but still a
         // real mesh lying where it grew, not vanished like a picked one.
+        audio.collect()
         forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
         const fallAxis = new THREE.Vector3(Math.cos(placement.rotationY), 0, Math.sin(placement.rotationY))
         target.rotateOnWorldAxis(fallAxis, Math.PI / 2)
@@ -359,6 +368,7 @@ async function main(): Promise<void> {
         save = { ...save, prefs }
         controls.setSensitivity(prefs.mouseSensitivity)
         touch.setSensitivity(prefs.mouseSensitivity)
+        audio.setVolume(prefs.soundVolume)
         forest.setWeather(prefs.weather)
         minimap.setVisible(prefs.minimap)
         void persistSave(save)

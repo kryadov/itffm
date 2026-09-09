@@ -28,6 +28,9 @@ export interface Prefs {
   weather: Weather
   /** Off by default — see ui/compass.ts and ui/minimap.ts for why. */
   minimap: boolean
+  /** 0..1 — the collect/cut sound (audio/audio.ts). 0 is silent; there is no
+   *  separate on/off toggle for one short effect. */
+  soundVolume: number
 }
 
 export interface SaveData {
@@ -49,7 +52,20 @@ export function defaultPrefs(): Prefs {
     timeMode: 'day',
     weather: 'clear',
     minimap: false,
+    soundVolume: 0.7,
   }
+}
+
+/**
+ * Fills a value loaded from storage in over the defaults — deeper than a flat
+ * `{ ...emptySave(), ...stored }` would go, because `prefs` is itself a
+ * nested object: a save written before a new `Prefs` field existed carries a
+ * `prefs` object missing that key, and a shallow merge would let that whole
+ * object win outright, silently blanking every field the old save predates
+ * rather than only the field it actually specifies.
+ */
+export function mergeSave(stored: Partial<SaveData> | undefined): SaveData {
+  return { ...emptySave(), ...stored, prefs: { ...defaultPrefs(), ...stored?.prefs } }
 }
 
 const DB_NAME = 'itffm'
@@ -93,7 +109,7 @@ export async function loadSave(): Promise<SaveData> {
     const db = await openDb()
     return await new Promise<SaveData>((resolve, reject) => {
       const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(KEY)
-      req.onsuccess = () => resolve({ ...emptySave(), ...(req.result as Partial<SaveData> | undefined) })
+      req.onsuccess = () => resolve(mergeSave(req.result as Partial<SaveData> | undefined))
       req.onerror = () => reject(req.error)
     })
   } catch {

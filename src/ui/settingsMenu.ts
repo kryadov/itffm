@@ -105,7 +105,7 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   let live = { ...prefs }
   const slider = (
     key: keyof Prefs,
-    labelKey: 'settingsWalkSpeed' | 'settingsSensitivity' | 'settingsDrawDistance',
+    labelKey: 'settingsWalkSpeed' | 'settingsSensitivity' | 'settingsDrawDistance' | 'settingsSound',
     min: number,
     max: number,
     step: number,
@@ -142,6 +142,7 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   slider('walkSpeedMultiplier', 'settingsWalkSpeed', 0.6, 1.6, 0.05, (v) => `×${v.toFixed(2)}`)
   slider('mouseSensitivity', 'settingsSensitivity', 0.3, 2.5, 0.05, (v) => `×${v.toFixed(2)}`)
   slider('drawDistance', 'settingsDrawDistance', 20, 80, 5, (v) => `${v} m`)
+  slider('soundVolume', 'settingsSound', 0, 1, 0.05, (v) => `${Math.round(v * 100)}%`)
 
   const timeRow = document.createElement('div')
   timeRow.style.cssText = LABEL_STYLE
