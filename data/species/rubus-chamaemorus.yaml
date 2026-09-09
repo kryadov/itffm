@@ -12,6 +12,7 @@ morphology:
   diameter: [12, 18]
   clusterSize: [1, 1]
   leafColor: "#5a6b3a"
+  bushHeight: [120, 220]
 ecology:
   mycorrhizal: []
   substrate: soil

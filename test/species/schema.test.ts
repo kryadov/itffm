@@ -38,6 +38,7 @@ const validBerry = {
     diameter: [6, 10],
     clusterSize: [3, 8],
     leafColor: '#3f5a2c',
+    bushHeight: [250, 400],
   },
   ecology: {
     mycorrhizal: [],

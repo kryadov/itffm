@@ -69,3 +69,38 @@ export function nearestInView(
   while (o && !o.userData.placement) o = o.parent
   return o
 }
+
+/**
+ * The exact same raycast `nearestInView` runs, but reporting every hit along
+ * the ray instead of only resolving the first one — for `?debug=1`
+ * (main.ts) to show, since "the label doesn't show up" has no other way to
+ * see what the crosshair's own ray actually touched this frame.
+ */
+export interface DebugHit {
+  name: string
+  distance: number
+  hasPlacement: boolean
+}
+
+export function debugRaycastHits(
+  camera: THREE.Camera,
+  objects: THREE.Object3D[],
+  maxDistance: number,
+  occluders: THREE.Object3D[] = [],
+): DebugHit[] {
+  raycaster.setFromCamera(centre, camera)
+  raycaster.far = maxDistance
+  const hits = raycaster.intersectObjects(occluders.length > 0 ? [...objects, ...occluders] : objects, true)
+  return hits.map((h) => {
+    let o: THREE.Object3D | null = h.object
+    let hasPlacement = false
+    while (o) {
+      if (o.userData.placement) {
+        hasPlacement = true
+        break
+      }
+      o = o.parent
+    }
+    return { name: h.object.name || h.object.type, distance: h.distance, hasPlacement }
+  })
+}

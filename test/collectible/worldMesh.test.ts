@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { withPickHitbox } from '../../src/collectible/worldMesh'
+import { withPickHitbox, HITBOX_RADIUS } from '../../src/collectible/worldMesh'
 
 describe('withPickHitbox', () => {
   it('wraps the given mesh as a child of a new group', () => {
@@ -35,11 +35,25 @@ describe('withPickHitbox', () => {
     expect(raycaster.intersectObject(wrapped, true).length).toBeGreaterThan(0)
   })
 
-  it('reuses one shared hitbox geometry rather than allocating one per call', () => {
-    const a = withPickHitbox(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)))
-    const b = withPickHitbox(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)))
-    const hitboxA = a.children[1] as THREE.Mesh
-    const hitboxB = b.children[1] as THREE.Mesh
-    expect(hitboxA.geometry).toBe(hitboxB.geometry)
+  it('never shrinks the hitbox below the floor radius for a tiny model', () => {
+    const speck = new THREE.Mesh(new THREE.BoxGeometry(0.001, 0.001, 0.001))
+    const wrapped = withPickHitbox(speck)
+    const hitbox = wrapped.children.find((c) => c !== speck) as THREE.Mesh
+    const sphere = hitbox.geometry as THREE.SphereGeometry
+    expect(sphere.parameters.radius).toBeCloseTo(HITBOX_RADIUS, 5)
+  })
+
+  it('grows the hitbox to cover a model bigger than the floor radius, centred on it', () => {
+    // A berry bush (berry/build.ts) stands up to ~0.4m tall — the hitbox
+    // must reach that whole height, not just a small sphere at its base
+    // (2026-09-09 live report: a fixed sphere at ground level covered only
+    // the bottom third of a knee-high bush).
+    const tall = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.4, 0.05))
+    tall.position.y = 0.2 // sitting on the ground, not straddling it
+    const wrapped = withPickHitbox(tall)
+    const hitbox = wrapped.children.find((c) => c !== tall) as THREE.Mesh
+    const sphere = hitbox.geometry as THREE.SphereGeometry
+    expect(sphere.parameters.radius).toBeGreaterThan(HITBOX_RADIUS)
+    expect(hitbox.position.y).toBeCloseTo(0.2, 5)
   })
 })

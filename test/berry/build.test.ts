@@ -7,6 +7,15 @@ const chernika: BerryMorphology = {
   diameter: [6, 10],
   clusterSize: [3, 8],
   leafColor: '#3f5a2c',
+  bushHeight: [250, 400],
+}
+
+const cloudberry: BerryMorphology = {
+  color: '#e8a53d',
+  diameter: [12, 18],
+  clusterSize: [1, 1],
+  leafColor: '#5a6b3a',
+  bushHeight: [120, 220],
 }
 
 describe('buildBerry', () => {
@@ -26,11 +35,20 @@ describe('buildBerry', () => {
     expect(posA).not.toEqual(posB)
   })
 
-  it('always builds at least one berry and a leaf', () => {
+  it('always builds at least one berry on at least one stem', () => {
     const g = buildBerry(chernika, 5, 0.5)
-    expect(g.getObjectByName('berries')).toBeDefined()
-    expect((g.getObjectByName('berries') as THREE.InstancedMesh).count).toBeGreaterThan(0)
-    expect(g.getObjectByName('leaf')).toBeDefined()
+    const berries = g.getObjectByName('berries') as THREE.InstancedMesh
+    expect(berries).toBeDefined()
+    expect(berries.count).toBeGreaterThan(0)
+    const stemCount = g.children.filter((c) => c instanceof THREE.Mesh && c.geometry.type === 'CylinderGeometry').length
+    expect(stemCount).toBeGreaterThan(0)
+  })
+
+  it('builds a single stem for a species whose clusterSize never exceeds one', () => {
+    // Cloudberry: one berry per stem, not a shrub's many-branched cluster.
+    const g = buildBerry(cloudberry, 7, 1)
+    const berries = g.getObjectByName('berries') as THREE.InstancedMesh
+    expect(berries.count).toBe(1)
   })
 
   it('grows a fuller cluster as it ripens', () => {
@@ -43,10 +61,18 @@ describe('buildBerry', () => {
     expect(ripe).toBeGreaterThan(young)
   })
 
-  it('stays a plausible size: a few centimetres, not a metre', () => {
+  it('stays a plausible bush size: tens of centimetres, not metres', () => {
     const box = new THREE.Box3().setFromObject(buildBerry(chernika, 9, 1))
     const size = box.getSize(new THREE.Vector3())
-    expect(Math.max(size.x, size.y, size.z)).toBeLessThan(0.1)
-    expect(Math.max(size.x, size.y, size.z)).toBeGreaterThan(0.001)
+    expect(Math.max(size.x, size.y, size.z)).toBeLessThan(0.6)
+    expect(Math.max(size.x, size.y, size.z)).toBeGreaterThan(0.05)
+  })
+
+  it('gives a low creeping species a visibly shorter bush than a knee-high one', () => {
+    const low: BerryMorphology = { ...chernika, bushHeight: [70, 90] }
+    const tall: BerryMorphology = { ...chernika, bushHeight: [350, 400] }
+    const lowBox = new THREE.Box3().setFromObject(buildBerry(low, 3, 1))
+    const tallBox = new THREE.Box3().setFromObject(buildBerry(tall, 3, 1))
+    expect(tallBox.getSize(new THREE.Vector3()).y).toBeGreaterThan(lowBox.getSize(new THREE.Vector3()).y)
   })
 })

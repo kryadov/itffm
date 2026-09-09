@@ -62,11 +62,13 @@ export function toWorldMesh(group: THREE.Group): THREE.Mesh {
   return merged
 }
 
-/** Radius of the invisible pick target `withPickHitbox` adds, metres — on the
- *  order of a small mushroom cap, the one thing in the wood the crosshair's
- *  exact ray already lands on reliably. */
-const HITBOX_RADIUS = 0.12
-let hitboxGeometry: THREE.SphereGeometry | null = null
+/** Floor on the radius of the invisible pick target `withPickHitbox` adds,
+ *  metres — on the order of a small mushroom cap, the one thing in the wood
+ *  the crosshair's exact ray already lands on reliably. A model taller or
+ *  wider than this (a berry bush, say) gets a bigger sphere sized to its own
+ *  real bounds instead — see `withPickHitbox` below for why a single fixed
+ *  size stopped being enough. */
+export const HITBOX_RADIUS = 0.12
 /** Fully invisible (not merely transparent) — `colorWrite: false` means it
  *  never shows up even where it clips through something else. three.js's
  *  raycaster never looks at `visible` either way (verified against the
@@ -83,19 +85,33 @@ const HITBOX_MATERIAL = new THREE.MeshBasicMaterial({ transparent: true, opacity
  * sphere for the exact ray in `game/pick.ts` to hit — the same mechanism a
  * mushroom's own cap already satisfies just by being physically big enough.
  *
- * A berry, a nut or a find is a few centimetres across in real life, subtends
- * only a few screen pixels at any reasonable distance, and the crosshair's
- * exact ray routinely missed it even when aimed "at" it by eye — an earlier
- * angular "forgiveness cone" fallback tried to patch this at the aiming end
- * instead and went through two more live bugs before it was reliable even in
- * principle (see TODO.md, 2026-09-09). Giving the small object itself a
- * real, exact-ray-sized target removes the need for a second aiming code
- * path altogether: it is picked up exactly the way a mushroom is.
+ * A single berry, nut or find is a few centimetres across in real life,
+ * subtends only a few screen pixels at any reasonable distance, and the
+ * crosshair's exact ray routinely missed it even when aimed "at" it by eye —
+ * an earlier angular "forgiveness cone" fallback tried to patch this at the
+ * aiming end instead and went through two more live bugs before it was
+ * reliable even in principle (see TODO.md, 2026-09-09). Giving the small
+ * object itself a real, exact-ray-sized target removes the need for a
+ * second aiming code path altogether: it is picked up exactly the way a
+ * mushroom is.
+ *
+ * The sphere is centred on the model's own bounding box, not the ground
+ * point under it, and sized to that box rather than a single fixed radius —
+ * a berry now grows a real, knee-high bush (berry/build.ts) to actually be
+ * seen at all, and a fixed sphere sitting at ground level covered only the
+ * bottom third of it, well below where a player looking at the bush itself
+ * naturally aims (2026-09-09 live report, confirmed with `?debug=1`'s own
+ * lateral-miss readout).
  */
 export function withPickHitbox(mesh: THREE.Object3D): THREE.Object3D {
-  if (!hitboxGeometry) hitboxGeometry = new THREE.SphereGeometry(HITBOX_RADIUS, 8, 6)
+  const box = new THREE.Box3().setFromObject(mesh)
+  const center = box.getCenter(new THREE.Vector3())
+  const size = box.getSize(new THREE.Vector3())
+  const radius = Math.max(HITBOX_RADIUS, size.length() / 2)
   const wrapper = new THREE.Group()
   wrapper.add(mesh)
-  wrapper.add(new THREE.Mesh(hitboxGeometry, HITBOX_MATERIAL))
+  const hitbox = new THREE.Mesh(new THREE.SphereGeometry(radius, 8, 6), HITBOX_MATERIAL)
+  hitbox.position.copy(center)
+  wrapper.add(hitbox)
   return wrapper
 }

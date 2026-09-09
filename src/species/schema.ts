@@ -65,6 +65,12 @@ export interface BerryMorphology {
   clusterSize: Range
   /** The small tuft of foliage under the cluster. */
   leafColor: string
+  /** Height of the whole plant carrying the berries, mm — a knee-high shrub
+   *  for bilberry, a low creeping mat for lingonberry, a single stem for
+   *  cloudberry. The berries themselves are a few millimetres across and
+   *  unaimable on their own at any real distance; this is what actually
+   *  gives a player something to see and reach for. */
+  bushHeight: Range
 }
 
 /** Everything the mesh generator needs to build one herb plant. */
@@ -265,6 +271,7 @@ function parseBerryMorphology(raw: unknown, file: string): BerryMorphology {
     diameter: range(mo, 'diameter', file, 'morphology'),
     clusterSize: range(mo, 'clusterSize', file, 'morphology'),
     leafColor: color(mo, 'leafColor', file, 'morphology'),
+    bushHeight: range(mo, 'bushHeight', file, 'morphology'),
   }
 }
 

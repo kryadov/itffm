@@ -5,7 +5,7 @@ import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
-import { createBasket, nearestInView } from './game/pick'
+import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
 import type { Placement } from './ecology/spawn'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
@@ -17,6 +17,7 @@ import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, DAY_TIME } from './world/daynight'
 import { speciesById } from './species/load'
+import { HITBOX_RADIUS } from './collectible/build'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 
@@ -124,25 +125,48 @@ async function main(): Promise<void> {
   }
   let aimed: THREE.Object3D | null = null
 
-  // Opt-in only (?debug=1) — a live readout of what the crosshair actually
-  // sees, for exactly the kind of "the label just doesn't show up" report
-  // that is otherwise unreproducible from the outside: whether anything
-  // small is even in range, how far off-axis it is, and what nearestInView
-  // (game/pick.ts) actually resolved this frame, all without needing a
-  // screen-sharing session or guessed-at repro script.
-  const DEBUG = new URLSearchParams(location.search).has('debug')
-  const debugEl = DEBUG ? document.createElement('div') : null
-  if (debugEl) {
-    debugEl.style.cssText =
-      'position:fixed;top:8px;right:8px;background:rgba(0,0,0,.75);color:#7fffb0;' +
-      'font:12px/1.5 monospace;padding:8px 10px;white-space:pre;pointer-events:none;z-index:9999'
-    ui.appendChild(debugEl)
+  // A live readout of what the crosshair actually sees, for exactly the kind
+  // of "the label just doesn't show up" report that is otherwise
+  // unreproducible from the outside: every value nearestInView (game/pick.ts)
+  // itself would need — camera position and facing, the exact ray's own hit
+  // list in order, and the nearest small candidates by distance and angle —
+  // so a live session can be diagnosed from one screenshot instead of a
+  // guessed-at repro script. Starts on with `?debug=1` (handy for a repro
+  // link) but stays reachable afterwards with F3, the same key every
+  // Minecraft-descended game already uses for this.
+  let debugEnabled = new URLSearchParams(location.search).has('debug')
+  let debugEl: HTMLDivElement | null = null
+  function ensureDebugEl(): HTMLDivElement {
+    if (!debugEl) {
+      debugEl = document.createElement('div')
+      debugEl.style.cssText =
+        'position:fixed;top:8px;right:8px;background:rgba(0,0,0,.82);color:#7fffb0;' +
+        'font:12px/1.5 monospace;padding:8px 10px;white-space:pre;pointer-events:none;z-index:9999;max-width:520px'
+      ui.appendChild(debugEl)
+    }
+    return debugEl
   }
+  if (debugEnabled) ensureDebugEl()
   const debugCamDir = new THREE.Vector3()
+  const debugCamRight = new THREE.Vector3()
+  const debugCamUp = new THREE.Vector3()
+  const debugWorldUp = new THREE.Vector3(0, 1, 0)
   function updateDebugOverlay(): void {
-    if (!debugEl) return
+    if (!debugEnabled) return
+    const debugEl = ensureDebugEl()
     camera.getWorldDirection(debugCamDir)
-    let nearest: { id: string; dist: number; deg: number } | null = null
+    // "Off-axis angle" turned out to be the wrong number to show: something
+    // can sit well inside the 70° FOV (so visibly on screen) while still
+    // being a metre or more sideways of the actual aim ray at any real
+    // distance — "in view" and "aimed at" are not the same thing, and an
+    // angle alone made that read as a mystery instead of "you're just not
+    // looking straight at it yet" (2026-09-09 live report). What actually
+    // predicts a hit is the ray's own perpendicular (lateral) miss distance
+    // against withPickHitbox's own radius — the exact same number
+    // game/pick.ts's raycaster would test.
+    debugCamRight.crossVectors(debugCamDir, debugWorldUp).normalize()
+    debugCamUp.crossVectors(debugCamRight, debugCamDir).normalize()
+    const candidates: { id: string; dist: number; lateral: number; hint: string }[] = []
     for (const obj of forest.mushroomObjects) {
       const placement = obj.userData.placement
       const species = placement && speciesById(placement.speciesId)
@@ -150,19 +174,39 @@ async function main(): Promise<void> {
       const dx = obj.position.x - camera.position.x
       const dy = obj.position.y - camera.position.y
       const dz = obj.position.z - camera.position.z
-      const dist = Math.hypot(dx, dy, dz)
-      if (dist > REACH * 3) continue
-      const cos = (dx * debugCamDir.x + dy * debugCamDir.y + dz * debugCamDir.z) / (dist || 1e-6)
-      const deg = (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI
-      if (!nearest || dist < nearest.dist) nearest = { id: species.id, dist, deg }
+      const dist = Math.hypot(dx, dy, dz) || 1e-6
+      // Project onto the aim ray to find the closest approach, then measure
+      // how far off that same ray the object actually sits.
+      const t = dx * debugCamDir.x + dy * debugCamDir.y + dz * debugCamDir.z
+      const lateral = Math.hypot(dx - t * debugCamDir.x, dy - t * debugCamDir.y, dz - t * debugCamDir.z)
+      const horiz = (dx * debugCamRight.x + dy * debugCamRight.y + dz * debugCamRight.z) / dist
+      const vert = (dx * debugCamUp.x + dy * debugCamUp.y + dz * debugCamUp.z) / dist
+      const hint =
+        t < 0
+          ? 'BEHIND YOU'
+          : lateral < HITBOX_RADIUS
+            ? 'WOULD HIT'
+            : `turn ${horiz > 0 ? 'RIGHT' : 'LEFT'}${Math.abs(vert) > 0.15 ? ` + ${vert > 0 ? 'UP' : 'DOWN'}` : ''} (off by ${lateral.toFixed(2)}m, hitbox is ${HITBOX_RADIUS}m)`
+      candidates.push({ id: `${species.id} (${obj.position.x.toFixed(2)},${obj.position.y.toFixed(2)},${obj.position.z.toFixed(2)})`, dist, lateral, hint })
     }
+    candidates.sort((a, b) => a.dist - b.dist)
+
+    const hits = debugRaycastHits(camera, forest.mushroomObjects, REACH, forest.occluders)
+
     debugEl.textContent = [
       `aimed: ${aimed ? aimed.userData.placement.speciesId : 'none'}`,
-      `player: ${player.x.toFixed(2)}, ${player.z.toFixed(2)}`,
-      `yaw/pitch: ${((player.yaw * 180) / Math.PI).toFixed(1)}° / ${((player.pitch * 180) / Math.PI).toFixed(1)}°`,
-      nearest
-        ? `nearest small: ${nearest.id} @ ${nearest.dist.toFixed(2)}m, ${nearest.deg.toFixed(1)}° off-axis`
-        : `nearest small: none within ${REACH * 3}m`,
+      `player pos: ${player.x.toFixed(2)}, ${player.z.toFixed(2)} (ground y: ${forest.ground.heightAt(player.x, player.z).toFixed(2)})`,
+      `camera pos: ${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)}`,
+      `camera dir: ${debugCamDir.x.toFixed(3)}, ${debugCamDir.y.toFixed(3)}, ${debugCamDir.z.toFixed(3)}`,
+      // player.yaw accumulates without wrapping (harmless — every use of it
+      // goes through sin/cos, which do not care), so it is shown normalised
+      // to ±180° here purely so the number itself is not alarming.
+      `yaw/pitch: ${(((((player.yaw * 180) / Math.PI) % 360) + 540) % 360 - 180).toFixed(1)}° / ${((player.pitch * 180) / Math.PI).toFixed(1)}°`,
+      `REACH: ${REACH}m`,
+      `exact-ray hits (${hits.length}): ` +
+        (hits.length ? hits.map((h) => `${h.name}@${h.distance.toFixed(2)}m${h.hasPlacement ? '[placement]' : ''}`).join(', ') : 'none'),
+      `nearest small (top 3 of ${candidates.length} total, any distance):`,
+      ...candidates.slice(0, 3).map((c) => `  ${c.id} — ${c.dist.toFixed(2)}m — ${c.hint}`),
     ].join('\n')
   }
 
@@ -430,6 +474,10 @@ async function main(): Promise<void> {
     if (e.code === 'KeyF') {
       flashlightOn = !flashlightOn
       forest.setFlashlight(flashlightOn)
+    }
+    if (e.code === 'F3') {
+      debugEnabled = !debugEnabled
+      ensureDebugEl().hidden = !debugEnabled
     }
   })
 
