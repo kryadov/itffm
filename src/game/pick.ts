@@ -104,14 +104,27 @@ export function nearestInView(
   const hits = raycaster.intersectObjects(occluders.length > 0 ? [...objects, ...occluders] : objects, true)
   if (hits.length > 0) {
     // The ray hit something — a cap, a stipe, or an occluder in front of one.
-    // Walk up to the mushroom it belongs to; an occluder with no placement of
-    // its own returns null here, same as before, and does NOT fall through
-    // to the cone below — a mushroom truly hidden behind grass must stay
-    // hidden, not get picked up by the small-object forgiveness meant for
-    // "nothing was hit at all".
+    // Walk up to the mushroom it belongs to.
     let o: THREE.Object3D | null = hits[0].object
     while (o && !o.userData.placement) o = o.parent
-    return o
+    if (o) return o
+
+    // The closest hit was bare occluder — grass, undergrowth — with no real
+    // placement on this exact ray at all. That is not the same as a real
+    // mushroom standing behind it: a berry or herb grows IN the grass around
+    // it by design (ecology/sites.ts), so this case is the common one for
+    // them, not the rare one — treating it the same as "truly hidden behind
+    // a bush" defeated the small-object cone below almost every time it was
+    // needed (see TODO.md, 2026-09-08 live report: "works for mushrooms, but
+    // the berry's name never shows"). Only a genuine placement somewhere
+    // along this SAME ray — truly behind the occluder, not just near it —
+    // still counts as hidden.
+    const hidesARealTarget = hits.some((h) => {
+      let p: THREE.Object3D | null = h.object
+      while (p && !p.userData.placement) p = p.parent
+      return p !== null
+    })
+    if (hidesARealTarget) return null
   }
   return nearestSmallInCone(camera, smallObjects, maxDistance)
 }

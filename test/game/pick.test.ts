@@ -112,12 +112,24 @@ describe('nearestInView', () => {
       expect(nearestInView(camera, [m], 10, [], [b])).toBe(m)
     })
 
-    it('never falls through to the cone when an occluder blocks the exact ray', () => {
+    it('still falls through to the cone when the only thing the exact ray hit was bare grass', () => {
+      // A berry grows IN the grass around it, not behind a bush — bare
+      // occluder with no real target anywhere on the ray must not shadow the
+      // cone fallback, or it would almost never fire for exactly the small
+      // objects it exists for (see TODO.md, 2026-09-08 live report).
       const b = tinyBerry(0, -3)
       const grassBlade = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
       grassBlade.position.set(0, 0, -1)
       grassBlade.updateMatrixWorld(true)
-      expect(nearestInView(camera, [], 10, [grassBlade], [b])).toBe(null)
+      expect(nearestInView(camera, [], 10, [grassBlade], [b])).toBe(b)
+    })
+
+    it('still stays hidden when a real mushroom truly sits behind the occluder on the exact ray', () => {
+      const m = mushroom(-3)
+      const grassBlade = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
+      grassBlade.position.set(0, 0, -1)
+      grassBlade.updateMatrixWorld(true)
+      expect(nearestInView(camera, [m], 10, [grassBlade], [m])).toBe(null)
     })
 
     it('picks the nearer of two tiny objects both inside the cone', () => {
