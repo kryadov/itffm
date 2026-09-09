@@ -35,8 +35,8 @@ import { buildWaterMeshes, placeSprings, buildSpringMeshes, classifyWater, water
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
-import { loadSpecies, speciesById } from '../species/load'
-import { buildCollectible, toWorldMesh, withPickHitbox, buildCollectibleLod } from '../collectible/build'
+import { loadSpecies } from '../species/load'
+import { buildPlacementObject } from '../collectible/placement'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
 import type { Vec2 } from '../geo/types'
@@ -384,23 +384,11 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // needs the exact objects to call .update(camera) on every frame.
   const lods: THREE.LOD[] = []
   for (const p of placements) {
-    const species = speciesById(p.speciesId)
-    if (!species) continue
-    // A berry, a nut or a find is only a few centimetres across in real life
-    // — far smaller than a mushroom cap — so it gets an invisible, generously
-    // sized pick target of its own (collectible/worldMesh.ts's
-    // withPickHitbox) the moment it is built. A mushroom needs none of this:
-    // its own cap is already big enough for the exact ray in game/pick.ts to
-    // land on reliably (see TODO.md, 2026-09-09).
-    const lod = buildCollectibleLod(toWorldMesh(buildCollectible(species, p.seed, p.age)))
-    lods.push(lod)
-    let mesh: THREE.Object3D = lod
-    if (species.kind !== 'mushroom') mesh = withPickHitbox(mesh)
-    mesh.position.set(p.x, source.ground.heightAt(p.x, p.z), p.z)
-    mesh.rotateY(p.rotationY)
-    mesh.userData.placement = p
-    scene.add(mesh)
-    mushroomObjects.push(mesh)
+    const built = buildPlacementObject(p, source.ground)
+    if (!built) continue
+    lods.push(built.lod)
+    scene.add(built.object)
+    mushroomObjects.push(built.object)
   }
   const updateMushroomLod = (camera: THREE.Camera): void => {
     for (const lod of lods) lod.update(camera)
