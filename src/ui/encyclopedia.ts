@@ -2,6 +2,7 @@ import { loadSpecies } from '../species/load'
 import { hashString } from '../util/rng'
 import { t, speciesName } from '../i18n/i18n'
 import { renderCollectiblePreview } from './preview'
+import { ensureStyleOnce } from './responsiveStyle'
 import { columnsFor, layoutGrid, EXPORT_CELL_SIZE } from './export'
 import { matchesFilters, type EncyclopediaFilters, type Season } from './encyclopediaFilters'
 import { EDIBILITY, HYMENIUM, BIOMES, KINDS } from '../species/schema'
@@ -80,6 +81,12 @@ async function exportEncyclopediaImage(discovered: Species[]): Promise<void> {
 export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
   if (document.getElementById('encyclopedia')) return
   document.exitPointerLock()
+  // The grid itself already reflows on its own (`auto-fill`) — only the
+  // fixed 34/38px page padding needs to give narrow screens their room back.
+  ensureStyleOnce(
+    'encyclopedia-responsive-style',
+    `@media (max-width: 480px) { #encyclopedia { padding: 16px 14px !important; } }`,
+  )
 
   const overlay = document.createElement('div')
   overlay.id = 'encyclopedia'

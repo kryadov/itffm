@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { buildCollectible } from '../collectible/build'
 import { attachOrbit } from './orbit'
 import { t, speciesName, speciesText } from '../i18n/i18n'
+import { ensureStyleOnce } from './responsiveStyle'
 import type { Species, Edibility } from '../species/schema'
 
 const EDIBILITY_COLOR: Record<Edibility, string> = {
@@ -29,6 +30,18 @@ export function openInspect(
   onCut: () => void,
 ): void {
   document.exitPointerLock()
+  // Stacks the model above the card instead of squeezing both into two
+  // narrow columns on a portrait screen. `!important` wins over the panels'
+  // own inline `flex`/`max-width` (set once per call, below) without
+  // threading a "am I on a phone" flag through the rest of this function.
+  ensureStyleOnce(
+    'inspect-responsive-style',
+    `@media (max-aspect-ratio: 4/5) {
+      #inspect { flex-direction: column !important; }
+      #inspect-view { flex: 0 0 40vh !important; }
+      #inspect-card { flex: 1 1 auto !important; max-width: none !important; }
+    }`,
+  )
 
   const overlay = document.createElement('div')
   overlay.id = 'inspect'
@@ -38,8 +51,10 @@ export function openInspect(
   document.getElementById('ui')!.appendChild(overlay)
 
   const view = document.createElement('div')
+  view.id = 'inspect-view'
   view.style.cssText = 'flex:1 1 55%;position:relative;cursor:grab'
   const card = document.createElement('div')
+  card.id = 'inspect-card'
   card.style.cssText = 'flex:1 1 45%;max-width:480px;padding:32px 34px;overflow:auto'
   overlay.append(view, card)
 
