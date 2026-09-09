@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "boot-check": "node scripts/boot-check.mjs"
+    "boot-check": "node scripts/boot-check.mjs",
+    "silhouette-sheet": "node scripts/silhouette-sheet.mjs"
   },
   "dependencies": {
     "three": "^0.169.0",

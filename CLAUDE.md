@@ -36,6 +36,7 @@ npm run test:watch     # tests in watch mode
 npm test -- profile    # only files whose path contains "profile"
 npm run build          # tsc + build into dist/
 npm run boot-check     # after build: does the bundle start in headless Chrome
+npm run silhouette-sheet [outPng]  # every species' silhouette on one sheet, for "look at it"
 ```
 
 `npm test` and `npm run build` run in CI on every push to `master`, and a green
@@ -45,6 +46,15 @@ cut by pushing a version tag (`git tag v0.3.0 && git push --tags`).
 `boot-check` exists because unit tests never load `main.ts`: the build can be
 green while the screen is black. It has caught two real hangs already. If Chrome
 is not installed it skips silently.
+
+`silhouette-sheet` renders every species' silhouette (the same flat mode the
+encyclopedia already uses for an undiscovered one) onto one contact sheet — a
+dev tool for "look at it" (see Conventions below), not a pass/fail test: exact
+pixels drift across GPUs and drivers, so, like `boot-check`, it stays out of CI
+and out of `npm test` on purpose. Run it after any change to a species'
+morphology and scan the sheet for the kind of thing tests have missed before —
+chimeric proportions, a sideways stipe, a shape that reads as broken rather
+than just a different species.
 
 ## Architecture
 
