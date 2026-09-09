@@ -50,6 +50,11 @@ async function main(): Promise<void> {
   const renderer = new THREE.WebGLRenderer({ antialias: true })
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
   renderer.setSize(innerWidth, innerHeight)
+  // Off everywhere except the shelter's own hearth light and walls
+  // (world/shelter.ts) — the only pair in the wood that opted in with
+  // castShadow/receiveShadow. Fifteen hundred trees casting real shadows is
+  // its own future project (see TODO.md); one light in one hut is cheap.
+  renderer.shadowMap.enabled = true
   app.appendChild(renderer.domElement)
 
   // Not awaited: IndexedDB's callback never arrives under boot-check's virtual
@@ -118,6 +123,48 @@ async function main(): Promise<void> {
     bobPhase: 0,
   }
   let aimed: THREE.Object3D | null = null
+
+  // Opt-in only (?debug=1) — a live readout of what the crosshair actually
+  // sees, for exactly the kind of "the label just doesn't show up" report
+  // that is otherwise unreproducible from the outside: whether anything
+  // small is even in range, how far off-axis it is, and what nearestInView
+  // (game/pick.ts) actually resolved this frame, all without needing a
+  // screen-sharing session or guessed-at repro script.
+  const DEBUG = new URLSearchParams(location.search).has('debug')
+  const debugEl = DEBUG ? document.createElement('div') : null
+  if (debugEl) {
+    debugEl.style.cssText =
+      'position:fixed;top:8px;right:8px;background:rgba(0,0,0,.75);color:#7fffb0;' +
+      'font:12px/1.5 monospace;padding:8px 10px;white-space:pre;pointer-events:none;z-index:9999'
+    ui.appendChild(debugEl)
+  }
+  const debugCamDir = new THREE.Vector3()
+  function updateDebugOverlay(): void {
+    if (!debugEl) return
+    camera.getWorldDirection(debugCamDir)
+    let nearest: { id: string; dist: number; deg: number } | null = null
+    for (const obj of forest.mushroomObjects) {
+      const placement = obj.userData.placement
+      const species = placement && speciesById(placement.speciesId)
+      if (!species || species.kind === 'mushroom') continue
+      const dx = obj.position.x - camera.position.x
+      const dy = obj.position.y - camera.position.y
+      const dz = obj.position.z - camera.position.z
+      const dist = Math.hypot(dx, dy, dz)
+      if (dist > REACH * 3) continue
+      const cos = (dx * debugCamDir.x + dy * debugCamDir.y + dz * debugCamDir.z) / (dist || 1e-6)
+      const deg = (Math.acos(Math.min(1, Math.max(-1, cos))) * 180) / Math.PI
+      if (!nearest || dist < nearest.dist) nearest = { id: species.id, dist, deg }
+    }
+    debugEl.textContent = [
+      `aimed: ${aimed ? aimed.userData.placement.speciesId : 'none'}`,
+      `player: ${player.x.toFixed(2)}, ${player.z.toFixed(2)}`,
+      `yaw/pitch: ${((player.yaw * 180) / Math.PI).toFixed(1)}° / ${((player.pitch * 180) / Math.PI).toFixed(1)}°`,
+      nearest
+        ? `nearest small: ${nearest.id} @ ${nearest.dist.toFixed(2)}m, ${nearest.deg.toFixed(1)}° off-axis`
+        : `nearest small: none within ${REACH * 3}m`,
+    ].join('\n')
+  }
 
   function toast(text: string): void {
     const el = document.createElement('div')
@@ -433,6 +480,7 @@ async function main(): Promise<void> {
 
     cullDistantMushrooms()
     updateAim()
+    updateDebugOverlay()
     renderer.render(forest.scene, camera)
 
     // Boot-check needs only a handful of frames, and can't afford more: a few

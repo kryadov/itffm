@@ -80,6 +80,14 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   // reads as plain, not broken, and broken is worse.
   const walls = new THREE.Mesh(new THREE.BoxGeometry(width, wallHeight, depth), wallMat)
   walls.position.y = wallHeight / 2
+  // The hearth light below sits inside this box. Without shadow casting a
+  // three.js PointLight ignores geometry entirely and lights the ground
+  // through the floor and walls alike — visible at night as a warm glow
+  // leaking out from under the hut, nowhere near a window (2026-09-09 live
+  // report). One light and one solid box is cheap enough to shadow properly
+  // instead of just dimming the light and hoping the leak stays unnoticed.
+  walls.castShadow = true
+  walls.receiveShadow = true
   group.add(walls)
 
   const roofSpan = Math.hypot(width, depth) * 0.62
@@ -127,6 +135,16 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   })
   const frameGeo = new THREE.PlaneGeometry(0.5, 0.5)
   const glassGeo = new THREE.PlaneGeometry(0.38, 0.38)
+  // A cross-shaped muntin bar over the glass — real boxes, not planes, so
+  // they read as wood from every angle without the same one-sided-plane
+  // trap the glass itself already ran into once. A flat frame with plain
+  // glass behind it (the original shape) never stopped looking like one
+  // pale, borderless patch on the wall — a real cottage window is panes
+  // separated by a bar, and that bar is most of what the eye recognises.
+  const muntinMat = frameMat
+  const muntinThickness = 0.028
+  const vMuntinGeo = new THREE.BoxGeometry(muntinThickness, 0.4, 0.03)
+  const hMuntinGeo = new THREE.BoxGeometry(0.4, muntinThickness, 0.03)
   const buildWindow = (x: number, faceOut: number): THREE.Group => {
     const win = new THREE.Group()
     const frame = new THREE.Mesh(frameGeo, frameMat)
@@ -142,6 +160,8 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
       glass.position.z = dz
       win.add(glass)
     }
+    win.add(new THREE.Mesh(vMuntinGeo, muntinMat))
+    win.add(new THREE.Mesh(hMuntinGeo, muntinMat))
     win.position.set(x, wallHeight * 0.58, 0)
     win.rotation.y = faceOut
     return win
@@ -156,12 +176,89 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   // same lesson the flashlight already learned (game/scene.ts).
   const hearthLight = new THREE.PointLight(0xffcf8a, 0, 5)
   hearthLight.position.set(0, wallHeight * 0.5, 0)
+  hearthLight.castShadow = true
+  // A cube shadow map this small only has to hide one box from itself —
+  // nowhere near what a scene-wide light would need.
+  hearthLight.shadow.mapSize.set(256, 256)
+  hearthLight.shadow.bias = -0.002
   group.add(hearthLight)
 
   const setNight = (t: number): void => {
     glassMat.emissiveIntensity = t * 2.2
     hearthLight.intensity = t * 18
   }
+
+  // A stacked armful of firewood against one side of the hut — the wall
+  // itself never explained where the hearth's own fuel comes from.
+  const firewoodMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 1 })
+  const logEndMat = new THREE.MeshStandardMaterial({ color: 0xcbb384, roughness: 0.9 })
+  const logRadius = 0.09
+  const logLength = 0.5
+  const logGeo = new THREE.CylinderGeometry(logRadius, logRadius, logLength, 8)
+  const logEndGeo = new THREE.CircleGeometry(logRadius, 8)
+  const firewood = new THREE.Group()
+  firewood.name = 'firewood'
+  const firewoodRows = [4, 3]
+  for (let row = 0; row < firewoodRows.length; row++) {
+    const count = firewoodRows[row]
+    const offset = (count - 1) / 2
+    const y = logRadius + row * logRadius * 2
+    for (let i = 0; i < count; i++) {
+      const log = new THREE.Mesh(logGeo, firewoodMat)
+      log.rotation.z = Math.PI / 2
+      log.position.set((i - offset) * (logRadius * 2 + 0.015), y, 0)
+      firewood.add(log)
+      // The cylinder's own caps carry the trunk colour; a paler disc facing
+      // the viewer is what actually reads as "cut log end" from outside.
+      const endCap = new THREE.Mesh(logEndGeo, logEndMat)
+      endCap.rotation.y = Math.PI / 2
+      endCap.position.set(log.position.x + logLength / 2 + 0.001, y, 0)
+      firewood.add(endCap)
+    }
+  }
+  firewood.position.set(width / 2 + 0.45, 0, depth / 2 - 0.3)
+  group.add(firewood)
+
+  // A small well: a stone-ringed shaft, a crossbeam on two posts, and a
+  // bucket hanging from it — the other everyday fixture a lived-in
+  // clearing has next to a hearth, not just a place to sleep.
+  const wellStoneMat = new THREE.MeshStandardMaterial({ color: 0x8a8a82, roughness: 1 })
+  const wellWoodMat = new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 1 })
+  const bucketMat = new THREE.MeshStandardMaterial({ color: 0x5a4a30, roughness: 0.6, metalness: 0.15 })
+  const well = new THREE.Group()
+  well.name = 'well'
+  const wellRadius = 0.42
+  const wellWallHeight = 0.32
+  // Open-ended — a capped cylinder would read as a solid stone drum, not a
+  // shaft with anything down it.
+  const wellWall = new THREE.Mesh(
+    new THREE.CylinderGeometry(wellRadius, wellRadius, wellWallHeight, 12, 1, true),
+    wellStoneMat,
+  )
+  wellWall.position.y = wellWallHeight / 2
+  well.add(wellWall)
+  const postHeight = 0.85
+  const postGeo = new THREE.BoxGeometry(0.06, postHeight, 0.06)
+  for (const side of [-1, 1]) {
+    const post = new THREE.Mesh(postGeo, wellWoodMat)
+    post.position.set(0, postHeight / 2, side * wellRadius * 0.85)
+    well.add(post)
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, wellRadius * 2.1), wellWoodMat)
+  beam.position.set(0, postHeight, 0)
+  well.add(beam)
+  const wellRoof = new THREE.Mesh(new THREE.ConeGeometry(wellRadius * 0.95, 0.32, 4), roofMat)
+  wellRoof.rotation.y = Math.PI / 4
+  wellRoof.position.set(0, postHeight + 0.18, 0)
+  well.add(wellRoof)
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.32, 6), wellWoodMat)
+  rope.position.set(0, postHeight - 0.16, 0)
+  well.add(rope)
+  const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.16, 10), bucketMat)
+  bucket.position.set(0, postHeight - 0.32 - 0.08, 0)
+  well.add(bucket)
+  well.position.set(-(width / 2 + 1.3), 0, -(depth / 2 + 1.4))
+  group.add(well)
 
   // The chimney and its smoke, both offset toward one corner of the roof —
   // centring it over the ridge would look planted, not built.

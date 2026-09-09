@@ -78,5 +78,9 @@ export function buildGround(
     }),
   )
   mesh.name = 'ground'
+  // Lets the shelter's hearth light (world/shelter.ts) leave a real shadow
+  // under its own walls instead of shining straight through them — the only
+  // shadow-casting light in the wood, so this costs nothing anywhere else.
+  mesh.receiveShadow = true
   return mesh
 }

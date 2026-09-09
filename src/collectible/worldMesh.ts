@@ -68,9 +68,14 @@ export function toWorldMesh(group: THREE.Group): THREE.Mesh {
 const HITBOX_RADIUS = 0.12
 let hitboxGeometry: THREE.SphereGeometry | null = null
 /** Fully invisible (not merely transparent) — `colorWrite: false` means it
- *  never shows up even where it clips through something else, but `visible`
- *  stays `true`, so three.js's raycaster still tests it (raycasting checks
- *  `Object3D.visible`, never what the material actually draws). */
+ *  never shows up even where it clips through something else. three.js's
+ *  raycaster never looks at `visible` either way (verified against the
+ *  installed three@0.169.0 source, node_modules/three/src/core/Raycaster.js
+ *  — an earlier version of this comment claimed otherwise from memory and
+ *  was wrong), so this could be `visible = false` just as validly; kept
+ *  `visible: true` with a fully transparent, non-writing material instead
+ *  so "does the raycaster skip hidden objects" is never a question that
+ *  needs re-deciding here later. */
 const HITBOX_MATERIAL = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
 
 /**

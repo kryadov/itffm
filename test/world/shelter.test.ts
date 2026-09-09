@@ -67,4 +67,31 @@ describe('buildShelterMesh', () => {
       for (let i = 0; i < 30; i++) update(1 / 30)
     }).not.toThrow()
   })
+
+  it('shadows its own hearth light off its own walls, so night light does not leak through the floor', () => {
+    const { group } = buildShelterMesh(s)
+    const walls = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.BoxGeometry) as THREE.Mesh
+    expect(walls.castShadow).toBe(true)
+    expect(walls.receiveShadow).toBe(true)
+    const light = group.children.find((c) => c instanceof THREE.PointLight) as THREE.PointLight
+    expect(light.castShadow).toBe(true)
+  })
+
+  it('gives each window a muntin bar, not just a bare pane', () => {
+    const { group } = buildShelterMesh(s)
+    const window = group.children.find((c) => c.getObjectByName('glass')) as THREE.Group
+    // frame + two glass panes + two muntin bars = five parts.
+    expect(window.children.length).toBe(5)
+  })
+
+  it('adds a firewood pile and a well next to the hut', () => {
+    const { group } = buildShelterMesh(s)
+    const firewood = group.getObjectByName('firewood')!
+    const well = group.getObjectByName('well')!
+    expect(firewood.children.length).toBeGreaterThan(0)
+    expect(well.children.length).toBeGreaterThan(0)
+    // Both stand outside the hut's own footprint, not inside its walls.
+    expect(Math.hypot(firewood.position.x, firewood.position.z)).toBeGreaterThan(1)
+    expect(Math.hypot(well.position.x, well.position.z)).toBeGreaterThan(1)
+  })
 })
