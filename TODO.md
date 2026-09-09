@@ -152,22 +152,31 @@
       — скриншотом headless Chrome (дверь и стена теперь в масштабе, глаза на
       уровне дверного проёма, не выше).
 
-- [ ] **Гриб — идеальная фигура тела вращения.** `mushroom/build.ts` строит
-      шляпку и ножку из `CylinderGeometry`/`SphereGeometry` без единой
-      деформации — идеально круглая в плане шляпка, идеально прямая ножка.
-      В реальности нет двух одинаковых грибов: шляпка редко правильный круг,
-      ножка почти всегда чуть изогнута или наклонена. У деревьев, валунов и
-      кустов (`world/trees.ts`, `boulders.ts`, `undergrowth.ts`) уже есть
-      приём для ровно этой проблемы — `buildRaggedCrown()`: икосаэдр со
-      смещением каждой вершины вдоль своей нормали по `fbm2`-шуму. Прямой
-      перенос той же идеи на купол шляпки, вероятно, работает, но с ножкой
-      сложнее: гриб — единственная модель, которую разглядывают в упор
-      (осмотр, энциклопедия) ради конкретных признаков определения — цвет
-      пластинок, наличие кольца, вольвы у основания, — и шум не должен
-      смазывать именно эти детали, иначе определение из проекта станет
-      менее честным, а не более живым. **Это сердце игры (по словам
-      пользователя) — стоит отдельно побрейнштормить подход (superpowers:
-      brainstorming), а не имплементировать с ходу.**
+- [x] **Гриб — идеальная фигура тела вращения.** Done. Brainstormed first
+      (per the note this item used to carry) — see the design decided in
+      chat 2026-09-10: `mushroom/irregularity.ts` holds two pure, tested
+      functions kept apart from `build.ts` the same way `profile.ts`'s
+      `capCrossSection` already is. `capWobble(phi, seed, age)` perturbs
+      the cap's own lathe-swept radius by angle, sampling a circle in
+      `fbm2` noise-space (so it is periodic — no seam where the sweep
+      closes on itself) rather than by raw vertex position the way
+      `buildRaggedCrown()` (`world/trees.ts`) does for a crown; tapered to
+      zero at the apex and at the stipe so neither gets a stray hole, and
+      grows with `age` (barely irregular young, more weathered mature).
+      `stipeBendCurve(t)` leans the stipe's own rings sideways by height
+      fraction — zero at the base (it still plants where it grew), eased
+      rather than linear. The one real complication a straight port of
+      `buildRaggedCrown()` would have missed: a bent stipe's tip drifts
+      sideways, so the cap/hymenium/ring all had to start following that
+      drift instead of assuming the tip sits straight above the base —
+      `buildStipe`/`buildCap`/`buildHymenium`/`buildRing`/`buildWarts` all
+      gained a real `{x, z}` offset instead of the old lateral-bracket-only
+      scalar. Measurements that decide identification (`capR`, `stipeH`,
+      gill/ring/volva sizing) are untouched — only the visual mesh ripples
+      around them, per the brainstormed constraint. Verified by new unit
+      tests (cap non-circular, wobble grows with age, stipe leans, cap
+      follows the bent tip) and `npm run silhouette-sheet` across all 43
+      species — no chimeric shapes, no broken silhouettes.
 - [x] **Mouse-look needed an extra click after "Go".** Live report,
       2026-09-10: `game/controls.ts`'s Pointer Lock request only ever fires
       from a `click` on the canvas itself, but the click that actually picks
