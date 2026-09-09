@@ -161,7 +161,7 @@ async function main(): Promise<void> {
       hud.setTarget(null)
       return
     }
-    aimed = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders, forest.smallObjects)
+    aimed = nearestInView(camera, forest.mushroomObjects, REACH, forest.occluders)
     const species = aimed ? speciesById(aimed.userData.placement.speciesId) : undefined
     hud.setTarget(species ? speciesName(species) : null)
   }
@@ -184,18 +184,6 @@ async function main(): Promise<void> {
     forest.scene.add(mark)
   }
 
-  /**
-   * Drops a collected or cut object from the small-object aim cone too, not
-   * just `mushroomObjects` — left in place, its detached mesh keeps whatever
-   * world position it last had and, being wherever the player just stood to
-   * reach it, routinely won the cone's "nearest" check forever after, which
-   * looked like every other berry nearby had simply stopped responding to E.
-   */
-  function removeFromSmallObjects(target: THREE.Object3D): void {
-    const i = forest.smallObjects.indexOf(target)
-    if (i !== -1) forest.smallObjects.splice(i, 1)
-  }
-
   function examineAimed(): void {
     const target = aimed
     if (!target) return
@@ -211,7 +199,6 @@ async function main(): Promise<void> {
         if (!basket.add(placement)) return
         target.removeFromParent()
         forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
-        removeFromSmallObjects(target)
         leaveTrace(placement)
         hud.setBasket(basket.items.length, BASKET_CAPACITY)
         const at = Date.now()
@@ -225,7 +212,6 @@ async function main(): Promise<void> {
         // the aim list (game/pick.ts) so it can't be re-examined, but still a
         // real mesh lying where it grew, not vanished like a picked one.
         forest.mushroomObjects.splice(forest.mushroomObjects.indexOf(target), 1)
-        removeFromSmallObjects(target)
         const fallAxis = new THREE.Vector3(Math.cos(placement.rotationY), 0, Math.sin(placement.rotationY))
         target.rotateOnWorldAxis(fallAxis, Math.PI / 2)
         const box = new THREE.Box3().setFromObject(target)

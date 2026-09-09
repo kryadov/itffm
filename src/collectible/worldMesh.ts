@@ -61,3 +61,36 @@ export function toWorldMesh(group: THREE.Group): THREE.Mesh {
   merged.name = 'collectible'
   return merged
 }
+
+/** Radius of the invisible pick target `withPickHitbox` adds, metres — on the
+ *  order of a small mushroom cap, the one thing in the wood the crosshair's
+ *  exact ray already lands on reliably. */
+const HITBOX_RADIUS = 0.12
+let hitboxGeometry: THREE.SphereGeometry | null = null
+/** Fully invisible (not merely transparent) — `colorWrite: false` means it
+ *  never shows up even where it clips through something else, but `visible`
+ *  stays `true`, so three.js's raycaster still tests it (raycasting checks
+ *  `Object3D.visible`, never what the material actually draws). */
+const HITBOX_MATERIAL = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false })
+
+/**
+ * Wraps a small collectible's real mesh with an invisible, generously-sized
+ * sphere for the exact ray in `game/pick.ts` to hit — the same mechanism a
+ * mushroom's own cap already satisfies just by being physically big enough.
+ *
+ * A berry, a nut or a find is a few centimetres across in real life, subtends
+ * only a few screen pixels at any reasonable distance, and the crosshair's
+ * exact ray routinely missed it even when aimed "at" it by eye — an earlier
+ * angular "forgiveness cone" fallback tried to patch this at the aiming end
+ * instead and went through two more live bugs before it was reliable even in
+ * principle (see TODO.md, 2026-09-09). Giving the small object itself a
+ * real, exact-ray-sized target removes the need for a second aiming code
+ * path altogether: it is picked up exactly the way a mushroom is.
+ */
+export function withPickHitbox(mesh: THREE.Object3D): THREE.Object3D {
+  if (!hitboxGeometry) hitboxGeometry = new THREE.SphereGeometry(HITBOX_RADIUS, 8, 6)
+  const wrapper = new THREE.Group()
+  wrapper.add(mesh)
+  wrapper.add(new THREE.Mesh(hitboxGeometry, HITBOX_MATERIAL))
+  return wrapper
+}

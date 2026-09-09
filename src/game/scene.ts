@@ -28,7 +28,7 @@ import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies, speciesById } from '../species/load'
-import { buildCollectible, toWorldMesh } from '../collectible/build'
+import { buildCollectible, toWorldMesh, withPickHitbox } from '../collectible/build'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
 import type { Vec2 } from '../geo/types'
@@ -75,12 +75,11 @@ export interface Forest {
   ground: ElevationProvider
   trees: Tree[]
   placements: Placement[]
-  /** One object per mushroom, in the same order as placements. */
+  /** One object per mushroom, in the same order as placements. A non-mushroom
+   *  kind (berry, herb, nut, find) is wrapped in `withPickHitbox` before it
+   *  ever lands here (game/scene.ts's own placement loop) — every entry is
+   *  pickable by the same plain exact-ray test in game/pick.ts. */
   mushroomObjects: THREE.Object3D[]
-  /** The subset of `mushroomObjects` for a non-mushroom kind (berry, herb,
-   *  nut, find) — small enough that game/pick.ts gives them a forgiving aim
-   *  cone the exact crosshair ray alone would too often miss. */
-  smallObjects: THREE.Object3D[]
   /** Everything besides standing trees that blocks the player — fallen logs,
    *  stumps, boulders, bushes — as collision circles for the same obstacle
    *  list `stepPlayer` and `chooseStartPose` already use for tree trunks. */
@@ -274,27 +273,26 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   }
 
   const mushroomObjects: THREE.Object3D[] = []
-  // A berry, a nut or a find is a few centimetres across — far smaller than a
-  // mushroom cap — so it subtends only a few screen pixels at any reasonable
-  // distance, and the crosshair's exact ray routinely misses it even when
-  // aimed "at" it by eye (see TODO.md, 2026-09-08). Tagged here, once, so
-  // game/pick.ts can give only these a forgiving cone instead of scanning
-  // every mushroom in the wood for one that rarely needs it.
-  const smallObjects: THREE.Object3D[] = []
   for (const p of placements) {
     const species = speciesById(p.speciesId)
     if (!species) continue
-    const mesh = toWorldMesh(buildCollectible(species, p.seed, p.age))
+    // A berry, a nut or a find is only a few centimetres across in real life
+    // — far smaller than a mushroom cap — so it gets an invisible, generously
+    // sized pick target of its own (collectible/worldMesh.ts's
+    // withPickHitbox) the moment it is built. A mushroom needs none of this:
+    // its own cap is already big enough for the exact ray in game/pick.ts to
+    // land on reliably (see TODO.md, 2026-09-09).
+    let mesh: THREE.Object3D = toWorldMesh(buildCollectible(species, p.seed, p.age))
+    if (species.kind !== 'mushroom') mesh = withPickHitbox(mesh)
     mesh.position.set(p.x, source.ground.heightAt(p.x, p.z), p.z)
     mesh.rotateY(p.rotationY)
     mesh.userData.placement = p
     scene.add(mesh)
     mushroomObjects.push(mesh)
-    if (species.kind !== 'mushroom') smallObjects.push(mesh)
   }
 
   return {
-    scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, smallObjects, extraObstacles,
+    scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateBirds, updateWater,
   }

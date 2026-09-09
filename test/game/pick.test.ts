@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createBasket, nearestInView } from '../../src/game/pick'
+import { withPickHitbox } from '../../src/collectible/worldMesh'
 import type { Placement } from '../../src/ecology/spawn'
 
 const item = (id: string): Placement => ({
@@ -79,73 +80,52 @@ describe('nearestInView', () => {
     expect(nearestInView(camera, [m], 10, [grassBlade])).toBe(m)
   })
 
-  // A berry/nut/find is real-world millimetres across — far too small for the
-  // exact ray above to land on reliably — so it gets a forgiving aim cone
-  // instead (see TODO.md, 2026-09-08).
-  describe('small-object fallback', () => {
+  // A berry/nut/find is real-world millimetres across — far too small for a
+  // bare exact ray to land on reliably. Two earlier approaches tried to
+  // patch this with a second, angular aim-forgiveness code path for small
+  // objects and both went through live regressions (see TODO.md,
+  // 2026-09-09) — the actual fix is `withPickHitbox`, which gives the small
+  // object itself a real, exact-ray-sized target, so it needs no separate
+  // aiming logic here at all: it is just another entry in `objects`.
+  describe('small collectibles (via withPickHitbox)', () => {
     const tinyBerry = (x: number, z: number): THREE.Object3D => {
-      const g = new THREE.Group()
-      g.position.set(x, 0, z)
-      g.userData.placement = item('vaccinium-myrtillus')
-      g.updateMatrixWorld(true)
-      return g
+      // The real visible geometry is a speck — a single, barely-there
+      // triangle — deliberately too small for a bare exact ray to land on,
+      // so any pass here is entirely down to the hitbox withPickHitbox adds.
+      const speck = new THREE.Mesh(new THREE.BoxGeometry(0.001, 0.001, 0.001))
+      const wrapped = withPickHitbox(speck)
+      wrapped.position.set(x, 0, z)
+      wrapped.userData.placement = item('vaccinium-myrtillus')
+      wrapped.updateMatrixWorld(true)
+      return wrapped
     }
 
-    it('finds a tiny object the exact ray missed, straight ahead', () => {
+    it('finds a tiny collectible dead ahead that its own bare geometry could never catch', () => {
       const b = tinyBerry(0, -3)
-      expect(nearestInView(camera, [], 10, [], [b])).toBe(b)
+      expect(nearestInView(camera, [b], 10)).toBe(b)
     })
 
-    it('ignores a tiny object well outside the aim cone', () => {
-      const b = tinyBerry(3, -3)
-      expect(nearestInView(camera, [], 10, [], [b])).toBe(null)
-    })
-
-    it('ignores a tiny object beyond the given distance', () => {
+    it('still respects the given distance', () => {
       const b = tinyBerry(0, -3)
-      expect(nearestInView(camera, [], 2, [], [b])).toBe(null)
+      expect(nearestInView(camera, [b], 2)).toBe(null)
     })
 
-    it('prefers an exact hit over the small-object cone', () => {
-      const m = mushroom(-3)
-      const b = tinyBerry(0, -3)
-      expect(nearestInView(camera, [m], 10, [], [b])).toBe(m)
-    })
-
-    it('still falls through to the cone when the only thing the exact ray hit was bare grass', () => {
-      // A berry grows IN the grass around it, not behind a bush — bare
-      // occluder with no real target anywhere on the ray must not shadow the
-      // cone fallback, or it would almost never fire for exactly the small
-      // objects it exists for (see TODO.md, 2026-09-08 live report).
+    it('stays hidden behind a real occluder in front of it, same as a mushroom', () => {
       const b = tinyBerry(0, -3)
       const grassBlade = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
       grassBlade.position.set(0, 0, -1)
       grassBlade.updateMatrixWorld(true)
-      expect(nearestInView(camera, [], 10, [grassBlade], [b])).toBe(b)
+      expect(nearestInView(camera, [b], 10, [grassBlade])).toBe(null)
     })
 
-    it('still finds an off-axis berry when a different real specimen from the same clustered colony sits further along the exact ray', () => {
+    it('tells apart two real specimens from the same clustered colony, standing centimetres apart', () => {
       // A clustered colony packs several real specimens within centimetres
-      // of each other (ecology/spawn.ts's COLONY_SPREAD). Grass at z=-1
-      // blocks the exact ray first; a DIFFERENT real berry from the same
-      // colony (real geometry, not the one being aimed at) happens to sit
-      // further along that same ray at z=-3 — neither should stop the
-      // off-axis target from being found through the cone (2026-09-09 live
-      // report: this exact shape of scene made almost every berry
-      // unreachable except when it happened to be alone).
-      const grazed = mushroom(-3)
-      grazed.userData.placement = item('vaccinium-myrtillus')
-      const grassBlade = new THREE.Mesh(new THREE.PlaneGeometry(2, 2))
-      grassBlade.position.set(0, 0, -1)
-      grassBlade.updateMatrixWorld(true)
-      const target = tinyBerry(0.3, -3)
-      expect(nearestInView(camera, [grazed], 10, [grassBlade], [target])).toBe(target)
-    })
-
-    it('picks the nearer of two tiny objects both inside the cone', () => {
-      const near = tinyBerry(0, -2)
-      const far = tinyBerry(0, -5)
-      expect(nearestInView(camera, [], 10, [], [far, near])).toBe(near)
+      // of each other (ecology/spawn.ts's COLONY_SPREAD) — one neighbour
+      // sitting nearby must never be mistaken for the one actually dead
+      // ahead of the crosshair.
+      const target = tinyBerry(0, -3)
+      const neighbour = tinyBerry(0.4, -3)
+      expect(nearestInView(camera, [target, neighbour], 10)).toBe(target)
     })
   })
 })
