@@ -31,6 +31,17 @@ declare global {
   interface Window { __READY?: boolean; __BOOTCHECK?: boolean }
 }
 
+// PWA: an icon on the home screen and a wood that still opens with no signal
+// once it has been visited once. Registered outside main() and unguarded by
+// __BOOTCHECK — this is independent of the game ever loading, and a failed
+// registration (an older browser, a disabled service worker) is silently
+// fine either way, the same as any other progressive enhancement.
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {})
+  })
+}
+
 /** How far you can reach to pick, metres. */
 const REACH = 3
 const BASKET_CAPACITY = 24

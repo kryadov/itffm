@@ -1,0 +1,12 @@
+{
+  "name": "itffm — В лес по грибы",
+  "short_name": "itffm",
+  "description": "A first-person game about picking mushrooms, and a mushroom encyclopedia in the same breath.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10140f",
+  "theme_color": "#10140f",
+  "lang": "ru",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
