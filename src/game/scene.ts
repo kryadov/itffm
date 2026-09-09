@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { buildGround } from '../world/ground'
 import { buildTreeMeshes, treePerches, type Tree } from '../world/trees'
 import { createBirds } from '../world/birds'
+import { createHares, createSquirrels, placeCritterHomes } from '../world/critters'
 import { mulberry32 } from '../util/rng'
 import {
   placeLogs,
@@ -126,6 +127,9 @@ export interface Forest {
   updateCampfire: (dt: number) => void
   /** Drifts the flock — call every frame with the player's own position. */
   updateBirds: (dt: number, playerX: number, playerZ: number) => void
+  /** Steps hares and squirrels — call every frame with the player's own
+   *  position, same as `updateBirds`. */
+  updateCritters: (dt: number, playerX: number, playerZ: number) => void
   /** Ripples every stream, breathes every waterfall's spray and bobs every
    *  spring — call every frame. */
   updateWater: (dt: number) => void
@@ -310,6 +314,20 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))
   const updateBirds = (dt: number, playerX: number, playerZ: number): void => birds.update(dt, playerX, playerZ)
 
+  // Ground fauna: see docs/superpowers/specs/2026-09-10-wildlife-design.md.
+  // Homes are scattered independently of the tree perches birds/squirrels
+  // land in — a squirrel idles on the ground and only takes to a trunk when
+  // it flees.
+  const perches = treePerches(source.trees)
+  const hareHomes = placeCritterHomes(source.ground, halfSize, seed + 20, 5, [...treeCircles, ...extraObstacles])
+  const hares = createHares(scene, mulberry32(seed + 21), 5, source.ground, hareHomes)
+  const squirrelHomes = placeCritterHomes(source.ground, halfSize, seed + 22, 5, [...treeCircles, ...extraObstacles])
+  const squirrels = createSquirrels(scene, mulberry32(seed + 23), 5, source.ground, squirrelHomes, perches)
+  const updateCritters = (dt: number, playerX: number, playerZ: number): void => {
+    hares.update(dt, playerX, playerZ)
+    squirrels.update(dt, playerX, playerZ)
+  }
+
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
   const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
@@ -358,7 +376,8 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds, updateWater,
+    setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds,
+    updateCritters, updateWater,
     updateMushroomLod,
   }
 }
