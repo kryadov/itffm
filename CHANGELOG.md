@@ -6,6 +6,66 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.71.0
+Real moon phases in the night sky — `world/moonPhase.ts` reads tonight's
+actual synodic-month phase from the system clock; the shader moon shows a
+real crescent/gibbous terminator instead of a dimmer full disc.
+
+## v0.70.0
+The hare and squirrel got a real head instead of ears glued straight onto
+the body — the actual fix for "reads as a blob, not an animal."
+
+## v0.69.0
+No two mushrooms alike: the cap's lathe-swept radius wobbles by angle and
+the stipe leans by height, both growing with age. Measurements that decide
+identification (cap/stipe size, gill/ring/volva sizing) stay untouched.
+
+## v0.68.0
+Infinite world for the offline/demo wood — chunked terrain, trees and
+ecology stream in around the player past the old fixed edge. A named real
+place stays bounded, as before.
+
+## v0.67.0
+Fixed mouse-look needing an unexplained second click after "Go" — Pointer
+Lock is requested where the place-picker's own click actually happens, not
+only on the canvas.
+
+## v0.66.0
+Fixed the consent screen being unreachable on real mobile browsers — the
+overlay now scrolls instead of assuming it always fits the visible viewport.
+
+## v0.65.0
+Wildlife (3/3): a wild hive against a tree, bees, and dragonflies over
+ponds — a swarm module, separate from the ground-critter state machine.
+
+## v0.64.0
+Wildlife (2/3): a snake, reusing the same ground-critter state machine with
+a slow "creeps away" instead of a bolt.
+
+## v0.63.0
+Wildlife (1/3): a shared ground-critter architecture, plus hares and
+squirrels — one state machine instead of five ad hoc systems.
+
+## v0.62.0
+A fisherman's hut and a boat at the shore, wherever the wood actually has
+water.
+
+## v0.61.0
+Furniture inside the hut — a table, a bed, a painting, a cup.
+
+## v0.60.0
+Walk into the hut — a working, hinged door.
+
+## v0.59.0
+Invert-Y mouse setting.
+
+## v0.58.0
+A campfire with a pot and a bench, apart from the hut.
+
+## v0.57.0
+Fixed the hut's toy-sized scale, and firewood that poked through its own
+wall.
+
 ## v0.56.0
 LOD для собранных находок — дешёвый силуэт (конус на bounding box, цвет
 усреднён из запечённых вершинных цветов) дальше 18м, настоящая геометрия
