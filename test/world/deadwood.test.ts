@@ -46,6 +46,14 @@ describe('placeLogs', () => {
     const dense = placeLogs(ground, 90, 3, 0.002)
     expect(dense.length).toBeGreaterThan(sparse.length)
   })
+
+  it('clusters around an optional chunkOrigin instead of world (0, 0)', () => {
+    const origin = { x: 1000, z: -400 }
+    for (const log of placeLogs(ground, 90, 3, 0.0008, origin)) {
+      expect(Math.abs(log.x - origin.x)).toBeLessThanOrEqual(90)
+      expect(Math.abs(log.z - origin.z)).toBeLessThanOrEqual(90)
+    }
+  })
 })
 
 describe('placeStumps', () => {

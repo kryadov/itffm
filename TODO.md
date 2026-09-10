@@ -910,25 +910,39 @@ actually shipped this pass" section this list mirrors.
       forced to `CHUNK_SIZE / 2` the same way without changing what a
       player actually asked for.
 - [x] **Landmarks, wildlife and decorative scatter stay confined to the
-      home plot.** Partly done this session — hares and squirrels now
-      follow the player into streamed chunks: `game/worldStream.ts`'s
-      `buildChunk` places 2 of each per chunk (`placeCritterHomes`, `create
-      Hares`/`createSquirrels`, `world/critters.ts`), seeded off the chunk
-      the same way its trees/sites are, disposed alongside it when it
-      unloads. Needed `util/openSpot.ts`'s `findOpenSpot` to grow an
-      optional `worldCenter` param first — its clearance bound was always
-      measured from world (0, 0), so a chunk far from the origin would have
-      failed that bound at every candidate and silently returned an
-      unchecked, possibly-inside-an-obstacle spot. Verified by `worldStream
-      .test.ts` (creation and disposal tracking a chunk's own lifecycle) and
-      a live headless run 900m out — `hares`/`squirrels` groups present in
-      the scene graph as chunks streamed in, no console errors beyond the
-      already-documented headless Pointer Lock limitation. Deliberately NOT
-      extended: the hut, campfire, fisherman's hut, wild hive/bees,
+      home plot.** Done this session in two passes:
+      1. Hares and squirrels now follow the player into streamed chunks:
+         `game/worldStream.ts`'s `buildChunk` places 2 of each per chunk
+         (`placeCritterHomes`, `createHares`/`createSquirrels`,
+         `world/critters.ts`), seeded off the chunk the same way its
+         trees/sites are, disposed alongside it when it unloads. Needed
+         `util/openSpot.ts`'s `findOpenSpot` to grow an optional
+         `worldCenter` param first — its clearance bound was always
+         measured from world (0, 0), so a chunk far from the origin would
+         have failed that bound at every candidate and silently returned
+         an unchecked, possibly-inside-an-obstacle spot.
+      2. Boulders, deadwood (logs/stumps/leaning trees), undergrowth and
+         flora/grass also now scatter per chunk, at their own home-plot
+         default densities — `placeBoulders`/`placeLogs`/`placeStumps`/
+         `placeLeaningTrees`/`placeBushes`/`placeFlora`/`placeGrass` all
+         gained the same optional `chunkOrigin` param. **Measured, not
+         guessed:** feeding their spawn points into `buildSites` the way
+         the home plot does (real deadwood/moss ecology sites) was tried
+         first and reverted — it pushed one chunk's site count from 200 to
+         ~950 and its own build cost from ~20ms to ~78ms, enough to take
+         the whole `worldStream.test.ts` suite from ~30s past two minutes
+         across the many chunks its tests build. Shipped as visual-only
+         scatter instead (no ecology-site feed), which measured back at
+         the original ~30-35s suite time.
+      Verified by `worldStream.test.ts` (creation/disposal tracking a
+      chunk's own lifecycle for both passes) and live headless runs 900m
+      out — `hares`/`squirrels` groups and visible boulders/scatter in the
+      scene graph as chunks streamed in, no console errors beyond the
+      already-documented headless Pointer Lock limitation. Deliberately
+      NOT extended: the hut, campfire, fisherman's hut, wild hive/bees,
       dragonflies, snakes (their home-plot count — "two to a wood" — means
-      something only if it doesn't repeat per chunk), and the InstancedMesh
-      decorative scatter (boulders, deadwood, undergrowth, flora, grass) —
-      each is either a one-per-wood landmark or its own separate follow-up.
+      something only if it doesn't repeat per chunk) — each is a
+      one-per-wood landmark, not a follow-up.
 - [x] **"Размer участка" (world-size picker) loses its old meaning for the
       demo wood.** Done — no design pass actually needed: `go()` itself
       already falls back to the demo wood on an empty query (same as

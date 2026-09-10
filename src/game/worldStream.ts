@@ -7,6 +7,11 @@ import { regionalMix } from '../world/osmTrees'
 import { buildGround } from '../world/ground'
 import { buildSites } from '../ecology/sites'
 import { createHares, createSquirrels, placeCritterHomes, type CritterGroup } from '../world/critters'
+import { placeBoulders, buildBoulderMeshes } from '../world/boulders'
+import { placeLogs, placeStumps, placeLeaningTrees, buildDeadwoodMeshes, buildLeaningTreeMeshes } from '../world/deadwood'
+import { placeBushes, buildBushMeshes } from '../world/undergrowth'
+import { placeFlora, buildFloraMeshes } from '../world/flora'
+import { placeGrass, buildGrassMesh } from '../world/grass'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
 import { buildPlacementObject } from '../collectible/placement'
 import { loadSpecies } from '../species/load'
@@ -173,6 +178,31 @@ export function createWorldStream(
     const trees = placeTrees(baseTerrain, half, seed + 1, mix, TREE_DENSITY, origin)
     group.add(buildTreeMeshes(trees))
 
+    // Decorative scatter, chunked — the same generators the home plot uses
+    // (`game/scene.ts`), at their own default densities: the demo wood's own
+    // home plot is itself exactly one chunk's area now (`CHUNK_SIZE / 2`,
+    // see `game/loadForest.ts`), so there is no "forty times bigger" density
+    // problem here the way real trees/sites had (TREE_DENSITY/
+    // CHUNK_SITE_COUNT above) — this chunk and the home plot are the same
+    // size. Deliberately NOT feeding logs/boulders into `buildSites` the way
+    // the home plot does (real deadwood/moss ecology sites) — measured
+    // during this session: doing so pushed one chunk's site count from 200
+    // to ~950 (every log/boulder contributes several spawn points) and its
+    // own build cost from ~20ms to ~78ms, enough to take the whole test
+    // suite from ~30s to over two minutes across many chunks. Visual-only
+    // scatter here; real ecology sites on deadwood/moss stay home-plot-only.
+    const logs = placeLogs(ground, half, seed + 4, undefined, origin)
+    const stumps = placeStumps(ground, half, seed + 5, undefined, origin)
+    const leaningTrees = placeLeaningTrees(ground, half, seed + 6, undefined, origin)
+    group.add(buildDeadwoodMeshes(logs, stumps))
+    group.add(buildLeaningTreeMeshes(leaningTrees))
+    const boulders = placeBoulders(ground, half, seed + 7, undefined, origin)
+    group.add(buildBoulderMeshes(boulders))
+    const bushes = placeBushes(ground, half, seed + 8, undefined, origin)
+    group.add(buildBushMeshes(bushes))
+    group.add(buildFloraMeshes(placeFlora(ground, half, seed + 9, undefined, origin)))
+    group.add(buildGrassMesh(placeGrass(ground, half, seed + 10, origin)))
+
     const sites = buildSites(ground, trees, half, seed + 2, biomeAt, CHUNK_SITE_COUNT, [], [], [], origin)
     const month = new Date().getMonth() + 1
     const placements: Placement[] = spawnMushrooms(species, sites, { month, seed: seed + 3, daysSinceRain: 2 })
@@ -194,11 +224,11 @@ export function createWorldStream(
     // home plot's own wildlife), so they're tracked and disposed here
     // through the returned CritterGroup handles instead.
     const treeCircles = trees.map((t) => ({ x: t.x, z: t.z, radius: t.radius }))
-    const hareHomes = placeCritterHomes(ground, half, seed + 10, CHUNK_HARE_COUNT, treeCircles, 1.5, origin)
-    const hares = createHares(scene, mulberry32(seed + 11), CHUNK_HARE_COUNT, ground, hareHomes)
-    const squirrelHomes = placeCritterHomes(ground, half, seed + 12, CHUNK_SQUIRREL_COUNT, treeCircles, 1.5, origin)
+    const hareHomes = placeCritterHomes(ground, half, seed + 20, CHUNK_HARE_COUNT, treeCircles, 1.5, origin)
+    const hares = createHares(scene, mulberry32(seed + 21), CHUNK_HARE_COUNT, ground, hareHomes)
+    const squirrelHomes = placeCritterHomes(ground, half, seed + 22, CHUNK_SQUIRREL_COUNT, treeCircles, 1.5, origin)
     const squirrels = createSquirrels(
-      scene, mulberry32(seed + 13), CHUNK_SQUIRREL_COUNT, ground, squirrelHomes, treePerches(trees),
+      scene, mulberry32(seed + 23), CHUNK_SQUIRREL_COUNT, ground, squirrelHomes, treePerches(trees),
     )
 
     scene.add(group)

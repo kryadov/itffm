@@ -37,4 +37,12 @@ describe('placeFlora', () => {
     // flowers across a 180x180m plot would not be that.
     expect(placeFlora(ground, 90, 5).length).toBeGreaterThan(100)
   })
+
+  it('clusters around an optional chunkOrigin instead of world (0, 0)', () => {
+    const origin = { x: 1000, z: -400 }
+    for (const f of placeFlora(ground, 90, 3, 0.01, origin)) {
+      expect(Math.abs(f.x - origin.x)).toBeLessThanOrEqual(90)
+      expect(Math.abs(f.z - origin.z)).toBeLessThanOrEqual(90)
+    }
+  })
 })

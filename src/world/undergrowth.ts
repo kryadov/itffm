@@ -45,6 +45,7 @@ export function placeBushes(
   halfSize: number,
   seed: number,
   density = 0.002,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): Bush[] {
   const rng = mulberry32(seed)
   const area = halfSize * 2 * halfSize * 2
@@ -52,8 +53,8 @@ export function placeBushes(
   const bushes: Bush[] = []
 
   for (let i = 0; i < attempts; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
+    const x = chunkOrigin.x + (rng() * 2 - 1) * halfSize
+    const z = chunkOrigin.z + (rng() * 2 - 1) * halfSize
     if (fbm2(x / PATCH_SCALE, z / PATCH_SCALE, seed + 31, 2) < PATCH_THRESHOLD) continue
     if (bushes.some((b) => Math.hypot(b.x - x, b.z - z) < MIN_GAP)) continue
     bushes.push({

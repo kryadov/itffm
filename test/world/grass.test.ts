@@ -41,6 +41,14 @@ describe('placeGrass', () => {
     const dry = placeGrass(flat, 40, 5).filter((t) => Math.hypot(t.x, t.z) < 4).length
     expect(wet).toBeGreaterThan(dry)
   })
+
+  it('clusters around an optional chunkOrigin instead of world (0, 0)', () => {
+    const origin = { x: 1000, z: -400 }
+    for (const t of placeGrass(flat, 20, 5, origin)) {
+      expect(Math.abs(t.x - origin.x)).toBeLessThanOrEqual(20)
+      expect(Math.abs(t.z - origin.z)).toBeLessThanOrEqual(20)
+    }
+  })
 })
 
 describe('buildGrassMesh', () => {

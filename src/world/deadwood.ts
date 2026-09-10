@@ -57,6 +57,7 @@ function scatter(
   halfSize: number,
   seed: number,
   density: number,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): { x: number; z: number; y: number }[] {
   const rng = mulberry32(seed)
   const area = halfSize * 2 * halfSize * 2
@@ -64,8 +65,8 @@ function scatter(
   const placed: { x: number; z: number; y: number }[] = []
 
   for (let i = 0; i < attempts; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
+    const x = chunkOrigin.x + (rng() * 2 - 1) * halfSize
+    const z = chunkOrigin.z + (rng() * 2 - 1) * halfSize
     if (placed.some((p) => Math.hypot(p.x - x, p.z - z) < MIN_GAP)) continue
     placed.push({ x, z, y: ground.heightAt(x, z) })
   }
@@ -87,8 +88,9 @@ export function placeLogs(
   halfSize: number,
   seed: number,
   density = 0.0008,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): Log[] {
-  const scattered = scatter(ground, halfSize, seed, density)
+  const scattered = scatter(ground, halfSize, seed, density, chunkOrigin)
   const rng = mulberry32(seed + 97)
   return scattered.map((p) => ({
     ...p,
@@ -108,8 +110,9 @@ export function placeLeaningTrees(
   halfSize: number,
   seed: number,
   density = 0.00015,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): LeaningTree[] {
-  const scattered = scatter(ground, halfSize, seed, density)
+  const scattered = scatter(ground, halfSize, seed, density, chunkOrigin)
   const rng = mulberry32(seed + 71)
   return scattered.map((p) => ({
     ...p,
@@ -128,8 +131,9 @@ export function placeStumps(
   halfSize: number,
   seed: number,
   density = 0.0004,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): Stump[] {
-  const scattered = scatter(ground, halfSize, seed, density)
+  const scattered = scatter(ground, halfSize, seed, density, chunkOrigin)
   const rng = mulberry32(seed + 53)
   return scattered.map((p) => ({
     ...p,

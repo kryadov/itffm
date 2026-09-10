@@ -31,6 +31,7 @@ export function placeBoulders(
   halfSize: number,
   seed: number,
   density = 0.0003,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): Boulder[] {
   const rng = mulberry32(seed)
   const area = halfSize * 2 * halfSize * 2
@@ -38,8 +39,8 @@ export function placeBoulders(
   const boulders: Boulder[] = []
 
   for (let i = 0; i < attempts; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
+    const x = chunkOrigin.x + (rng() * 2 - 1) * halfSize
+    const z = chunkOrigin.z + (rng() * 2 - 1) * halfSize
     if (boulders.some((b) => Math.hypot(b.x - x, b.z - z) < MIN_GAP)) continue
     boulders.push({ x, z, y: ground.heightAt(x, z), radius: 0.3 + rng() * 1.0 })
   }

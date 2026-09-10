@@ -26,6 +26,14 @@ describe('placeBoulders', () => {
       expect(b.radius).toBeLessThan(1.5)
     }
   })
+
+  it('clusters around an optional chunkOrigin instead of world (0, 0)', () => {
+    const origin = { x: 1000, z: -400 }
+    for (const b of placeBoulders(ground, 90, 3, 0.0003, origin)) {
+      expect(Math.abs(b.x - origin.x)).toBeLessThanOrEqual(90)
+      expect(Math.abs(b.z - origin.z)).toBeLessThanOrEqual(90)
+    }
+  })
 })
 
 describe('boulderObstacle', () => {

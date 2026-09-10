@@ -32,16 +32,28 @@ const MAX_TUFTS = 9000
  * reads `moistureAt` (ecology/sites.ts) — the same hollow that already grows
  * a wetter mushroom site grows thicker grass over it, for the same reason.
  */
-export function placeGrass(ground: ElevationProvider, halfSize: number, seed: number): GrassTuft[] {
+export function placeGrass(
+  ground: ElevationProvider,
+  halfSize: number,
+  seed: number,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
+): GrassTuft[] {
   const tufts: GrassTuft[] = []
   const reach = Math.ceil(halfSize / CELL)
+  // The lattice's own cell index stays in absolute world coordinates (not
+  // shifted to start at 0 for each chunk) — the same world cell always
+  // grows the same tuft regardless of which chunk asked for it, the same
+  // "sample the continuous field at the real position" principle
+  // undergrowth's patch noise already follows.
+  const originGx = Math.round(chunkOrigin.x / CELL)
+  const originGz = Math.round(chunkOrigin.z / CELL)
 
-  outer: for (let gx = -reach; gx <= reach; gx++) {
-    for (let gz = -reach; gz <= reach; gz++) {
+  outer: for (let gx = originGx - reach; gx <= originGx + reach; gx++) {
+    for (let gz = originGz - reach; gz <= originGz + reach; gz++) {
       const rng = mulberry32(hashString(`grass:${gx}:${gz}:${seed}`))
       const x = gx * CELL + (rng() - 0.5) * CELL
       const z = gz * CELL + (rng() - 0.5) * CELL
-      if (Math.abs(x) > halfSize || Math.abs(z) > halfSize) continue
+      if (Math.abs(x - chunkOrigin.x) > halfSize || Math.abs(z - chunkOrigin.z) > halfSize) continue
 
       const moisture = moistureAt(ground, x, z)
       const chance = Math.max(0.02, Math.min(0.95, BASE_CHANCE + (moisture - 0.5) * MOISTURE_WEIGHT))

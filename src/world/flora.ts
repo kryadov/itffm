@@ -27,6 +27,7 @@ export function placeFlora(
   halfSize: number,
   seed: number,
   density = 0.01,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): Flora[] {
   const rng = mulberry32(seed)
   const area = halfSize * 2 * halfSize * 2
@@ -34,8 +35,8 @@ export function placeFlora(
   const plants: Flora[] = []
 
   for (let i = 0; i < count; i++) {
-    const x = (rng() * 2 - 1) * halfSize
-    const z = (rng() * 2 - 1) * halfSize
+    const x = chunkOrigin.x + (rng() * 2 - 1) * halfSize
+    const z = chunkOrigin.z + (rng() * 2 - 1) * halfSize
     const kind = pickWeighted(rng, ['fern', 'flower'] as const, (k) => (k === 'fern' ? 0.65 : 0.35)) ?? 'fern'
     plants.push({
       x,
