@@ -955,7 +955,13 @@ actually shipped this pass" section this list mirrors.
 
 - [ ] **Сезоны и календарь.** Сейчас в лесу вечный сентябрь после дождя.
       Календарь превращает `season` из фильтра в механику: за одну вылазку всех
-      видов не собрать, надо возвращаться.
+      видов не собрать, надо возвращаться. Re-checked this session: not a
+      pure code task — the mechanic's actual shape is a game-design call
+      the code cannot make on its own (how much real time per in-game
+      season, whether returning days later is fun pacing or just friction,
+      whether the calendar advances on its own or only when the player
+      chooses to "wait"). Needs that decision before there is anything
+      concrete to build against `species.ecology.season`.
 - [x] **Собственные заметки к находке** — где нашёл, дата, своя пометка. Готово
       (v0.42.0): `Find.note?` (`save/store.ts`) + чистая `setFindNote(save,
       at, note)` в том же стиле, что `applyFind` (новый объект, старый не
