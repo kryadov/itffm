@@ -82,6 +82,23 @@ describe('createBirds', () => {
     expect(scene.getObjectByName('birds')!.visible).toBe(false)
   })
 
+  it('positions() matches where each bird was actually rendered', () => {
+    const { scene, birds } = build(4)
+    birds.update(1 / 30, 5, -3)
+    const body = scene.getObjectByName('birds')!.children[0] as THREE.InstancedMesh
+    const m = new THREE.Matrix4()
+    const pos = new THREE.Vector3()
+    const reported = birds.positions()
+    expect(reported).toHaveLength(4)
+    for (let i = 0; i < body.count; i++) {
+      body.getMatrixAt(i, m)
+      pos.setFromMatrixPosition(m)
+      expect(reported[i].x).toBeCloseTo(pos.x, 5)
+      expect(reported[i].y).toBeCloseTo(pos.y, 5)
+      expect(reported[i].z).toBeCloseTo(pos.z, 5)
+    }
+  })
+
   it('disposes without throwing', () => {
     const { scene, birds } = build(1)
     expect(() => birds.dispose()).not.toThrow()

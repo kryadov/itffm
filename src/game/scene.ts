@@ -130,6 +130,9 @@ export interface Forest {
   updateCampfire: (dt: number) => void
   /** Drifts the flock — call every frame with the player's own position. */
   updateBirds: (dt: number, playerX: number, playerZ: number) => void
+  /** Every bird's current position, for `audio/birdCalls.ts` to pick a
+   *  caller from — a snapshot, not a live reference. */
+  birdPositions: () => { x: number; y: number; z: number }[]
   /** Steps hares and squirrels — call every frame with the player's own
    *  position, same as `updateBirds`. */
   updateCritters: (dt: number, playerX: number, playerZ: number) => void
@@ -325,6 +328,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))
   const updateBirds = (dt: number, playerX: number, playerZ: number): void => birds.update(dt, playerX, playerZ)
+  const birdPositions = (): ReturnType<typeof birds.positions> => birds.positions()
 
   // Ground fauna: see docs/superpowers/specs/2026-09-10-wildlife-design.md.
   // Homes are scattered independently of the tree perches birds/squirrels
@@ -406,7 +410,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds,
-    updateCritters, updateInsects, updateWater,
+    birdPositions, updateCritters, updateInsects, updateWater,
     updateMushroomLod,
   }
 }

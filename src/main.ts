@@ -7,7 +7,9 @@ import { createControls } from './game/controls'
 import { createTouchControls } from './game/touchControls'
 import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
+import { birdPan, birdGain, nearestBird } from './audio/birdCalls'
 import { distanceToRing } from './util/geometry'
+import { mulberry32 } from './util/rng'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
@@ -53,6 +55,14 @@ const BASKET_CAPACITY = 24
 /** How close to a pond/stream ring a footstep reads as "water" underfoot —
  *  close enough to be at its edge, not merely somewhere in view of it. */
 const WATER_FOOTSTEP_RADIUS = 1.5
+/** How far a bird call still carries, metres — past this the flock is
+ *  simply out of earshot (`audio/birdCalls.ts`'s `birdGain`/`nearestBird`). */
+const BIRD_CALL_RADIUS = 60
+/** How long, in real seconds, between one bird call and the next roll for
+ *  another — wide enough that the wood isn't a chorus every second, narrow
+ *  enough that a flock nearby is heard now and then, not never. */
+const BIRD_CALL_MIN_GAP = 4
+const BIRD_CALL_MAX_GAP = 11
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
 
@@ -202,6 +212,12 @@ async function main(): Promise<void> {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
     bobPhase: 0,
   }
+  // Bird calls: a random wait, then whichever bird happens to be nearest
+  // when it elapses — same "roll a duration, count it down" shape as
+  // `world/birds.ts`'s own perch timers, just for the audio side instead.
+  const birdCallRand = mulberry32(seed + 40)
+  let birdCallTimer = BIRD_CALL_MIN_GAP + birdCallRand() * (BIRD_CALL_MAX_GAP - BIRD_CALL_MIN_GAP)
+
   let aimed: THREE.Object3D | null = null
   // Whether the player is close enough to the shelter's own doorway for `E`
   // to open/close it instead of examining an aimed mushroom — a plain
@@ -636,6 +652,19 @@ async function main(): Promise<void> {
           (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
         )
         audio.footstep(footstepSubstrate(biome, nearWater))
+      }
+
+      birdCallTimer -= dt
+      if (birdCallTimer <= 0) {
+        birdCallTimer = BIRD_CALL_MIN_GAP + birdCallRand() * (BIRD_CALL_MAX_GAP - BIRD_CALL_MIN_GAP)
+        const caller = nearestBird(forest.birdPositions(), player.x, player.z, BIRD_CALL_RADIUS)
+        if (caller) {
+          const dist = Math.hypot(caller.x - player.x, caller.z - player.z)
+          audio.birdCall(
+            birdPan(player.x, player.z, player.yaw, caller.x, caller.z),
+            birdGain(dist, BIRD_CALL_RADIUS),
+          )
+        }
       }
 
       // A tap stands for "aim at it and press E" in one motion — see

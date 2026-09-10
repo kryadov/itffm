@@ -7,12 +7,13 @@ import type { FootstepSubstrate } from './footsteps'
  * and synthesized-engine content is that project's own game, not this one's
  * (CLAUDE.md's own note on the donor project).
  *
- * No CC0 recording, by choice, for either sound this game has: the whole
+ * No CC0 recording, by choice, for any sound this game has: the whole
  * game draws without pictures (see CLAUDE.md's Conventions) — mushrooms,
  * terrain and litter are all generated from a handful of numbers rather
- * than shipped as assets — and a synthesized "dry cut" or footstep thud (a
- * short filtered noise burst, not a sampled recording) is the same idea
- * applied to sound. That only holds for a short, discrete EVENT, though:
+ * than shipped as assets — and a synthesized "dry cut", footstep thud, or
+ * bird chirp (a short filtered noise burst or a couple of oscillator
+ * notes, not a sampled recording) is the same idea applied to sound. That
+ * only holds for a short, discrete EVENT, though:
  * the broader ambient-sound plan (continuous wind, a babbling stream — see
  * TODO.md's 🔊 section) is a different problem, where synthesis does not
  * read as a real recorded place convincingly the way one sharp noise burst
@@ -141,6 +142,38 @@ export class AudioEngine {
       plopGain.connect(this.sfxGain)
       plop.start(t)
       plop.stop(t + 0.09)
+    }
+  }
+
+  /**
+   * A short two-note chirp from a bird in the flock (`audio/birdCalls.ts`
+   * decides which bird, and this call's own `pan`/`gain`) — another short
+   * discrete event, same synthesis-is-honest-here reasoning as `collect()`
+   * and `footstep()` above, not the continuous-texture case TODO.md's 🔊
+   * section still wants a real recording for. Two quick upward chirps read
+   * as a bird call; one long tone reads as a siren.
+   */
+  birdCall(pan: number, gain: number): void {
+    if (!this.ctx || !this.sfxGain || this.volume <= 0 || gain <= 0) return
+    const ctx = this.ctx
+    const t = ctx.currentTime
+    const panner = ctx.createStereoPanner()
+    panner.pan.value = Math.max(-1, Math.min(1, pan))
+    panner.connect(this.sfxGain)
+
+    const NOTE_GAP = 0.09
+    for (const start of [0, NOTE_GAP]) {
+      const osc = ctx.createOscillator()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(2600, t + start)
+      osc.frequency.exponentialRampToValueAtTime(3400, t + start + 0.04)
+      const g = ctx.createGain()
+      g.gain.setValueAtTime(0.22 * gain, t + start)
+      g.gain.exponentialRampToValueAtTime(0.0008, t + start + 0.06)
+      osc.connect(g)
+      g.connect(panner)
+      osc.start(t + start)
+      osc.stop(t + start + 0.07)
     }
   }
 }

@@ -394,8 +394,21 @@
       walk with no exceptions thrown from the audio wiring.
 - [ ] **Вода** — речка и озеро слышны раньше, чем видны, и громче вблизи. Это
       даёт настоящий ориентир в лесу, где ориентиров мало.
-- [ ] **Птицы** — привязать к стае из `birds.ts`, чтобы голос шёл из точки, где
-      птица сидит, а не из ниоткуда.
+- [x] **Птицы** — привязать к стае из `birds.ts`, чтобы голос шёл из точки, где
+      птица сидит, а не из ниоткуда. Done: re-triaged this session — this
+      was grouped with the continuous-ambient items above (wind, water),
+      but a single call is a short discrete event like `collect()`/
+      `footstep()`, not a texture, so it doesn't need a real recording.
+      `world/birds.ts`'s `Bird` now tracks its own last-rendered `x/y/z`
+      (cached at the exact point `update()` already computes it for
+      rendering, no new math) and exposes them via a new `positions()`;
+      `audio/birdCalls.ts`'s pure `birdPan`/`birdGain`/`nearestBird` decide
+      which bird calls and how it should sound from where the player
+      stands; `AudioEngine.birdCall()` synthesizes a two-note chirp through
+      a `StereoPannerNode`. `main.ts` rolls a random 4-11s wait between
+      calls (`world/birds.ts`'s own perch-timer shape, just for audio).
+      Verified: 12 new unit tests for the pure pan/gain/picker logic, plus
+      a live headless run with zero console errors.
 - [x] **Сбор гриба** — короткий сухой звук среза. Готово, но осознанным
       отступлением от "источника записей" ниже: не CC0-запись, а
       синтезированный звук (короткий шумовой всплеск через `highpass`-фильтр

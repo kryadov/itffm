@@ -6,6 +6,9 @@ export interface Birds {
   update(dt: number, playerX: number, playerZ: number): void
   setEnabled(on: boolean): void
   dispose(): void
+  /** Every bird's last-rendered world position — a snapshot, not a live
+   *  reference, so the caller can hold onto it past the next `update()`. */
+  positions(): { x: number; y: number; z: number }[]
 }
 
 /** A flock this size reads as birds; one bird crossing the sky reads as a bug. */
@@ -341,6 +344,14 @@ interface Bird {
   toY: number
   toZ: number
   landDur: number
+
+  // The world position `update()` actually rendered this bird at last —
+  // `positions()` reads these back for anything outside that wants "where
+  // is a bird right now" without redoing the state machine's own math
+  // (`audio/birdCalls.ts`'s call-site picker).
+  x: number
+  y: number
+  z: number
 }
 
 /**
@@ -433,6 +444,9 @@ export function createBirds(
       toY: 0,
       toZ: 0,
       landDur: 1,
+      x: 0,
+      y: 0,
+      z: 0,
     })
     col.setHex(pickPlumage(rand))
     body.setColorAt(i, col)
@@ -529,6 +543,9 @@ export function createBirds(
   return {
     setEnabled(on) {
       group.visible = on
+    },
+    positions() {
+      return birds.map((b) => ({ x: b.x, y: b.y, z: b.z }))
     },
     dispose() {
       scene.remove(group)
@@ -772,6 +789,9 @@ export function createBirds(
         const bx = coreX + b.ox * os
         const bz = coreZ + b.oz * os
         const by = coreY
+        b.x = bx
+        b.y = by
+        b.z = bz
         const grounded = b.state === 'perched'
         qHeading.setFromAxisAngle(yAxis, heading)
         pos.set(bx, by, bz)
