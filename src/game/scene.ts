@@ -26,6 +26,7 @@ import {
 } from '../world/shelter'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
+import { placeMine, mineObstacles, buildMineMesh } from '../world/mine'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { moonPhase } from '../world/moonPhase'
@@ -88,6 +89,10 @@ export interface ForestSource {
    *  empty for a source with none, which is every source before plan 2 and
    *  most real woods since huts are rarely mapped at all. */
   shelters?: Vec2[]
+  /** A real cave/adit/mineshaft mouth (`geo/parse.ts`'s `CaveEntrance`), in
+   *  local metres — empty for a source with none, which is every source
+   *  before plan 2 and the offline demo wood (`world/demoForest.ts`) always. */
+  caves?: Vec2[]
 }
 
 export interface Forest {
@@ -347,6 +352,17 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     scene.add(buildFisherHutMesh(fisherHut))
     scene.add(buildBoatMesh(fisherHut.boat))
     extraObstacles.push(fisherHutObstacle(fisherHut))
+  }
+
+  // A mine/cave interior, but only where a surveyor actually found one — see
+  // world/mine.ts's own doc comment for why there is no procedural fallback.
+  // In range of the loaded plot at all: OSM's own query area is not the same
+  // shape as this circle, same filter world/shelter.ts's `mapped` uses.
+  const caveEntrance = (source.caves ?? []).find((c) => Math.abs(c.x) <= halfSize && Math.abs(c.z) <= halfSize)
+  if (caveEntrance) {
+    const mine = placeMine(caveEntrance, source.ground)
+    scene.add(buildMineMesh(mine))
+    extraObstacles.push(...mineObstacles(mine))
   }
 
   const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))

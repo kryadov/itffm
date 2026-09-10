@@ -107,7 +107,7 @@ function buildSource(
   const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize)
   return {
     ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water,
-    shelters: world.shelters.map((s) => s.at),
+    shelters: world.shelters.map((s) => s.at), caves: world.caves.map((c) => c.at),
   }
 }
 

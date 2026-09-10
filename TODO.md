@@ -875,21 +875,36 @@
       (временно раздвинут лесной полигон демо-леса и подставлена
       песчаная/болотная зона рядом с домиком) — дюна видна грядой на
       горизонте, болото — мельче и мягче, оба вернулись перед коммитом.
-- [ ] **Интерьер штольни.** Вход берётся из OSM (`cave_entrance`, `adit`,
-      `mineshaft`), а подземного пространства за ним пока нет — генерировать
-      предстоит самим. Re-checked this session: `world/biome.ts`'s
-      `cave-adit` is only an invisible 12m-radius tag around the OSM point
-      (`CAVE_RADIUS`) that steers which mushrooms spawn nearby on the
-      surface — no entrance mesh, no interior space, and it never appears
-      at all in the offline demo wood (`world/demoForest.ts`'s `caves: []`).
-      Genuinely architectural, not bounded: needs actual design decisions
-      first — is the interior a real walkable room carved into the terrain
-      or a teleport into a separate small scene, how does the player get
-      back out, what lights it (no sun underground), does the demo wood get
-      a synthesized entrance to make this visible/testable at all without a
-      real-place OSM cave nearby. Follows `world/shelter.ts`'s
-      procedural-structure pattern for the entrance itself, but the
-      interior is a new kind of space this game doesn't have yet.
+- [x] **Интерьер штольни.** Вход берётся из OSM (`cave_entrance`, `adit`,
+      `mineshaft`); `world/biome.ts`'s `cave-adit` was only an invisible
+      12m-radius tag around the point steering nearby mushroom spawn — no
+      entrance mesh, no interior. Re-checked this session: my own earlier
+      read of this as needing a new architecture (a teleport, a separate
+      scene) was wrong — `world/shelter.ts` already IS the exact precedent,
+      a real walkable interior built as ordinary ground-level geometry, no
+      teleport at all. `world/mine.ts` (new) follows it: `placeMine` sits
+      at a real `CaveEntrance` (`geo/parse.ts`) — no procedural fallback,
+      unlike the shelter, since a tunnel at an arbitrary point wouldn't
+      mean anything the way a hut in a clearing does. OSM never records
+      which way a mapped entrance faces, so the heading is read off the
+      terrain itself (whichever of 12 candidate directions climbs the most
+      over 8m is "into the hillside") rather than guessed or seeded.
+      `mineObstacles` (two side walls + a dead-end back wall, the same
+      wall-circle-chain technique as `wallObstacles`) and `buildMineMesh`
+      (floor/ceiling/walls plus a lantern `PointLight` — same small-shadow-
+      map recipe as the hearth light) round it out. Wired in `scene.ts`
+      only when `source.caves` actually has an entry in range — the demo
+      wood never does (`world/demoForest.ts`'s `caves: []`), same honest-
+      null pattern as the fisherman's hut with no water. Verified: 6 unit
+      tests (heading picks the real uphill direction, deterministic,
+      obstacles span both sides plus the back) and a live headless
+      screenshot with a temporarily synthesized demo-wood entrance (TEMP
+      DEBUG, reverted, `git diff` empty before commit) — a real structure
+      in the wood with a dark tunnel mouth and the lantern's warm glow
+      spilling out, sitting on the ground at a plausible scale next to the
+      shelter. Not yet tested against a real OSM-mapped entrance (network-
+      dependent, no guaranteed location to try) — the terrain-fit at a
+      genuinely steep real hillside remains unverified.
 - [ ] **Второй вид дюнного гриба** — *Peziza ammophila* растёт там же, что и
       *Psathyrella ammophila*, но морфологически это чашевидный аскомицет без
       привычной шляпки и ножки — та же проблема схемы, что и с трюфелем ниже,
