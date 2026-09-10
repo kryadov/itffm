@@ -27,6 +27,7 @@ import {
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
 import { placeMine, mineObstacles, buildMineMesh } from '../world/mine'
+import { placeRailLine, buildRailMesh, createTrain } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { moonPhase } from '../world/moonPhase'
@@ -148,6 +149,9 @@ export interface Forest {
   /** Steps hares and squirrels — call every frame with the player's own
    *  position, same as `updateBirds`. */
   updateCritters: (dt: number, playerX: number, playerZ: number) => void
+  /** Shuttles the train along its line — call every frame. Ambient: no
+   *  player position needed, same as `updateInsects` below. */
+  updateTrain: (dt: number) => void
   /** Drifts bees around the hive and dragonflies over the water, if either
    *  exists in this wood — call every frame. Ambient: unlike `updateCritters`,
    *  it needs no player position. */
@@ -274,6 +278,14 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
 
   scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt, seed + 17))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground, halfSize))
+
+  // A narrow-gauge line and a small train shuttling along it — the lowest-
+  // priority TODO item, a live request ported from race-the-city's own
+  // idea, not its city-scale code (see world/railway.ts's own doc comment).
+  const railLine = placeRailLine(source.ground, halfSize, seed + 29)
+  scene.add(buildRailMesh(railLine))
+  const train = createTrain(scene, railLine, seed + 30)
+  const updateTrain = (dt: number): void => train.update(dt)
   const water = buildWaterMeshes(source.water ?? [], source.ground)
   scene.add(water.group)
   const springs = placeSprings(source.water ?? [], halfSize, mulberry32(seed + 16), 3)
@@ -449,7 +461,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds,
-    birdPositions, updateCritters, updateInsects, updateWater,
+    birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
     updateMushroomLod,
   }
 }

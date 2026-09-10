@@ -701,6 +701,7 @@ async function main(): Promise<void> {
     forest.updateCritters(dt, player.x, player.z)
     worldStream?.updateCritters(dt, player.x, player.z)
     forest.updateInsects(dt)
+    forest.updateTrain(dt)
     forest.updateWater(dt)
     if (flashlightOn) forest.updateFlashlight(camera.position, camera.getWorldDirection(camDir))
 

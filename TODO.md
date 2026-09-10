@@ -352,13 +352,26 @@
       segmented chain, see its own screenshot from v0.64.0) and the bees/
       dragonflies (ambient background detail, not scrutinised up close the
       way a hare/squirrel is).
-- [ ] **Railway and a train.** A low-priority addition — a rail line and a
-      passing train through the wood, ported from `race-the-city`
-      (`kryadov/race-the-city` already has train/rail rendering for its own
-      city scale; per CLAUDE.md's own donor-code lesson, the class of
-      problem there is a car chasing traffic through a city, not a walk
-      through a wood — expect to take the rendering/track-following idea,
-      not the code as-is).
+- [x] **Railway and a train.** A low-priority addition — a rail line and a
+      passing train through the wood, ported from `race-the-city`'s own
+      idea (station platforms, level crossings, three train classes for a
+      real city network — none of it applies to a wood, per CLAUDE.md's
+      own donor-code lesson). `world/railway.ts` (new): `placeRailLine` is
+      a single straight narrow-gauge line offset from the middle (never
+      through the hut's own clearing), ground-following at each of a
+      handful of sampled points; `createTrain` shuttles a short 3-car train
+      back and forth along it (a dead-end spur, not a loop — no points, no
+      sidings, honest scope cuts from a real network). Runs in every wood,
+      demo or real-place, unconditionally — unlike the mine, this needs no
+      real survey data to mean something. Verified: 15 unit tests (line
+      placement, ground-height interpolation, the bounce-at-either-end
+      step function, car positions staying finite and in-bounds over a
+      long run) and two live headless screenshots — sleepers receding in
+      correct perspective with a train car visible down the line, and a
+      closer pass confirming the car's own colour/geometry, zero console
+      errors both times (temporary scene-exposure and teleport debug hooks
+      used to find and frame it, both reverted, `git diff` empty before
+      commit).
 
 ## 🚶 Ходьба и ориентирование
 
