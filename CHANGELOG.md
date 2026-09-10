@@ -6,6 +6,19 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.74.0
+Hares and squirrels now follow the player into the streamed chunks beyond
+the home plot, not just inside it.
+
+## v0.73.0
+Footsteps: a short synthesized sound per substrate underfoot (leaf litter,
+moss, sand, a splash near water), timed off the camera's own walking bob.
+
+## v0.72.0
+The "Размер участка" (world-size) picker now hides itself whenever it
+would have meant nothing — an empty place field already falls back to the
+demo wood, size and all.
+
 ## v0.71.0
 Real moon phases in the night sky — `world/moonPhase.ts` reads tonight's
 actual synodic-month phase from the system clock; the shader moon shows a
