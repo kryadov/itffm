@@ -28,6 +28,7 @@ import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/cam
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
+import { moonPhase } from '../world/moonPhase'
 import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
 import { buildPathMeshes } from '../world/paths'
@@ -171,6 +172,11 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // at the horizon.
   const sky = buildSky()
   scene.add(sky.mesh)
+  // Tonight's real moon phase — no in-game calendar exists yet to track its
+  // own (see TODO.md), and this reads honestly regardless rather than
+  // always drawing a full disc. Computed once: it moves too slowly for a
+  // session to notice it hasn't been resampled since load.
+  const moonPhaseNow = moonPhase(new Date())
   /** Sun position on a circle whose radius sets how high overhead it swings
    *  — matches the old fixed light's rough distance from the origin. */
   const SUN_DISTANCE = 90
@@ -196,7 +202,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     // dusk should read as a gradient, not a light switch.
     const sunVis = Math.max(0, elevation)
     const night = Math.max(0, Math.min(1, -elevation * 1.5))
-    sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night)
+    sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow)
     shelterFx?.setNight(night)
   }
   updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look

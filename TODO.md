@@ -248,11 +248,24 @@
       на экране. Когда дойдём до календаря (см. «Игра»), стоит завязать
       видимую погоду на то же значение, что двигает спавн, а не держать их
       двумя независимыми ручками.
-- [ ] **Moon phases.** `world/sky.ts`'s shader moon is always a plain lit
-      disc (`moonDisc`/`moonGlow`) regardless of date — no waxing/waning, no
-      crescent. A real phase (from the calendar, once that exists — see
-      "Игра" below) should render as an actual crescent/gibbous shape, not
-      just a dimmer full disc.
+- [x] **Moon phases.** Done — didn't wait for the in-game calendar
+      (`world/moonPhase.ts`'s `moonPhase(date)` reads the real synodic-month
+      phase for whatever real date the player is actually playing on, a
+      standard days-since-a-known-new-moon calculation; no calendar of its
+      own needed, and nothing to invalidate once one exists). `world/sky.ts`
+      now finds each fragment's local position on the moon's own disc
+      (right/up basis perpendicular to the moon direction) and lights a
+      fake hemisphere from a direction that itself rotates with the phase —
+      the same terminator geometry a real moon phase actually has, not a
+      dimmer full disc. Verified: unit tests for `moonPhase()` (known new
+      moon, half a month later ≈ full, wraps correctly) and, since the true
+      disc is tiny and the demo wood's trees made it hard to frame directly,
+      a live headless check with the disc's own lit-mask threshold
+      temporarily widened ~30× confirmed the underlying local-coordinate
+      math is a smooth, continuous, non-degenerate gradient across the
+      whole moon-relative angular space — the algebraic derivation (phase
+      0/0.25/0.5/0.75 → new/quarter/full/quarter, checked by hand) is what
+      the actual tight disc relies on.
 - [x] **Ручей, водопад, источники рядом с водоёмами.** Готово (v0.40.0):
       `world/water.ts` теперь различает пруд и ручей по форме кольца
       (`classifyWater` — замкнутое и компактное значит пруд, вытянутое или
