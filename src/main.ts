@@ -6,6 +6,8 @@ import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
 import { createTouchControls } from './game/touchControls'
 import { AudioEngine } from './audio/audio'
+import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
+import { distanceToRing } from './util/geometry'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
@@ -48,6 +50,9 @@ if ('serviceWorker' in navigator) {
 /** How far you can reach to pick, metres. */
 const REACH = 3
 const BASKET_CAPACITY = 24
+/** How close to a pond/stream ring a footstep reads as "water" underfoot —
+ *  close enough to be at its edge, not merely somewhere in view of it. */
+const WATER_FOOTSTEP_RADIUS = 1.5
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
 
@@ -618,12 +623,20 @@ async function main(): Promise<void> {
       const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome)
       const input = touch.active ? touch.read(dt) : controls.read(dt)
       const stepObstacles = worldStream ? [...obstacles, ...worldStream.obstacles()] : obstacles
+      const prevBobPhase = player.bobPhase
       player = stepPlayer(player, input, combinedGround, stepObstacles, speed)
       if (!worldStream) {
         player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
         player.z = Math.max(-halfSize, Math.min(halfSize, player.z))
       }
       worldStream?.update(player.x, player.z)
+
+      if (crossedFootstep(prevBobPhase, player.bobPhase)) {
+        const nearWater = (source.water ?? []).some(
+          (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
+        )
+        audio.footstep(footstepSubstrate(biome, nearWater))
+      }
 
       // A tap stands for "aim at it and press E" in one motion — see
       // game/touchControls.ts's own doc comment for why a crosshair is not

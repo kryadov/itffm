@@ -1,20 +1,22 @@
+import type { FootstepSubstrate } from './footsteps'
+
 /**
  * Sound in the wood. Only the mixer plumbing is ported from race-the-city's
  * own `src/audio/audio.ts` — one `AudioContext`, a single volume-controlled
  * gain node, resumed from a user gesture (autoplay policy). Its music/radio
  * and synthesized-engine content is that project's own game, not this one's
- * (CLAUDE.md's own note on the donor project) — what plays through the gain
- * here is `itffm`'s single sound so far: a snip when a mushroom is severed.
+ * (CLAUDE.md's own note on the donor project).
  *
- * No CC0 recording, by choice: the whole game draws without pictures (see
- * CLAUDE.md's Conventions) — mushrooms, terrain and litter are all generated
- * from a handful of numbers rather than shipped as assets — and a synthesized
- * "dry cut" (a short filtered noise burst, not a sampled snip) is the same
- * idea applied to the one sound effect the game has right now. The broader
- * ambient-sound plan (wind, footsteps, water — TODO.md's 🔊 section) is a
- * different problem: those need to sound like real recorded places, which
- * synthesis does not do convincingly, and that is where sourcing real CC0
- * recordings actually belongs.
+ * No CC0 recording, by choice, for either sound this game has: the whole
+ * game draws without pictures (see CLAUDE.md's Conventions) — mushrooms,
+ * terrain and litter are all generated from a handful of numbers rather
+ * than shipped as assets — and a synthesized "dry cut" or footstep thud (a
+ * short filtered noise burst, not a sampled recording) is the same idea
+ * applied to sound. That only holds for a short, discrete EVENT, though:
+ * the broader ambient-sound plan (continuous wind, a babbling stream — see
+ * TODO.md's 🔊 section) is a different problem, where synthesis does not
+ * read as a real recorded place convincingly the way one sharp noise burst
+ * does, and that is where sourcing real CC0 recordings actually belongs.
  */
 export class AudioEngine {
   private ctx: AudioContext | null = null
@@ -78,5 +80,67 @@ export class AudioEngine {
     g.connect(this.sfxGain)
     noise.start(t)
     noise.stop(t + 0.09)
+  }
+
+  /** One filtered-noise recipe per substrate — same "short burst, fast decay"
+   *  shape as `collect()`, just a different filter and length so each reads
+   *  as a distinct footstep rather than four volumes of the same thud. */
+  private static readonly FOOTSTEP_PARAMS: Record<
+    FootstepSubstrate,
+    { filterType: BiquadFilterType; frequency: number; q: number; duration: number; peakGain: number }
+  > = {
+    // Leaf litter: a soft, dull thud — low-passed, nothing sharp in it.
+    litter: { filterType: 'lowpass', frequency: 900, q: 0.5, duration: 0.07, peakGain: 0.5 },
+    // Moss: even softer and quieter — a damp cushion, not bare ground.
+    moss: { filterType: 'lowpass', frequency: 450, q: 0.4, duration: 0.09, peakGain: 0.32 },
+    // Sand: a gritty, broader-spectrum crunch instead of one dull tone.
+    sand: { filterType: 'bandpass', frequency: 3000, q: 0.8, duration: 0.05, peakGain: 0.42 },
+    // Water: the noise burst carries the splash's own broadband spray; the
+    // short descending tone in footstep() below is what actually reads as
+    // "wet", not this filter alone.
+    water: { filterType: 'lowpass', frequency: 1800, q: 0.6, duration: 0.08, peakGain: 0.4 },
+  }
+
+  /**
+   * One footstep, timed from the camera bob's own rhythm
+   * (`audio/footsteps.ts`'s `crossedFootstep`, called once per foot) —
+   * `substrate` (`footstepSubstrate()`, from the biome/water under the
+   * player) picks which of four short noise bursts plays.
+   */
+  footstep(substrate: FootstepSubstrate): void {
+    if (!this.ctx || !this.sfxGain || this.volume <= 0) return
+    const ctx = this.ctx
+    const t = ctx.currentTime
+    const p = AudioEngine.FOOTSTEP_PARAMS[substrate]
+
+    const noise = ctx.createBufferSource()
+    noise.buffer = this.noiseBurst(p.duration)
+    const filter = ctx.createBiquadFilter()
+    filter.type = p.filterType
+    filter.frequency.value = p.frequency
+    filter.Q.value = p.q
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(p.peakGain, t)
+    g.gain.exponentialRampToValueAtTime(0.0008, t + p.duration)
+
+    noise.connect(filter)
+    filter.connect(g)
+    g.connect(this.sfxGain)
+    noise.start(t)
+    noise.stop(t + p.duration + 0.01)
+
+    if (substrate === 'water') {
+      const plop = ctx.createOscillator()
+      plop.type = 'sine'
+      plop.frequency.setValueAtTime(650, t)
+      plop.frequency.exponentialRampToValueAtTime(140, t + 0.07)
+      const plopGain = ctx.createGain()
+      plopGain.gain.setValueAtTime(0.18, t)
+      plopGain.gain.exponentialRampToValueAtTime(0.0008, t + 0.08)
+      plop.connect(plopGain)
+      plopGain.connect(this.sfxGain)
+      plop.start(t)
+      plop.stop(t + 0.09)
+    }
   }
 }

@@ -375,9 +375,22 @@
 
 - [ ] **Фон леса** — ветер в кронах, скрип стволов, шорох листвы. Меняется от
       погоды и времени суток, а не крутится одной петлёй.
-- [ ] **Шаги** — разные по субстрату: подстилка, мох, песок, вода. Субстрат в
-      точке уже известен (`ecology/sites.ts`), брать оттуда. Ритм берётся из
-      покачивания камеры, см. раздел выше.
+- [x] **Шаги** — разные по субстрату: подстилка, мох, песок, вода. Done:
+      `audio/footsteps.ts`'s `crossedFootstep` fires once per foot touch-down
+      off the camera-bob phase (`game/player.ts`'s `bobPhase`, two crossings
+      per `2·PI`), `footstepSubstrate` picks the sound from the biome under
+      the player plus a water-ring proximity check (mirrors `ecology/
+      sites.ts`'s own moisture check); `AudioEngine.footstep()` synthesises
+      one of four short filtered-noise bursts per substrate (water adds a
+      descending-sine "plop"), same short-discrete-event synthesis choice as
+      `collect()` above. Verification gap, honestly noted: headless Chrome
+      throttles `requestAnimationFrame` to ~1-2Hz for a backgrounded tab, so
+      a wall-clock key-hold in the live-check script only ever simulated
+      ~0.4 game-seconds — short of one stride length — and never proved a
+      footstep actually fired live (same class of gap as the Pointer Lock
+      note elsewhere in this file). Covered instead by unit tests of the
+      pure trigger/substrate logic (9 tests) and a clean, error-free live
+      walk with no exceptions thrown from the audio wiring.
 - [ ] **Вода** — речка и озеро слышны раньше, чем видны, и громче вблизи. Это
       даёт настоящий ориентир в лесу, где ориентиров мало.
 - [ ] **Птицы** — привязать к стае из `birds.ts`, чтобы голос шёл из точки, где
