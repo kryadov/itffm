@@ -113,12 +113,16 @@ export function placeCritterHomes(
   count: number,
   obstacles: Circle[],
   clearance = 1.5,
+  chunkOrigin: { x: number; z: number } = { x: 0, z: 0 },
 ): HomeSpot[] {
   const rand = mulberry32(seed)
   const homes: HomeSpot[] = []
   for (let i = 0; i < count; i++) {
-    const origin = { x: (rand() - 0.5) * 2 * halfSize * 0.85, z: (rand() - 0.5) * 2 * halfSize * 0.85 }
-    const spot = findOpenSpot(obstacles, halfSize, origin, clearance)
+    const candidate = {
+      x: chunkOrigin.x + (rand() - 0.5) * 2 * halfSize * 0.85,
+      z: chunkOrigin.z + (rand() - 0.5) * 2 * halfSize * 0.85,
+    }
+    const spot = findOpenSpot(obstacles, halfSize, candidate, clearance, undefined, chunkOrigin)
     homes.push({ x: spot.x, y: ground.heightAt(spot.x, spot.z), z: spot.z })
   }
   return homes

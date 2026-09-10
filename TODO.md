@@ -347,8 +347,9 @@
 
 - [x] **Покачивание камеры и ритм шага.** Готово: `PlayerState.bobPhase` +
       `cameraBob()` (`game/player.ts`) — вертикальный подъём и боковой качок
-      от пройденной дистанции, не от времени. Момент для звуков шагов (см.
-      выше) — этот же `bobPhase`, ещё не использован там.
+      от пройденной дистанции, не от времени. Момент для звуков шагов —
+      этот же `bobPhase`, теперь используется (`audio/footsteps.ts`, see 🔊
+      above).
 - [x] **Мини-карта.** Готово: `ui/minimap.ts`, портирован из race-the-city.
       Компас по умолчанию, мини-карта — пункт в настройках (`Prefs.minimap`,
       выключена по умолчанию), без единой отметки гриба; единственный
@@ -846,11 +847,30 @@
       горизонте, болото — мельче и мягче, оба вернулись перед коммитом.
 - [ ] **Интерьер штольни.** Вход берётся из OSM (`cave_entrance`, `adit`,
       `mineshaft`), а подземного пространства за ним пока нет — генерировать
-      предстоит самим.
+      предстоит самим. Re-checked this session: `world/biome.ts`'s
+      `cave-adit` is only an invisible 12m-radius tag around the OSM point
+      (`CAVE_RADIUS`) that steers which mushrooms spawn nearby on the
+      surface — no entrance mesh, no interior space, and it never appears
+      at all in the offline demo wood (`world/demoForest.ts`'s `caves: []`).
+      Genuinely architectural, not bounded: needs actual design decisions
+      first — is the interior a real walkable room carved into the terrain
+      or a teleport into a separate small scene, how does the player get
+      back out, what lights it (no sun underground), does the demo wood get
+      a synthesized entrance to make this visible/testable at all without a
+      real-place OSM cave nearby. Follows `world/shelter.ts`'s
+      procedural-structure pattern for the entrance itself, but the
+      interior is a new kind of space this game doesn't have yet.
 - [ ] **Второй вид дюнного гриба** — *Peziza ammophila* растёт там же, что и
       *Psathyrella ammophila*, но морфологически это чашевидный аскомицет без
       привычной шляпки и ножки — та же проблема схемы, что и с трюфелем ниже,
-      только менее радикальная.
+      только менее радикальная. Re-checked this session: genuinely blocked,
+      not bounded — `species/schema.ts`'s `MushroomMorphology` requires a
+      cap (`CAP_SHAPES` has no cup/goblet shape) and a stipe (`height: Range`,
+      not optional), and there is no second `kind` for an apothecium body
+      plan the way `berry`/`herb`/`nut`/`find` each get their own. Needs a
+      schema decision (new morphology variant, or an optional stipe + a cup
+      cap shape) before any geometry work — same "decide together" class of
+      problem as the truffle, not a code task to just pick up.
 
 ## 🗺️ Infinite world (chunked generation)
 
@@ -889,14 +909,26 @@ actually shipped this pass" section this list mirrors.
       rate-limit cost the demo wood's does not, so it cannot simply be
       forced to `CHUNK_SIZE / 2` the same way without changing what a
       player actually asked for.
-- [ ] **Landmarks, wildlife and decorative scatter stay confined to the
-      home plot.** The hut, campfire, fisherman's hut, wild hive, birds/
-      hares/squirrels/snakes/bees/dragonflies, and the InstancedMesh
-      scatter (boulders, deadwood, undergrowth, flora, grass) are not
-      chunked — deliberately, per the design doc's scope cut. A wood
-      beyond the home plot is real terrain, real trees, real things to
-      find, but no wildlife and no second hut. Extending any of these
-      per-chunk is real, separate follow-up work.
+- [x] **Landmarks, wildlife and decorative scatter stay confined to the
+      home plot.** Partly done this session — hares and squirrels now
+      follow the player into streamed chunks: `game/worldStream.ts`'s
+      `buildChunk` places 2 of each per chunk (`placeCritterHomes`, `create
+      Hares`/`createSquirrels`, `world/critters.ts`), seeded off the chunk
+      the same way its trees/sites are, disposed alongside it when it
+      unloads. Needed `util/openSpot.ts`'s `findOpenSpot` to grow an
+      optional `worldCenter` param first — its clearance bound was always
+      measured from world (0, 0), so a chunk far from the origin would have
+      failed that bound at every candidate and silently returned an
+      unchecked, possibly-inside-an-obstacle spot. Verified by `worldStream
+      .test.ts` (creation and disposal tracking a chunk's own lifecycle) and
+      a live headless run 900m out — `hares`/`squirrels` groups present in
+      the scene graph as chunks streamed in, no console errors beyond the
+      already-documented headless Pointer Lock limitation. Deliberately NOT
+      extended: the hut, campfire, fisherman's hut, wild hive/bees,
+      dragonflies, snakes (their home-plot count — "two to a wood" — means
+      something only if it doesn't repeat per chunk), and the InstancedMesh
+      decorative scatter (boulders, deadwood, undergrowth, flora, grass) —
+      each is either a one-per-wood landmark or its own separate follow-up.
 - [x] **"Размer участка" (world-size picker) loses its old meaning for the
       demo wood.** Done — no design pass actually needed: `go()` itself
       already falls back to the demo wood on an empty query (same as

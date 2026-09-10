@@ -149,4 +149,33 @@ describe('createWorldStream', () => {
     stream.dispose()
     expect(scene.children.filter((c) => c.name.startsWith('chunk:'))).toHaveLength(0)
   })
+
+  it('gives each loaded chunk its own hares and squirrels, disposed when the chunk unloads', () => {
+    const scene = new THREE.Scene()
+    const stream = createWorldStream(scene, 1, flatHome, HOME_RADIUS)
+    settle(stream, CHUNK_SIZE * 2, 0)
+    expect(scene.children.filter((c) => c.name === 'hares')).toHaveLength(9)
+    expect(scene.children.filter((c) => c.name === 'squirrels')).toHaveLength(9)
+    // Far enough away that none of the original 9 chunks stay loaded — if
+    // their wildlife wasn't disposed alongside them, this would double up
+    // to 18 rather than staying at a fresh 9.
+    settle(stream, CHUNK_SIZE * 10, 0)
+    expect(scene.children.filter((c) => c.name === 'hares')).toHaveLength(9)
+    expect(scene.children.filter((c) => c.name === 'squirrels')).toHaveLength(9)
+  })
+
+  it('updateCritters does not throw over every loaded chunk', () => {
+    const scene = new THREE.Scene()
+    const stream = createWorldStream(scene, 1, flatHome, HOME_RADIUS)
+    settle(stream, CHUNK_SIZE * 2, 0)
+    expect(() => stream.updateCritters(0.1, CHUNK_SIZE * 2, 0)).not.toThrow()
+  })
+
+  it('dispose removes every loaded chunk\'s wildlife too', () => {
+    const scene = new THREE.Scene()
+    const stream = createWorldStream(scene, 1, flatHome, HOME_RADIUS)
+    settle(stream, CHUNK_SIZE * 2, 0)
+    stream.dispose()
+    expect(scene.children.filter((c) => c.name === 'hares' || c.name === 'squirrels')).toHaveLength(0)
+  })
 })

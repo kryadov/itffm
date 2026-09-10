@@ -2,14 +2,16 @@ import * as THREE from 'three'
 import { withPits } from '../terrain/pits'
 import { proceduralTerrain } from '../terrain/procedural'
 import { griddedProvider } from '../terrain/gridded'
-import { placeTrees, buildTreeMeshes, type Tree } from '../world/trees'
+import { placeTrees, buildTreeMeshes, treePerches, type Tree } from '../world/trees'
 import { regionalMix } from '../world/osmTrees'
 import { buildGround } from '../world/ground'
 import { buildSites } from '../ecology/sites'
+import { createHares, createSquirrels, placeCritterHomes, type CritterGroup } from '../world/critters'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
 import { buildPlacementObject } from '../collectible/placement'
 import { loadSpecies } from '../species/load'
 import { CHUNK_SIZE, chunkCoordAt, chunkOrigin, chunkSeed, chunksInRadius, chunkKey, type ChunkCoord } from '../world/chunking'
+import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Species } from '../species/schema'
 
@@ -60,12 +62,23 @@ const TREE_DENSITY = 0.03
  *  specs/2026-09-10-infinite-world-design.md), never for a named real place. */
 const STREAM_LAT = 55.87
 
+/** Hares/squirrels per streamed chunk — a flat, much smaller count than the
+ *  home plot's own 5-and-5 (`game/scene.ts`), same "sparser further out"
+ *  reasoning as CHUNK_SITE_COUNT/TREE_DENSITY above: up to nine chunks are
+ *  live at once (LOAD_RADIUS), so even a small per-chunk count adds up.
+ *  Snakes are deliberately left out here — the brainstormed count was "two
+ *  to a wood, not five" (see world/critters.ts's own comment), a rarity
+ *  that means something only if it does not repeat per chunk. */
+const CHUNK_HARE_COUNT = 2
+const CHUNK_SQUIRREL_COUNT = 2
+
 interface LoadedChunk {
   group: THREE.Group
   ground: ElevationProvider
   trees: Tree[]
   lods: THREE.LOD[]
   mushroomObjects: THREE.Object3D[]
+  critters: CritterGroup[]
 }
 
 export interface WorldStream {
@@ -100,6 +113,10 @@ export interface WorldStream {
    *  never does this on its own (same reason `Forest.updateMushroomLod`
    *  exists). Call every frame. */
   updateLod(camera: THREE.Camera): void
+  /** Steps every loaded chunk's hares and squirrels (state machine, pose,
+   *  instanced-mesh matrices) — three.js does not do this on its own either,
+   *  same reason `updateLod` above exists. Call every frame. */
+  updateCritters(dt: number, playerX: number, playerZ: number): void
   /** Terrain height anywhere in a loaded chunk (or the reserved home-plot
    *  chunk, where this defers to `homeGround` instead of generating
    *  anything of its own). Falls back to the raw, ungridded base terrain
@@ -113,8 +130,9 @@ export interface WorldStream {
  * The chunk manager for the offline/demo wood's infinite wilderness beyond
  * its own home plot — see docs/superpowers/specs/2026-09-10-infinite-world-
  * design.md for what is (terrain, trees, mushroom/berry/herb/nut/find
- * ecology) and is not (the hut, campfire, wildlife, decorative scatter,
- * real-place OSM tiling) chunked in this pass.
+ * ecology, hares and squirrels) and is not (the hut, campfire, hive/bees,
+ * dragonflies, snakes, decorative InstancedMesh scatter, real-place OSM
+ * tiling) chunked in this pass.
  *
  * @param homeGround the home plot's own `ElevationProvider` (`createForest`'s
  *   `source.ground`) — reused, not reimplemented, for any point that falls
@@ -169,8 +187,22 @@ export function createWorldStream(
       mushroomObjects.push(built.object)
     }
 
+    // Ground fauna, chunked — see docs/superpowers/specs/2026-09-10-
+    // infinite-world-design.md's own follow-up note. createHares/
+    // createSquirrels add their instanced meshes straight to `scene`
+    // (not into `group` — the same layering `game/scene.ts` uses for the
+    // home plot's own wildlife), so they're tracked and disposed here
+    // through the returned CritterGroup handles instead.
+    const treeCircles = trees.map((t) => ({ x: t.x, z: t.z, radius: t.radius }))
+    const hareHomes = placeCritterHomes(ground, half, seed + 10, CHUNK_HARE_COUNT, treeCircles, 1.5, origin)
+    const hares = createHares(scene, mulberry32(seed + 11), CHUNK_HARE_COUNT, ground, hareHomes)
+    const squirrelHomes = placeCritterHomes(ground, half, seed + 12, CHUNK_SQUIRREL_COUNT, treeCircles, 1.5, origin)
+    const squirrels = createSquirrels(
+      scene, mulberry32(seed + 13), CHUNK_SQUIRREL_COUNT, ground, squirrelHomes, treePerches(trees),
+    )
+
     scene.add(group)
-    return { group, ground, trees, lods, mushroomObjects }
+    return { group, ground, trees, lods, mushroomObjects, critters: [hares, squirrels] }
   }
 
   function disposeChunk(loaded: LoadedChunk): void {
@@ -182,6 +214,7 @@ export function createWorldStream(
       if (Array.isArray(mat)) mat.forEach((m) => m.dispose())
       else mat?.dispose()
     })
+    for (const c of loaded.critters) c.dispose()
   }
 
   // Coordinates that are needed but not yet built, nearest first — drained
@@ -247,6 +280,11 @@ export function createWorldStream(
     updateLod(camera) {
       for (const loaded of chunks.values()) {
         for (const lod of loaded.lods) lod.update(camera)
+      }
+    },
+    updateCritters(dt, playerX, playerZ) {
+      for (const loaded of chunks.values()) {
+        for (const c of loaded.critters) c.update(dt, playerX, playerZ)
       }
     },
     heightAt(x, z) {

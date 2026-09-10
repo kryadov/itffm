@@ -25,6 +25,11 @@ const ANGLES_PER_RING = 12
  * @param extra an additional condition a candidate point must satisfy beyond
  *   clearance — `world/campfire.ts` uses it to also require an actual
  *   clearing (`world/clearings.ts`'s `isClearing`), not just open ground.
+ * @param worldCenter the halfSize bound is measured from here, not always
+ *   world (0, 0) — `game/worldStream.ts`'s chunked wildlife needs the bound
+ *   centred on the chunk itself; a chunk far from the origin would otherwise
+ *   fail the bound at every candidate (including `origin`) and silently fall
+ *   back to it unchecked, skipping clearance entirely.
  */
 export function findOpenSpot(
   obstacles: Circle[],
@@ -32,10 +37,11 @@ export function findOpenSpot(
   origin: Point,
   clearance: number,
   extra?: (x: number, z: number) => boolean,
+  worldCenter: Point = { x: 0, z: 0 },
 ): Point {
   const isOpen = (x: number, z: number): boolean =>
-    Math.abs(x) <= halfSize &&
-    Math.abs(z) <= halfSize &&
+    Math.abs(x - worldCenter.x) <= halfSize &&
+    Math.abs(z - worldCenter.z) <= halfSize &&
     obstacles.every((o) => Math.hypot(x - o.x, z - o.z) >= o.radius + clearance) &&
     (!extra || extra(x, z))
 

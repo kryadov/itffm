@@ -119,6 +119,22 @@ describe('placeCritterHomes', () => {
       expect(Math.hypot(h.x, h.z)).toBeGreaterThanOrEqual(80 + 1.5 - 1e-6)
     }
   })
+
+  it('clusters around an optional chunkOrigin instead of world (0, 0)', () => {
+    const origin = { x: 1000, z: -400 }
+    for (const h of placeCritterHomes(ground, 90, 5, 4, [], 1.5, origin)) {
+      expect(Math.abs(h.x - origin.x)).toBeLessThanOrEqual(90)
+      expect(Math.abs(h.z - origin.z)).toBeLessThanOrEqual(90)
+    }
+  })
+
+  it('still respects obstacle clearance far from world (0, 0)', () => {
+    const origin = { x: 1000, z: -400 }
+    const obstacles = [{ x: origin.x, z: origin.z, radius: 80 }]
+    for (const h of placeCritterHomes(ground, 90, 5, 4, obstacles, 1.5, origin)) {
+      expect(Math.hypot(h.x - origin.x, h.z - origin.z)).toBeGreaterThanOrEqual(80 + 1.5 - 1e-6)
+    }
+  })
 })
 
 describe('nearestPoint', () => {
