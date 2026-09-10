@@ -884,16 +884,19 @@ actually shipped this pass" section this list mirrors.
       beyond the home plot is real terrain, real trees, real things to
       find, but no wildlife and no second hut. Extending any of these
       per-chunk is real, separate follow-up work.
-- [ ] **"Размer участка" (world-size picker) loses its old meaning for the
-      demo wood.** Live comment, 2026-09-10, right after the feature
-      shipped: once the demo wood always builds its home plot at
-      `CHUNK_SIZE / 2` regardless of the picker, the size choice next to
-      "просто показать лес" no longer does anything for that button (it
-      still governs a real, bounded, named place normally). Needs its own
-      small design pass — hide/disable the size control for that one
-      button, or repurpose it as something that still means something in
-      an infinite wood (an initial load radius?) — not decided here.
-      `ui/worldSize.ts`.
+- [x] **"Размer участка" (world-size picker) loses its old meaning for the
+      demo wood.** Done — no design pass actually needed: `go()` itself
+      already falls back to the demo wood on an empty query (same as
+      `#place-demo`), so the size control was already irrelevant whenever
+      the input was empty, not just for one specific button. `ui/
+      placePicker.ts` now shows the size row only once there is text in the
+      place field — mechanical, not a UX guess (it exactly mirrors the
+      existing `q.length > 0 ? q : null` branch `go()` already had), and it
+      is gone the instant the field is cleared again. The popular-place
+      shortcut buttons still bypass it (fixed at `DEFAULT_WORLD_SIZE`) — a
+      quick-pick reasonably trading configurability for one click, not
+      revisited here. Verified live: hidden on load and once the field is
+      cleared, reappears the moment a character is typed.
 - [ ] **Chunk build cost is still a real, if now much smaller, per-frame
       stall.** `BUILD_BUDGET_PER_UPDATE` (1 chunk per `update()` call,
       `game/worldStream.ts`) turns "freeze for seconds" into "an

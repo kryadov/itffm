@@ -35,7 +35,7 @@ export function openPlacePicker(onPick: (query: string | null, halfSize: number)
     <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">${t('placeIntro')}</p>
     <input id="place-input" type="text" placeholder="${t('placePlaceholder')}"
       style="width:min(420px,90vw);padding:11px 14px;font-size:16px;border-radius:8px;border:1px solid #444;background:#1a201a;color:#eee" />
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:.8">${t('placeSize')}
+    <label id="place-size-row" style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:.8">${t('placeSize')}
       <select id="place-size" style="padding:6px 10px;border-radius:6px;border:1px solid #444;background:#1a201a;color:#ddd;font-size:13px">${sizeOptions}</select>
     </label>
     <div style="display:flex;gap:12px;margin-top:4px">
@@ -56,6 +56,21 @@ export function openPlacePicker(onPick: (query: string | null, halfSize: number)
   const sizeInput = overlay.querySelector<HTMLSelectElement>('#place-size')!
   const chosenHalfSize = (): number =>
     (WORLD_SIZES.find((o) => o.id === sizeInput.value) ?? DEFAULT_WORLD_SIZE).halfSize
+
+  // The size choice only ever reaches a real, bounded place: an empty query
+  // goes to the demo wood regardless of which button is pressed (`go()`
+  // below falls back to `null` the same way `#place-demo` does), and the
+  // demo wood always builds its own home plot at a fixed size now that it
+  // streams infinitely beyond it (game/loadForest.ts, see TODO.md's
+  // "Infinite world" section) — showing a control that would silently do
+  // nothing is worse than not showing it, so it only appears once there is
+  // an actual name for it to size.
+  const sizeRow = overlay.querySelector<HTMLLabelElement>('#place-size-row')!
+  const updateSizeRow = () => {
+    sizeRow.style.display = input.value.trim().length === 0 ? 'none' : 'flex'
+  }
+  updateSizeRow()
+  input.addEventListener('input', updateSizeRow)
 
   const go = () => {
     const q = input.value.trim()
