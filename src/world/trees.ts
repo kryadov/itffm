@@ -262,7 +262,17 @@ const DEFAULT_CONIFER_SHAPE: ConiferShape = CONIFER_SHAPES.picea!
  * variant too): a thousand trees would otherwise cost a thousand draw calls
  * and the frame with them.
  */
-export function buildTreeMeshes(trees: Tree[]): THREE.Group {
+/**
+ * @param shadowRadius trees within this distance of the world origin get
+ *   `castShadow = true` on their own trunk/crown batch, everything further
+ *   out gets none — 0 (the default) casts no shadow at all, the wood's
+ *   long-standing behaviour. A real directional-light shadow over every
+ *   tree in a 1500-tree wood is a genuine, unmeasured perf question on real
+ *   (non-desktop) hardware — see TODO.md — so this stays opt-in and, even
+ *   opted in, only ever covers a small radius around the one fixed point a
+ *   shadow is actually worth the cost: the home plot's own clearing.
+ */
+export function buildTreeMeshes(trees: Tree[], shadowRadius = 0): THREE.Group {
   const group = new THREE.Group()
   group.name = 'trees'
   const byGenus = new Map<TreeGenus, Tree[]>()
@@ -273,61 +283,81 @@ export function buildTreeMeshes(trees: Tree[]): THREE.Group {
   }
 
   const dummy = new THREE.Object3D()
+  const isNear = (t: Tree): boolean => shadowRadius > 0 && Math.hypot(t.x, t.z) <= shadowRadius
+
+  /** One InstancedMesh from `list`, or none at all if it's empty — split
+   *  callers (trunks/each crown variant) both need this, and an empty
+   *  shadow or non-shadow half is the common case at a small radius. */
+  function instancedBatch(
+    geometry: THREE.BufferGeometry, material: THREE.Material, list: Tree[], castShadow: boolean,
+    setPose: (t: Tree, dummy: THREE.Object3D) => void,
+  ): THREE.InstancedMesh | null {
+    if (list.length === 0) return null
+    const mesh = new THREE.InstancedMesh(geometry, material, list.length)
+    mesh.castShadow = castShadow
+    list.forEach((t, i) => {
+      dummy.rotation.set(0, 0, 0)
+      setPose(t, dummy)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(i, dummy.matrix)
+    })
+    return mesh
+  }
+
+  function addSplit(
+    geometry: THREE.BufferGeometry, material: THREE.Material, list: Tree[],
+    setPose: (t: Tree, dummy: THREE.Object3D) => void,
+  ): void {
+    const near = list.filter(isNear)
+    const far = shadowRadius > 0 ? list.filter((t) => !isNear(t)) : list
+    const nearMesh = instancedBatch(geometry, material, near, true, setPose)
+    const farMesh = instancedBatch(geometry, material, far, false, setPose)
+    if (nearMesh) group.add(nearMesh)
+    if (farMesh) group.add(farMesh)
+  }
+
   for (const [genus, list] of byGenus) {
     const look = LOOK[genus] ?? DEFAULT_LOOK
 
-    const trunks = new THREE.InstancedMesh(
+    addSplit(
       new THREE.CylinderGeometry(look.trunk * 0.7, look.trunk, 1, 7),
       new THREE.MeshStandardMaterial({ color: look.trunkColor, roughness: 1 }),
-      list.length,
+      list,
+      (t, d) => {
+        d.position.set(t.x, t.y + t.height / 2, t.z)
+        d.scale.set(1, t.height, 1)
+      },
     )
-    list.forEach((t, i) => {
-      dummy.rotation.set(0, 0, 0)
-      dummy.position.set(t.x, t.y + t.height / 2, t.z)
-      dummy.scale.set(1, t.height, 1)
-      dummy.updateMatrix()
-      trunks.setMatrixAt(i, dummy.matrix)
-    })
-    group.add(trunks)
 
     const crownMat = new THREE.MeshStandardMaterial({ color: look.crownColor, roughness: 1 })
 
     if (look.conifer) {
       const shape = CONIFER_SHAPES[genus] ?? DEFAULT_CONIFER_SHAPE
-      const crowns = new THREE.InstancedMesh(shape.geometry, crownMat, list.length)
-      list.forEach((t, i) => {
+      addSplit(shape.geometry, crownMat, list, (t, d) => {
         const spread = 0.75 + ((t.height - look.height[0]) / (look.height[1] - look.height[0])) * 0.5
         const crownH = t.height * shape.crownHeightFrac
         const crownR = spread * look.crown * shape.xzScale
-        dummy.rotation.set(0, 0, 0)
-        dummy.position.set(t.x, t.y + t.height - crownH / 2, t.z)
-        dummy.scale.set(crownR, crownH, crownR)
-        dummy.updateMatrix()
-        crowns.setMatrixAt(i, dummy.matrix)
+        d.position.set(t.x, t.y + t.height - crownH / 2, t.z)
+        d.scale.set(crownR, crownH, crownR)
       })
-      group.add(crowns)
       continue
     }
 
     // Broadleaf: split by crown shape so each variant gets its own instanced
     // batch. Still just as many draw calls as genera in the wood, times the
-    // fixed variant count — not one per tree.
+    // fixed variant count (times two once a shadowRadius is in play) — not
+    // one per tree.
     const byVariant: Tree[][] = Array.from({ length: BROADLEAF_CROWNS.length }, () => [])
     for (const t of list) byVariant[crownVariantIndex(t.x, t.z)].push(t)
 
     byVariant.forEach((variantTrees, vi) => {
       if (variantTrees.length === 0) return
       const shape = BROADLEAF_CROWNS[vi]
-      const crowns = new THREE.InstancedMesh(shape.geometry, crownMat, variantTrees.length)
-      variantTrees.forEach((t, i) => {
+      addSplit(shape.geometry, crownMat, variantTrees, (t, d) => {
         const spread = 0.75 + ((t.height - look.height[0]) / (look.height[1] - look.height[0])) * 0.5
-        dummy.rotation.set(0, 0, 0)
-        dummy.position.set(t.x, t.y + t.height * shape.heightFrac, t.z)
-        dummy.scale.set(spread * shape.xzScale, spread * shape.yScale, spread * shape.xzScale)
-        dummy.updateMatrix()
-        crowns.setMatrixAt(i, dummy.matrix)
+        d.position.set(t.x, t.y + t.height * shape.heightFrac, t.z)
+        d.scale.set(spread * shape.xzScale, spread * shape.yScale, spread * shape.xzScale)
       })
-      group.add(crowns)
     })
   }
   return group

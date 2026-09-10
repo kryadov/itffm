@@ -1,4 +1,5 @@
-import { placeTrees, treePerches } from '../../src/world/trees'
+import * as THREE from 'three'
+import { placeTrees, treePerches, buildTreeMeshes } from '../../src/world/trees'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 
 const terrain = proceduralTerrain(5)
@@ -113,5 +114,39 @@ describe('treePerches', () => {
       expect(p.y).toBeGreaterThan(t.y)
       expect(p.y).toBeLessThan(t.y + t.height)
     }
+  })
+})
+
+describe('buildTreeMeshes', () => {
+  function totalInstances(group: THREE.Group): number {
+    return group.children.reduce((n, c) => n + (c as THREE.InstancedMesh).count, 0)
+  }
+
+  it('casts no shadow at all by default, matching the existing wood', () => {
+    const trees = placeTrees(terrain, 90, 3, ['betula', 'picea'])
+    const group = buildTreeMeshes(trees)
+    for (const child of group.children) expect(child.castShadow).toBe(false)
+    expect(totalInstances(group)).toBe(trees.length * 2) // trunk + one crown mesh per tree's variant
+  })
+
+  it('casts shadows only from trees within shadowRadius of the origin', () => {
+    const trees = placeTrees(terrain, 90, 3, ['betula', 'picea'])
+    const nearCount = trees.filter((t) => Math.hypot(t.x, t.z) <= 30).length
+    // Only meaningful if the seed actually put some trees on each side of the line.
+    expect(nearCount).toBeGreaterThan(0)
+    expect(nearCount).toBeLessThan(trees.length)
+
+    const group = buildTreeMeshes(trees, 30)
+    const shadowCasters = group.children.filter((c) => c.castShadow)
+    const nonCasters = group.children.filter((c) => !c.castShadow)
+    expect(shadowCasters.length).toBeGreaterThan(0)
+    expect(nonCasters.length).toBeGreaterThan(0)
+  })
+
+  it('never loses or duplicates a tree when splitting by shadowRadius', () => {
+    const trees = placeTrees(terrain, 90, 3, ['betula', 'picea'])
+    const withShadow = buildTreeMeshes(trees, 30)
+    const without = buildTreeMeshes(trees, 0)
+    expect(totalInstances(withShadow)).toBe(totalInstances(without))
   })
 })

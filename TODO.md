@@ -101,13 +101,30 @@
       скриншота смазывают контраст), тот же компромисс, что уже был у птиц
       (v0.39.0): данные корректны, смотреть в реальной игре с более
       близкого расстояния показательнее одного скриншота.
-- [ ] **Деревья не отбрасывают тени.** Формы крон разведены (три силуэта на
-      лиственных, v0.5.0), а вот `HemisphereLight` + `DirectionalLight` в
-      `game/scene.ts` теней не дают вовсе, и лес выглядит плоско освещённым в
-      любую погоду. Полторы тысячи деревьев с честными тенями — уже вопрос
-      производительности, а не только кода: разбираться вместе с LOD и
-      инстансингом деревьев (см. «Внутреннее»), а не просто включить
-      `castShadow` в лоб.
+- [x] **Деревья не отбрасывают тени.** Формы крон разведены (три силуэта на
+      лиственных, v0.5.0); `HemisphereLight` + `DirectionalLight` в
+      `game/scene.ts` теней не давали вовсе, лес выглядел плоско освещённым.
+      Re-checked this session: partly done, deliberately not the full "all
+      1500 trees" version — `world/trees.ts`'s `buildTreeMeshes` gained an
+      optional `shadowRadius`; trees within it get their own `castShadow`
+      InstancedMesh batch (split by genus/variant, same draw-call shape as
+      before, just doubled where the split actually produces two non-empty
+      halves), everything further out stays exactly as it was. `scene.ts`
+      wires the sun's own `castShadow`/shadow-camera bounds and passes
+      `TREE_SHADOW_RADIUS = 45` (between the fog's near/far fade, where a
+      shadow is actually visible) for the home plot's own call — the
+      streamed chunks' own `buildTreeMeshes` call (`game/worldStream.ts`)
+      passes no radius, unaffected. Honest limit: "all 1500 trees honestly
+      shadowed" is still the real, unmeasured perf question a real
+      (non-desktop) GPU would answer, not this session's headless
+      SwiftShader — GPU shadow-map rasterization cost doesn't port across
+      GPU classes the way CPU-bound JS timing does (unlike the chunk-build-
+      cost profiling elsewhere in this file), so that stays open. What
+      shipped is bounded by construction (a small, fixed radius, not the
+      whole wood) rather than measured directly. Verified: 3 new unit
+      tests (`world/trees.ts`'s split, no lost/duplicated tree) and a live
+      headless screenshot — real, correctly-angled ground shadows under
+      nearby trunks, no visible acne or peter-panning, zero console errors.
 - [x] **Хвойные — один конус на весь силуэт.** Готово: `CONIFER_SHAPES`
       (`world/trees.ts`) — ель/пихта единый узкий опущенный шпиль,
       сосна/лиственница ярусная "свадебный торт" крона, поднятая выше.

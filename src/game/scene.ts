@@ -50,6 +50,13 @@ export const DEFAULT_HALF_SIZE = 90
 /** Site count spawnMushrooms works from at the default plot size — scaled by
  *  area for any other size, so a bigger wood is not just an emptier one. */
 const DEFAULT_SITE_COUNT = 1600
+/** Sun position on a circle whose radius sets how high overhead it swings
+ *  — matches the old fixed light's rough distance from the origin. */
+const SUN_DISTANCE = 90
+/** Trees within this many metres of the origin (the home plot's own
+ *  clearing) cast a real shadow — see the sun light's own setup below for
+ *  why this stays a small, fixed radius rather than the whole wood. */
+const TREE_SHADOW_RADIUS = 45
 
 /**
  * Ground mesh resolution per side, for a plot of this half-size. Shared with
@@ -169,6 +176,25 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   const sun = new THREE.DirectionalLight(0xfff1cf, 1.1)
   sun.position.copy(sunPosition)
   scene.add(sun)
+  // A real ground shadow under trees, but only near the home plot's own
+  // clearing (TREE_SHADOW_RADIUS below) — 1500 honest shadow casters across
+  // a whole wood is a real, unmeasured perf question on real (non-desktop)
+  // hardware (see TODO.md); a small, fixed-size radius around the one point
+  // that matters (where the player actually starts and lingers) keeps the
+  // shadow map's own resolution sharp instead of stretched over 200m, and
+  // bounds the shadow-casting tree count regardless of the wood's density.
+  sun.castShadow = true
+  sun.shadow.mapSize.set(1024, 1024)
+  sun.shadow.camera.left = -TREE_SHADOW_RADIUS
+  sun.shadow.camera.right = TREE_SHADOW_RADIUS
+  sun.shadow.camera.top = TREE_SHADOW_RADIUS
+  sun.shadow.camera.bottom = -TREE_SHADOW_RADIUS
+  sun.shadow.camera.near = 1
+  sun.shadow.camera.far = SUN_DISTANCE * 2
+  sun.shadow.camera.updateProjectionMatrix()
+  sun.shadow.bias = -0.0015
+  sun.target.position.set(0, 0, 0)
+  scene.add(sun.target)
 
   // Replaces the old flat background colour: a dome the fog never quite
   // hides above the treeline, rather than a solid fill with a visible seam
@@ -180,9 +206,6 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // always drawing a full disc. Computed once: it moves too slowly for a
   // session to notice it hasn't been resampled since load.
   const moonPhaseNow = moonPhase(new Date())
-  /** Sun position on a circle whose radius sets how high overhead it swings
-   *  — matches the old fixed light's rough distance from the origin. */
-  const SUN_DISTANCE = 90
   // Set once the shelter exists, further down — updateDayNight runs once at
   // noon before that, when there is nothing to light anyway.
   let shelterFx: ShelterFx | null = null
@@ -257,7 +280,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     water.update(waterClock)
     springFx.update(waterClock)
   }
-  scene.add(buildTreeMeshes(source.trees))
+  scene.add(buildTreeMeshes(source.trees, TREE_SHADOW_RADIUS))
 
   const logs = placeLogs(source.ground, halfSize, seed + 5)
   const stumps = placeStumps(source.ground, halfSize, seed + 6)
