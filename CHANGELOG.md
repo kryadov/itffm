@@ -6,6 +6,25 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.79.0
+A narrow-gauge rail line and a short train shuttling back and forth along
+it, running in every wood.
+
+## v0.78.0
+A mine/cave interior — a real walkable tunnel, lit by its own lantern —
+wherever OSM actually surveyed a cave, adit or mineshaft entrance.
+
+## v0.77.0
+Trees near the home plot's own clearing cast a real ground shadow.
+
+## v0.76.0
+A short chirp from wherever the nearest bird actually is, panned and
+faded by real distance instead of playing from nowhere.
+
+## v0.75.0
+Boulders, deadwood, undergrowth, flora and grass now scatter into the
+streamed chunks beyond the home plot too.
+
 ## v0.74.0
 Hares and squirrels now follow the player into the streamed chunks beyond
 the home plot, not just inside it.
