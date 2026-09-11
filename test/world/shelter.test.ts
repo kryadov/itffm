@@ -8,6 +8,7 @@ import {
   doorObstacle,
   doorPosition,
   DOOR_INTERACT_RADIUS,
+  FOUNDATION_DEPTH,
 } from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import { stepPlayer, type PlayerState } from '../../src/game/player'
@@ -98,7 +99,7 @@ describe('buildShelterMesh', () => {
     }).not.toThrow()
   })
 
-  it('shadows its own hearth light off its own walls, so night light does not leak through the floor', () => {
+  it('shadows its own lamp light off its own walls, so night light does not leak through the floor', () => {
     const { group } = buildShelterMesh(s)
     const walls = group.getObjectByName('walls') as THREE.Group
     expect(walls.children.length).toBeGreaterThan(0)
@@ -106,8 +107,11 @@ describe('buildShelterMesh', () => {
       expect(panel.castShadow).toBe(true)
       expect(panel.receiveShadow).toBe(true)
     }
-    const light = group.children.find((c) => c instanceof THREE.PointLight) as THREE.PointLight
-    expect(light.castShadow).toBe(true)
+    let light: THREE.PointLight | undefined
+    group.traverse((c) => {
+      if (c instanceof THREE.PointLight) light = c
+    })
+    expect(light?.castShadow).toBe(true)
   })
 
   it('gives each window a muntin bar, not just a bare pane', () => {
@@ -211,6 +215,27 @@ describe('buildShelterMesh — door state', () => {
     toggleDoor()
     expect(isDoorOpen()).toBe(false)
     expect(obstacle.radius).toBeGreaterThan(0)
+  })
+
+  it('extends the ground-touching walls and floor into a foundation, so uneven terrain leaves no gap underneath', () => {
+    // Live report: on a bumpy site a wall's rigid, flat bottom edge could sit
+    // above the real ground under one corner, leaving a literal hole the
+    // lamp's light leaked through. Every wall that actually reaches the
+    // ground (not the lintel, which never does) and the floor should now
+    // reach at least FOUNDATION_DEPTH below the hut's own origin.
+    const { group } = buildShelterMesh(s)
+    const walls = group.getObjectByName('walls') as THREE.Group
+    for (const panel of walls.children as THREE.Mesh[]) {
+      const box = new THREE.Box3().setFromObject(panel)
+      const touchesGround = box.min.y < 0.01
+      if (!touchesGround) continue // the lintel, floating over the doorway
+      expect(box.min.y).toBeLessThanOrEqual(-FOUNDATION_DEPTH + 0.01)
+    }
+    const floor = group.children.find(
+      (c) => c instanceof THREE.Mesh && Math.abs(c.position.x) < 1e-6 && c.position.y < 0,
+    ) as THREE.Mesh
+    expect(floor).toBeTruthy()
+    expect(new THREE.Box3().setFromObject(floor).min.y).toBeLessThanOrEqual(-FOUNDATION_DEPTH + 0.01)
   })
 
   it('shows a handle and plank grooves on both faces, not just the inside', () => {

@@ -6,6 +6,11 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.82.0
+A real oil lamp on the table instead of an unexplained light in mid-air,
+and a foundation skirt so light no longer leaks out from under the hut on
+uneven ground.
+
 ## v0.81.0
 The shelter door now has its handle and plank relief on both faces, not
 just the inside. Bird calls and the mushroom collect/cut sound are off.

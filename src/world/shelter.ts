@@ -42,6 +42,19 @@ const DEPTH = 3.1
 // the door cut into it. Tall enough now for real headroom above STAND_EYE.
 const WALL_HEIGHT = 2.6
 const WALL_THICKNESS = 0.12
+/** How far the walls (and the floor) extend below the hut's own origin
+ *  (`Shelter.y`, one ground sample at the footprint's centre) — a live
+ *  report: on real, uneven terrain a corner of the ~3.6x3.1m footprint can
+ *  sit noticeably lower than that one centre sample, leaving a real gap
+ *  between a wall's rigid bottom edge and the actual ground there. Nothing
+ *  occluded that gap (no floor mesh existed at all), so the lamp's light —
+ *  physically correct falloff, ignores geometry outright without shadow
+ *  casting — shone straight out underneath, nowhere near a window. A fixed
+ *  skirt is a bounded compromise, not true terrain-conforming walls (which
+ *  would need sampling the ground under each corner, a bigger job than one
+ *  live report's fix): generous enough to swallow ordinary local bump, honest
+ *  that it is not a guarantee on every conceivable slope.  */
+export const FOUNDATION_DEPTH = 0.8
 // A real human doorway, not the 0.7x1.25m child-sized slab a live report
 // (2026-09-09) caught — that made the player's own eye level sit above the
 // door entirely, part of the same "toy house" bug as the wall height above.
@@ -286,26 +299,43 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
     mesh.receiveShadow = true
     walls.add(mesh)
   }
+  // Any panel that actually reaches the ground goes through this instead of
+  // `panel()` directly — extended by FOUNDATION_DEPTH below the hut's own
+  // origin (see that constant's own comment) so it keeps touching real,
+  // possibly-uneven terrain instead of hanging a fixed height above y=0
+  // regardless of what the ground under that particular corner does. The
+  // lintel above the door never reaches the ground at all, so it stays on
+  // plain `panel()`.
+  const groundPanel = (sizeX: number, sizeZ: number, cx: number, cz: number): void => {
+    panel(sizeX, wallHeight + FOUNDATION_DEPTH, sizeZ, cx, wallHeight / 2 - FOUNDATION_DEPTH / 2, cz)
+  }
   const hw = width / 2
   const hd = depth / 2
   const hdoor = doorWidth / 2
   const frontSegWidth = hw - hdoor
-  panel(frontSegWidth, wallHeight, WALL_THICKNESS, -(hdoor + frontSegWidth / 2), wallHeight / 2, -hd)
-  panel(frontSegWidth, wallHeight, WALL_THICKNESS, hdoor + frontSegWidth / 2, wallHeight / 2, -hd)
+  groundPanel(frontSegWidth, WALL_THICKNESS, -(hdoor + frontSegWidth / 2), -hd)
+  groundPanel(frontSegWidth, WALL_THICKNESS, hdoor + frontSegWidth / 2, -hd)
   panel(doorWidth, wallHeight - doorHeight, WALL_THICKNESS, 0, doorHeight + (wallHeight - doorHeight) / 2, -hd) // lintel
-  panel(width, wallHeight, WALL_THICKNESS, 0, wallHeight / 2, hd) // back
-  panel(WALL_THICKNESS, wallHeight, depth, -hw, wallHeight / 2, 0) // left
-  panel(WALL_THICKNESS, wallHeight, depth, hw, wallHeight / 2, 0) // right
+  groundPanel(width, WALL_THICKNESS, 0, hd) // back
+  groundPanel(WALL_THICKNESS, depth, -hw, 0) // left
+  groundPanel(WALL_THICKNESS, depth, hw, 0) // right
   group.add(walls)
 
   // A plank floor — bare ground showing through a doorway you can now
-  // actually walk into read as broken, not rustic.
+  // actually walk into read as broken, not rustic. Deepened down to the
+  // same FOUNDATION_DEPTH the walls' own skirt reaches (its visible top
+  // surface unchanged, still a thin plank at y≈0.02-0.04): the old 0.04m
+  // slab left the same open-bottomed gap under uneven terrain the walls did,
+  // and closing only the walls' own skirt without deepening the floor too
+  // would still have left a flat horizontal seam for light to leak through.
   const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3624, roughness: 1 })
+  const floorThickness = FOUNDATION_DEPTH + 0.04
   const floor = new THREE.Mesh(
-    new THREE.BoxGeometry(width - WALL_THICKNESS * 2, 0.04, depth - WALL_THICKNESS * 2),
+    new THREE.BoxGeometry(width - WALL_THICKNESS * 2, floorThickness, depth - WALL_THICKNESS * 2),
     floorMat,
   )
-  floor.position.y = 0.02
+  floor.position.y = 0.04 - floorThickness / 2
+  floor.castShadow = true
   floor.receiveShadow = true
   group.add(floor)
 
@@ -363,6 +393,42 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   cup.name = 'cup'
   cup.position.set(0.12, tableHeight + 0.02 + 0.03, -0.08)
   table.add(cup)
+
+  // The oil lamp — the room's only light source now sits on a visible
+  // object instead of floating at the centre of the room with nothing to
+  // explain it (a live report: "свет идёт непонятно откуда"). Opposite
+  // corner from the cup, same "not dead centre" reasoning.
+  const lamp = new THREE.Group()
+  lamp.name = 'lamp'
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0x3a2f22, roughness: 0.5, metalness: 0.3 })
+  const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.02, 10), lampMat)
+  const baseY = tableHeight + 0.02 + 0.01
+  lampBase.position.y = baseY
+  lamp.add(lampBase)
+  const lampPole = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.11, 8), lampMat)
+  lampPole.position.y = baseY + 0.065
+  lamp.add(lampPole)
+  const shadeMat = new THREE.MeshStandardMaterial({
+    color: 0xffdca0, roughness: 0.4, emissive: 0xffcf8a, emissiveIntensity: 0, side: THREE.DoubleSide,
+  })
+  const shadeY = baseY + 0.12 + 0.045
+  const lampShade = new THREE.Mesh(new THREE.ConeGeometry(0.065, 0.09, 10, 1, true), shadeMat)
+  lampShade.position.y = shadeY
+  lamp.add(lampShade)
+  // The bulb itself, inside the shade — where the light actually comes from,
+  // same "physically-correct falloff needs tens, not units" note the old
+  // hearth light and the flashlight (game/scene.ts) both already learned.
+  const lampLight = new THREE.PointLight(0xffcf8a, 0, 4)
+  lampLight.position.y = shadeY - 0.01
+  lampLight.castShadow = true
+  // A cube shadow map this small only has to hide one room's worth of
+  // furniture from itself — nowhere near what a scene-wide light would need.
+  lampLight.shadow.mapSize.set(256, 256)
+  lampLight.shadow.bias = -0.002
+  lamp.add(lampLight)
+  lamp.position.set(-0.14, 0, 0.1)
+  table.add(lamp)
+
   table.position.set(TABLE_X, 0, TABLE_Z)
   group.add(table)
 
@@ -501,21 +567,10 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const winRight = buildWindow(width / 2 + 0.08, -Math.PI / 2)
   group.add(winLeft, winRight)
 
-  // A point light at the hearth: physically-correct falloff (three r150+)
-  // means it needs tens, not units, to read from a few metres out — see the
-  // same lesson the flashlight already learned (game/scene.ts).
-  const hearthLight = new THREE.PointLight(0xffcf8a, 0, 5)
-  hearthLight.position.set(0, wallHeight * 0.5, 0)
-  hearthLight.castShadow = true
-  // A cube shadow map this small only has to hide one box from itself —
-  // nowhere near what a scene-wide light would need.
-  hearthLight.shadow.mapSize.set(256, 256)
-  hearthLight.shadow.bias = -0.002
-  group.add(hearthLight)
-
   const setNight = (t: number): void => {
     glassMat.emissiveIntensity = t * 2.2
-    hearthLight.intensity = t * 18
+    shadeMat.emissiveIntensity = t * 2.2
+    lampLight.intensity = t * 14
   }
 
   // A stacked armful of firewood against one side of the hut — the wall
