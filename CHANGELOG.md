@@ -6,6 +6,13 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.87.3
+Fix: the walking stick vanished a few hundred ms into every touch on real
+phones — the canvas never told the browser to keep touch gestures for
+itself, so the browser's own pan/zoom recognizer took the drag over and
+cancelled it. The stick is also now permanently visible at a fixed spot
+instead of only appearing once already being touched.
+
 ## v0.87.2
 Fix: mushrooms had all but stopped appearing since the calendar update — the
 game month was stuck at "January" regardless of the real date, and most

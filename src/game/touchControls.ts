@@ -12,6 +12,11 @@ const TAP_MOVE_THRESHOLD = 12
 /** A press held longer than this, ms, is not a tap even if the finger never
  *  moved — a deliberate hold reads as something else, not an accidental tap. */
 const TAP_TIME_THRESHOLD = 350
+/** The walking stick's fixed on-screen home, px from the left/bottom edge —
+ *  a thumb needs a permanent, findable-by-feel spot, not a ring that only
+ *  exists once it is already being dragged. */
+const ANCHOR_LEFT = 90
+const ANCHOR_BOTTOM = 110
 
 // No touch sprint control — the crouch button is the only gesture this
 // scheme spends a dedicated screen element on; a run is out of scope here.
@@ -102,6 +107,14 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
     }
   }
 
+  // The root cause of the control vanishing mid-drag on real phones: with
+  // `touch-action` left at its default `auto`, the browser's own gesture
+  // recognizer claims a drag as a page pan/zoom a few hundred ms in and fires
+  // `pointercancel`, tearing down the stick/look touch this element was
+  // still tracking. Harmless on desktop — `touch-action` only governs touch
+  // gesture recognition, never mouse input.
+  dom.style.touchAction = 'none'
+
   let sens = sensitivity
   let invertY = false
   let stick: StickTouch | null = null
@@ -138,22 +151,36 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
   crouchBtn.addEventListener('pointercancel', releaseCrouch)
   document.body.append(crouchBtn)
 
-  // Purely visual: a ring at the thumb's starting point and a knob that
-  // follows the drag, so the stick is discoverable at all — nothing else on
-  // screen hints that the left half is touch-draggable. `pointer-events:none`
-  // keeps them out of the way of the drag they are only reflecting.
+  // Permanently on screen at a fixed home rather than appearing at the
+  // thumb's touch point — a control that only exists once already being
+  // dragged is not a control a player can find. `pointer-events:none` keeps
+  // them out of the way of the drag they only reflect.
   const ringStyle =
     'position:fixed;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;' +
     'background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);' +
-    'pointer-events:none;z-index:40;display:none'
+    'pointer-events:none;z-index:40'
   const knobStyle =
     'position:fixed;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;' +
-    'background:rgba(255,255,255,.35);pointer-events:none;z-index:41;display:none'
+    'background:rgba(255,255,255,.35);pointer-events:none;z-index:41'
   const ring = document.createElement('div')
   ring.style.cssText = ringStyle
   const knob = document.createElement('div')
   knob.style.cssText = knobStyle
   document.body.append(ring, knob)
+
+  const anchorX = (): number => ANCHOR_LEFT
+  const anchorY = (): number => innerHeight - ANCHOR_BOTTOM
+
+  const placeKnob = (x: number, y: number): void => {
+    knob.style.left = `${x}px`
+    knob.style.top = `${y}px`
+  }
+  const placeAtAnchor = (): void => {
+    ring.style.left = `${anchorX()}px`
+    ring.style.top = `${anchorY()}px`
+    placeKnob(anchorX(), anchorY())
+  }
+  placeAtAnchor()
 
   const onLeft = (x: number): boolean => x < innerWidth / 2
 
@@ -161,13 +188,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
     if (e.pointerType !== 'touch') return
     if (onLeft(e.clientX)) {
       if (stick) return
-      stick = { id: e.pointerId, startX: e.clientX, startY: e.clientY, curX: e.clientX, curY: e.clientY }
-      ring.style.left = `${e.clientX}px`
-      ring.style.top = `${e.clientY}px`
-      ring.style.display = 'block'
-      knob.style.left = `${e.clientX}px`
-      knob.style.top = `${e.clientY}px`
-      knob.style.display = 'block'
+      stick = { id: e.pointerId, startX: anchorX(), startY: anchorY(), curX: e.clientX, curY: e.clientY }
     } else {
       if (look) return
       look = {
@@ -185,8 +206,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       const dy = stick.curY - stick.startY
       const len = Math.hypot(dx, dy)
       const clamp = len > STICK_RADIUS ? STICK_RADIUS / len : 1
-      knob.style.left = `${stick.startX + dx * clamp}px`
-      knob.style.top = `${stick.startY + dy * clamp}px`
+      placeKnob(stick.startX + dx * clamp, stick.startY + dy * clamp)
     }
     if (look && e.pointerId === look.id) {
       dYaw -= (e.clientX - look.lastX) * BASE_SENSITIVITY * sens
@@ -202,8 +222,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
   const onUp = (e: PointerEvent): void => {
     if (stick && e.pointerId === stick.id) {
       stick = null
-      ring.style.display = 'none'
-      knob.style.display = 'none'
+      placeKnob(anchorX(), anchorY())
     }
     if (look && e.pointerId === look.id) {
       if (!look.moved && isTap(0, 0, performance.now() - look.startT)) {

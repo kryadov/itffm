@@ -1453,6 +1453,33 @@ UX/фичи покрупнее.
       OR-условием `ontouchstart`/`maxTouchPoints` увело бы такие устройства
       с клавиатуры на сенсорный ввод насильно) — нужны конкретные
       модель/браузер, прежде чем трогать эту эвристику.
+- [x] **Movement/gather controls flashed and vanished on real phones — game
+      unplayable on mobile.** Live report 2026-09-12, confirmed on iPhone,
+      Android phone and tablet alike (not one specific device, ruling out the
+      `pointer: coarse` heuristic above): touching the stick zone showed the
+      ring for a few hundred ms, a tiny camera nudge happened, then the
+      control vanished. Headless CDP touch emulation (both local `dist` and
+      the live site) couldn't reproduce it — `touch.active` and the buttons
+      were fine there, which was the tell: CDP dispatches synthetic pointer
+      events directly, never triggering a real browser's native gesture
+      recognizer. Root cause: `game/touchControls.ts`'s `dom` (the renderer's
+      canvas) never set `touch-action`, so at its default `auto` the browser
+      claimed an in-progress drag as a page pan/zoom a few hundred ms in and
+      fired `pointercancel`, tearing down the stick/look touch mid-drag — the
+      crouch button already had `touch-action:none` and never showed the bug,
+      which in hindsight should have pointed here sooner. Fixed by setting
+      `dom.style.touchAction = 'none'` once `active` (never touches desktop —
+      the property only governs touch gesture recognition, not mouse input).
+      Same live report separately asked that the walking stick be
+      permanently visible rather than only appearing once already touched
+      (the original floating-ring design assumed the left half being
+      draggable was discoverable; it evidently was not) — the ring/knob now
+      live at a fixed on-screen anchor (bottom-left, mirroring the crouch
+      button's own fixed spot) shown from the moment touch controls are
+      built, and a stick's forward/strafe is now measured from that anchor
+      rather than from wherever the finger first landed. Verified: `npm
+      test`/`build`/`boot-check` green; CDP mobile-emulation screenshot shows
+      the stick ring visible before any touch.
 
 ## 🌍 Биомы за пределами леса
 
