@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { placeRailLine, railHeightAt, stepTrainT, createTrain } from '../../src/world/railway'
+import { proceduralTerrain } from '../../src/terrain/procedural'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
@@ -34,6 +35,33 @@ describe('placeRailLine', () => {
     const slope: ElevationProvider = { heightAt: (x) => x * 0.1 }
     const line = placeRailLine(slope, 90, 3)
     for (const p of line.points) expect(p.y).toBeCloseTo(slope.heightAt(p.x, p.z), 5)
+  })
+
+  it('samples densely enough that the interpolated line never strays far from ' +
+     'the real ground between two sample points — a live report found rails ' +
+     'visibly sagging or floating on real, bumpy procedural terrain', () => {
+    // Several seeds/sizes, not just one — a single lucky seed could hide a
+    // sampling gap that a bumpier terrain or a longer line exposes.
+    for (const seed of [3, 7, 11, 19]) {
+      for (const halfSize of [60, 90, 150]) {
+        const ground = proceduralTerrain(seed)
+        const line = placeRailLine(ground, halfSize, seed)
+        const x0 = line.points[0].x
+        const x1 = line.points[line.points.length - 1].x
+        const z = line.points[0].z
+        // Probe far more finely than the line's own samples — this is exactly
+        // the gap a sparse line hides (railHeightAt only ever gets checked
+        // exactly at its own sample points otherwise).
+        for (let x = x0; x <= x1; x += 0.5) {
+          const err = Math.abs(railHeightAt(line, x) - ground.heightAt(x, z))
+          // A rail sitting 8cm above the sleepers (RAIL_HEIGHT) already reads
+          // as floating or sunk well before this — a generous ceiling, not a
+          // tight tolerance, but well below what 12 fixed samples over a
+          // 100-270m line actually produced (measured up to ~0.9m).
+          expect(err).toBeLessThan(0.2)
+        }
+      }
+    }
   })
 })
 

@@ -152,4 +152,11 @@ describe('placeOsmTrees', () => {
     const trees = placeOsmTrees(mappedOnPath, flat, 55, 3, 60)
     expect(trees.some((t) => t.x === 5 && t.z === 0)).toBe(true)
   })
+
+  it('leaves a clear corridor along a rail line running through the wood ' +
+     '— a live report found trees growing straight through the rails', () => {
+    const railLine = { points: [{ x: -60, z: 20, y: 0 }, { x: 60, z: 20, y: 0 }] }
+    const trees = placeOsmTrees(world, flat, 55, 3, 60, railLine)
+    for (const t of trees) expect(Math.abs(t.z - 20)).toBeGreaterThanOrEqual(1.8)
+  })
 })

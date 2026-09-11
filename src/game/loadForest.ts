@@ -11,6 +11,7 @@ import { withBiomeRelief } from '../terrain/relief'
 import { proceduralTerrain } from '../terrain/procedural'
 import { demoForest } from '../world/demoForest'
 import { placeOsmTrees } from '../world/osmTrees'
+import { placeRailLine, RAIL_SEED_OFFSET } from '../world/railway'
 import { buildBiomeMap } from '../world/biome'
 import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
@@ -104,10 +105,18 @@ function buildSource(
   // reads a height from this ground, so a tree planted at the edge of a
   // dune stands on the same bump the player later walks over.
   const ground = withBiomeRelief(baseGround, biomeAt, seed + 4)
-  const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize)
+  // Computed here, before trees, rather than left to `game/scene.ts`'s own
+  // `placeRailLine` call: the exact same seed offset (`RAIL_SEED_OFFSET`)
+  // gives the exact same line either way, but only computing it first lets
+  // `placeOsmTrees` below keep trees off it (a live report found trees
+  // growing straight through the rails, `world/osmTrees.ts`'s
+  // `RAIL_CLEARANCE`). Threaded through on `ForestSource` so `createForest`
+  // reuses this one instead of placing a second, redundant line.
+  const railLine = placeRailLine(ground, halfSize, seed + RAIL_SEED_OFFSET)
+  const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize, railLine)
   return {
     ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water,
-    shelters: world.shelters.map((s) => s.at), caves: world.caves.map((c) => c.at),
+    shelters: world.shelters.map((s) => s.at), caves: world.caves.map((c) => c.at), railLine,
   }
 }
 

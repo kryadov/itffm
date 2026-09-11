@@ -28,14 +28,43 @@ UX/фичи покрупнее.
       игрок стоит.** Не птичий крик (`audio/birdCalls.ts`, интервал 4-11с) —
       что-то ещё держит собственный таймер в `audio/` или `game/`, найти
       источник.
-- [ ] **Поезд не появляется.** Рельсы видны, поезд — нет, при долгой ходьбе
-      рядом. Плюс: рельсы не всегда лежат на рельефе (провисают в воздухе),
-      деревья/объекты растут прямо на рельсах (`world/railway.ts` не
-      исключает свою полосу из размещения деревьев — нужен тот же
-      `PATH_CLEARANCE`-приём, что уже есть у троп, `world/osmTrees.ts`'s
-      `distanceToPolyline`), рельсы должны продолжаться без края (тот же
-      бесконечный-мир вопрос, что и у остального стриминга), сам поезд —
-      редкое явление, а не то, что должно быть видно почти всегда.
+- [x] **Поезд не появляется.** Root cause found: `placeRailLine`
+      (`world/railway.ts`) sampled ground height at a fixed 12 points
+      regardless of the line's own length (up to ~270m for the "large" plot
+      size) and interpolated between them — on real procedural terrain that
+      let the interpolated line stray up to ~0.9m from the actual ground
+      between samples (measured directly; see the new
+      `test/world/railway.test.ts` regression test). Against an 8cm rail
+      (`RAIL_HEIGHT`) and a ~1m-tall train, that is enough to bury the train
+      under the terrain mesh over most of its run — not a timing bug, the
+      shuttle (`stepTrainT`) and the per-frame `forest.updateTrain(dt)` call
+      in `main.ts` were both already correct and un-gated by player position.
+      Fixed: `placeRailLine` now samples every 3m by distance
+      (`RAIL_STEP`), the same "dense enough to follow the ground" approach
+      `world/paths.ts`'s `RIBBON_STEP`/`densify` already use, instead of a
+      fixed segment count — brings the worst-case error on real terrain
+      under 0.2m. Trees growing through the rails: fixed the same way as
+      paths — `placeOsmTrees` (`world/osmTrees.ts`) now takes the rail line
+      and applies `RAIL_CLEARANCE` via the same `distanceToPolyline` used for
+      `PATH_CLEARANCE`; `game/loadForest.ts` sites the line once (before
+      trees) and threads it through `ForestSource.railLine` so
+      `game/scene.ts` reuses the exact same line instead of siting a second
+      one. Deferred, honestly: continuing the rail line seamlessly into
+      streamed chunks (`game/worldStream.ts`) is the same halfSize-vs-
+      chunk-grid work the open "Real-place chunking" item below already
+      flags — not attempted here. Also pre-existing and out of scope: no
+      scatter placer other than `placeOsmTrees` (boulders/undergrowth/flora/
+      deadwood) avoids paths OR the rail line at all — a broader gap than
+      this rail-specific report, left alone rather than expanded into a
+      general clearance pass. Verified: new tests in
+      `test/world/railway.test.ts` (ground-following error bound, across
+      several seeds/plot sizes) and `test/world/osmTrees.test.ts` (rail
+      corridor), `npm test` (722 tests) and `npm run build` green,
+      `npm run boot-check` OK, and a throwaway headless-Chrome render of the
+      real procedural terrain + rail mesh + train (built, screenshotted,
+      then deleted — not part of the repo) showing sleepers following the
+      ground's own bumps and the train sitting visibly on the rails, not
+      sunk into the terrain.
 - [ ] **Швы между чанками карты видны** — перепады высоты/цвета земли и щели/
       разрывы меша на границе. `game/worldStream.ts`/`world/chunking.ts`:
       соседние чанки, похоже, не согласуют высоту/цвет на общей границе.
