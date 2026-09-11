@@ -94,8 +94,7 @@ async function main(): Promise<void> {
   // at the least, and the local round trip finishes well within that, so the
   // language is in place in practice before it is ever read for real; the
   // one cost is the place picker itself possibly rendering once in the
-  // default language before a saved preference arrives, same trade-off the
-  // first-run disclaimer already accepted.
+  // default language before a saved preference arrives.
   let save: SaveData = emptySave()
   void loadSave().then((loaded) => {
     save = loaded
@@ -482,27 +481,10 @@ async function main(): Promise<void> {
     return el
   }
 
-  function showDisclaimer(): void {
-    const el = overlay(
-      'disclaimer',
-      `<div style="max-width:540px;padding:34px">
-         <p style="line-height:1.6;margin:0 0 22px">${t('disclaimer')}</p>
-         <p style="opacity:.6;font-size:14px;margin:0 0 26px">${t('controls')}</p>
-         <button id="ok" style="padding:11px 24px;border:0;border-radius:8px;background:#7ec46b;color:#12160f;font-weight:600;font-size:15px;cursor:pointer">${t('understood')}</button>
-       </div>`,
-      [],
-    )
-    el.querySelector('#ok')!.addEventListener('click', () => {
-      el.remove()
-      save = { ...save, disclaimerSeen: true }
-      void persistSave(save)
-    })
-  }
-
-  // The disclaimer shows the same control list once, on first run only —
-  // after that there is nowhere to be reminded what opens the basket or the
-  // encyclopedia. H reopens it any time, and the always-visible corner hint
-  // (ui/hud.ts) is what tells a player the key exists at all.
+  // The always-visible corner hint (ui/hud.ts) tells a player the H key
+  // exists at all; this is what it opens — the same control list a first-run
+  // disclaimer screen used to show once, before that screen was removed
+  // entirely (2026-09-11: it kept blocking mobile play past repair).
   function showHelp(): void {
     overlay(
       'help',
@@ -614,8 +596,6 @@ async function main(): Promise<void> {
       ensureDebugEl().hidden = !debugEnabled
     }
   })
-
-  if (!save.disclaimerSeen) showDisclaimer()
 
   let last = performance.now()
   let bootFrames = 0

@@ -13,12 +13,9 @@ const WAIT_MS = Number(process.argv[4] ?? 1800)
 const CLICK_SCRIPT =
   process.argv[5] ??
   `
-  var stage = 0
   var poll = setInterval(() => {
     var demo = document.querySelector('#place-picker #place-demo')
-    if (demo) { demo.click(); return }
-    var ok = document.querySelector('#disclaimer #ok')
-    if (ok) { ok.click(); stage = 1; clearInterval(poll) }
+    if (demo) { demo.click(); clearInterval(poll) }
   }, 100)
 `
 

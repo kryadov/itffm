@@ -26,9 +26,6 @@ export const RU = {
   inedible: 'несъедобный',
   poisonous: 'ядовитый',
   deadly: 'смертельно ядовитый',
-  disclaimer:
-    'Игра не является определителем грибов. Не используйте её, чтобы решать, что можно есть: настоящий гриб определяют по совокупности признаков, а ошибка стоит здоровья.',
-  understood: 'Понятно',
   controls:
     'WASD — идти, Shift — присесть, E — рассмотреть, Tab — энциклопедия, Q — разобрать корзину, M — настройки',
   helpTitle: 'Управление',
@@ -138,9 +135,6 @@ export const EN: Record<keyof typeof RU, string> = {
   inedible: 'inedible',
   poisonous: 'poisonous',
   deadly: 'deadly poisonous',
-  disclaimer:
-    'This game is not a field guide. Do not use it to decide what is safe to eat: a real mushroom is identified from the whole set of its characters, and a mistake costs your health.',
-  understood: 'Understood',
   controls:
     'WASD to walk, Shift to crouch, E to examine, Tab for the encyclopedia, Q to sort the basket, M for settings',
   helpTitle: 'Controls',

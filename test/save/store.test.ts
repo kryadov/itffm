@@ -36,7 +36,6 @@ describe('applyFind', () => {
     const s = emptySave()
     expect(s.discovered).toEqual([])
     expect(s.finds).toEqual([])
-    expect(s.disclaimerSeen).toBe(false)
   })
 })
 
@@ -46,9 +45,8 @@ describe('mergeSave', () => {
   })
 
   it('takes top-level fields from a stored save', () => {
-    const s = mergeSave({ lang: 'en', disclaimerSeen: true })
+    const s = mergeSave({ lang: 'en' })
     expect(s.lang).toBe('en')
-    expect(s.disclaimerSeen).toBe(true)
   })
 
   it('fills in a prefs field a stored save predates, rather than losing every prefs field to it', () => {
