@@ -46,11 +46,25 @@ UX/фичи покрупнее.
       подгрузка через Overpass/DEM по чанку вокруг игрока, с честным
       процедурным fallback на чанк при любой сетевой неудаче — решение уже
       есть в доке, реализация — нет.
-- [ ] **Disclaimer убран целиком** — экран с правилами не проходим на
+- [x] **Disclaimer убран целиком** — экран с правилами не проходим на
       мобильных (не почёлся кнопке), чинить в очередной раз не стали.
       Убрать экран согласия из `main.ts` полностью (первый запуск и кнопка
       в HUD/энциклопедии), не оставляя even урезанной версии. `CLAUDE.md`
       уже обновлён (раздел «Responsibility» больше не требует disclaimer).
+      **Done:** removed `showDisclaimer()`, its first-run call, and the
+      `overlay('disclaimer', ...)` markup from `main.ts`; removed the
+      permanent disclaimer banner from `ui/encyclopedia.ts` (no button ever
+      reopened a separate disclaimer screen — the encyclopedia's own inline
+      banner was the only other place it showed). Deleted the now-dead
+      `disclaimerSeen` field from `SaveData` (`save/store.ts`, plus its
+      `emptySave()`/tests), and the now-unused `disclaimer`/`understood`
+      i18n keys (`i18n/i18n.ts`, both RU and EN) — `controls` stays, since
+      the `H` help overlay still uses it. Updated `scripts/shot-cdp.mjs`'s
+      click script, which used to dismiss the disclaimer for screenshots.
+      Verified: `npm test` (720 tests) and `npm run build` green, `npm run
+      boot-check` OK, and a live headless CDP screenshot after picking the
+      demo place shows gameplay directly — no disclaimer screen at any
+      point.
 - [ ] **Просадки FPS и 100% загрузка GPU/CPU, дрожание теней, когда игрок
       стоит на месте.** И постоянная нагрузка, и рывки при ходьбе (похоже на
       подгрузку чанков) — пользователь играет на RTX, значит дело не в

@@ -42,7 +42,6 @@ export interface SaveData {
   discovered: string[]
   finds: Find[]
   lang: Lang
-  disclaimerSeen: boolean
   prefs: Prefs
 }
 
@@ -78,7 +77,7 @@ const STORE = 'save'
 const KEY = 'current'
 
 export function emptySave(): SaveData {
-  return { discovered: [], finds: [], lang: 'ru', disclaimerSeen: false, prefs: defaultPrefs() }
+  return { discovered: [], finds: [], lang: 'ru', prefs: defaultPrefs() }
 }
 
 /** Applies a find. Returns a new object and leaves the old one untouched. */

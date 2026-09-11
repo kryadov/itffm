@@ -153,9 +153,6 @@ export function openEncyclopedia(save: SaveData, lang: 'ru' | 'en'): void {
       <button id="export-encyclopedia" style="margin-left:auto;padding:6px 14px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;font-size:13px;cursor:pointer">${t('exportEncyclopedia')}</button>
       <span style="opacity:.5;font-size:14px">${t('closeHint')}</span>
     </div>
-    <p style="margin:0 0 18px;padding:10px 14px;background:#2a1f14;border-left:3px solid #d8a04a;border-radius:0 6px 6px 0;font-size:13px;line-height:1.5;opacity:.9;max-width:760px">
-      ${t('disclaimer')}
-    </p>
     <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:20px">
       ${labeled(t('filterKind'), kindSelect)}
       ${labeled(t('filterBiome'), biomeSelect)}
