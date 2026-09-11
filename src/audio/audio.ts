@@ -106,6 +106,16 @@ export class AudioEngine {
   private waterAmpLfoDepth: GainNode | null = null
   private waterDistanceGain: GainNode | null = null
 
+  // The forest's own background wind — same continuous-loop shape as water
+  // ambience just above (no "landing on a beat" to worry about), but with
+  // only one LFO: a slow sweep on the lowpass cutoff is enough to read as
+  // gusting, and unlike water there is no second "kind" of texture to
+  // switch between, so only the final gain node needs to stay reachable —
+  // audio/windAmbience.ts's windGain() is the only thing that changes per
+  // frame, and the filter/LFO underneath it just run on their own once set.
+  private windNoise: AudioBufferSourceNode | null = null
+  private windGainNode: GainNode | null = null
+
   // The music bed (day/night/campfire) and the footstep loop (walk/run) are
   // both real recordings (see the class doc comment above) rather than
   // synthesis — three/two looping AudioBufferSourceNodes each, decoded once
@@ -522,5 +532,64 @@ export class AudioEngine {
     this.waterAmpLfo.frequency.setTargetAtTime(p.ampLfoRate, t, 0.5)
     this.waterAmpLfoDepth.gain.setTargetAtTime(p.ampLfoDepth, t, 0.5)
     this.waterDistanceGain.gain.setTargetAtTime(gain * p.peakGain, t, 0.15)
+  }
+
+  /** Builds the wind-ambience node graph once, the same lazy-on-first-need
+   *  shape as `ensureWaterAmbience()` above: a looping noise buffer through
+   *  a lowpass filter, its cutoff swept slowly by one LFO for a gusting
+   *  feel, into the gain `updateWindAmbience` drives every frame. */
+  private ensureWindAmbience(): void {
+    if (!this.ctx || !this.sfxGain || this.windNoise) return
+    const ctx = this.ctx
+
+    const noise = ctx.createBufferSource()
+    noise.buffer = this.noiseBurst(2)
+    noise.loop = true
+
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.value = 450
+    filter.Q.value = 0.5
+
+    const freqLfo = ctx.createOscillator()
+    freqLfo.type = 'sine'
+    freqLfo.frequency.value = 0.07 // one slow gust roughly every 14s
+    const freqLfoDepth = ctx.createGain()
+    freqLfoDepth.gain.value = 260
+    freqLfo.connect(freqLfoDepth)
+    freqLfoDepth.connect(filter.frequency)
+
+    const g = ctx.createGain()
+    g.gain.value = 0
+
+    noise.connect(filter)
+    filter.connect(g)
+    g.connect(this.sfxGain)
+
+    noise.start()
+    freqLfo.start()
+
+    this.windNoise = noise
+    this.windGainNode = g
+  }
+
+  /**
+   * The forest's own background — wind in the canopy, called every frame
+   * with `gain` already computed (`audio/windAmbience.ts`'s `windGain`,
+   * from the current weather and `world/daynight.ts`'s `nightFactor`), the
+   * same "caller decides how loud, this just plays it" split
+   * `updateWaterAmbience` uses. Never silent outright at gain 0 — like
+   * water, this only ramps an existing graph toward silence rather than
+   * tearing it down.
+   */
+  updateWindAmbience(gain: number): void {
+    if (!this.ctx || !this.sfxGain) return
+    if (gain <= 0) {
+      if (this.windGainNode) this.windGainNode.gain.setTargetAtTime(0, this.ctx.currentTime, 0.5)
+      return
+    }
+    this.ensureWindAmbience()
+    if (!this.windGainNode) return
+    this.windGainNode.gain.setTargetAtTime(gain, this.ctx.currentTime, 0.5)
   }
 }

@@ -9,6 +9,7 @@ import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
 import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAmbience'
 import { campfireGain } from './audio/musicAmbience'
+import { windGain } from './audio/windAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
@@ -782,7 +783,9 @@ async function main(): Promise<void> {
     const clockT = timeFor(save.prefs.timeMode, cycleT)
     forest.updateDayNight(clockT, camera.position)
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
-    audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
+    const night = nightFactor(clockT)
+    audio.updateMusic(night, campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
+    audio.updateWindAmbience(windGain(save.prefs.weather, night))
     forest.updateClouds(camera.position, dt)
     forest.updateWeather(camera.position, dt)
     forest.updateShelter(dt)

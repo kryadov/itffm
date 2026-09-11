@@ -41,7 +41,13 @@ describe('applyFind', () => {
 
 describe('mergeSave', () => {
   it('starts from the defaults with nothing stored at all', () => {
-    expect(mergeSave(undefined)).toEqual(emptySave())
+    // calendarStart is Date.now() at call time — compared separately
+    // (a tolerant "close to now") rather than via toEqual, which would
+    // flake whenever the two calls below land in different milliseconds.
+    const merged = mergeSave(undefined)
+    const empty = emptySave()
+    expect({ ...merged, calendarStart: 0 }).toEqual({ ...empty, calendarStart: 0 })
+    expect(Math.abs(merged.calendarStart - Date.now())).toBeLessThan(5000)
   })
 
   it('takes top-level fields from a stored save', () => {
