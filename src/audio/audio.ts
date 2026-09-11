@@ -66,16 +66,27 @@ export const FOOTSTEP_PARAMS: Record<
  * distance. TODO.md's 🔊 section's forest ambience (wind, creaks) is still
  * open and still undecided between the two.
  *
- * `updateMusic()`/`updateFootstepLoop()` below are a deliberate, later
- * exception to the "no CC0 recording" rule above, not an erosion of it: a
- * real 2026-09-11 request asked specifically for real recordings (zvukbox.ru,
+ * `updateMusic()`/`footstepClip()` below are a deliberate, later exception
+ * to the "no CC0 recording" rule above, not an erosion of it: a real
+ * 2026-09-11 request asked specifically for real recordings (zvukbox.ru,
  * metadata and cover art stripped before they entered the repo) for the
- * wood's own day/night/campfire music bed and its walk/run footstep loop —
+ * wood's own day/night/campfire music bed and its walk/run footstep sound —
  * every other sound in this file is still synthesis, and stays that way.
  * Both play through their own `Prefs`-driven volume (`musicVolume`,
  * `footstepVolume`), independent of `sfxGain`'s `soundVolume` — a player who
  * wants the mushroom-collect snap without the music, or the reverse, can
  * have it.
+ *
+ * `footstepClip()` is a one-shot retrigger from the start of the recording
+ * on every `crossedFootstep()` (`main.ts`, the same event `footstep()`
+ * already fires on) rather than a continuously-playing background loop —
+ * a live report the same day ("звук шагов не синхронизирован с ходьбой")
+ * caught the first version, which ran the clip on its own free-running
+ * loop gated only by volume: it never landed on a real footfall, drifting
+ * further out of step the longer the player walked. Retriggering from
+ * offset 0 every footfall is the same fix `updateWaterAmbience()` never
+ * needed (water has no beat to land on) but `footstep()` already had right
+ * from the start.
  */
 export class AudioEngine {
   private ctx: AudioContext | null = null
@@ -114,8 +125,6 @@ export class AudioEngine {
   private footstepVolume = 0.6
   private walkBuffer: AudioBuffer | null = null
   private runBuffer: AudioBuffer | null = null
-  private walkGain: GainNode | null = null
-  private runGain: GainNode | null = null
 
   /** Create/resume the AudioContext. Call from a click/keydown handler —
    *  browsers refuse to start audio before one. */
@@ -188,12 +197,12 @@ export class AudioEngine {
     const [walk, run] = await Promise.all([this.loadClip('./audio/walk.mp3'), this.loadClip('./audio/run.mp3')])
     this.walkBuffer = walk
     this.runBuffer = run
-    this.ensureFootstepSources()
   }
 
-  /** One looping source, gain-nulled until the first real `updateMusic()`/
-   *  `updateFootstepLoop()` call sets a target — built once its buffer has
-   *  actually finished decoding, a no-op on every call after. */
+  /** One looping source, gain-nulled until the first real `updateMusic()`
+   *  call sets a target — built once its buffer has actually finished
+   *  decoding, a no-op on every call after. Music has no beat to land on
+   *  (unlike the footstep clip below), so a free-running loop is fine here. */
   private startLoop(buffer: AudioBuffer, into: GainNode): GainNode {
     const ctx = this.ctx!
     const src = ctx.createBufferSource()
@@ -216,12 +225,6 @@ export class AudioEngine {
     }
   }
 
-  private ensureFootstepSources(): void {
-    if (!this.ctx || !this.footstepGain) return
-    if (this.walkBuffer && !this.walkGain) this.walkGain = this.startLoop(this.walkBuffer, this.footstepGain)
-    if (this.runBuffer && !this.runGain) this.runGain = this.startLoop(this.runBuffer, this.footstepGain)
-  }
-
   /**
    * The wood's own music bed — called every frame (`main.ts`, alongside the
    * water-ambience/footstep wiring) with `night` (`world/daynight.ts`'s
@@ -241,22 +244,44 @@ export class AudioEngine {
     if (this.campfireLoopGain) this.campfireLoopGain.gain.setTargetAtTime(fireGain, t, 0.8)
   }
 
+  /** How much of walk.mp3/run.mp3, from its own start, plays per footfall —
+   *  short enough that a faster cadence (sprinting, or just a quick step)
+   *  doesn't pile several overlapping copies on top of each other, the same
+   *  concern `FOOTSTEP_PARAMS`' own short durations above already solve for
+   *  the synthesized substrates. Run gets the shorter slice: sprint footfalls
+   *  land closer together (`SPRINT_SPEED`/`WALK_SPEED` in game/player.ts). */
+  private static readonly FOOTSTEP_CLIP_DURATION = { walk: 0.4, run: 0.3 }
+
   /**
-   * The walking/running footstep loop — called every frame next to
-   * `updateMusic()`. `moving` is whether the player actually covered ground
-   * this frame (main.ts's own bob-phase delta, the same signal that already
-   * drives the water-splash's `footstep()` call); `sprinting` picks run.mp3
-   * over walk.mp3; `silence` mutes both outright while the player is in or
-   * near water, where `footstep()`'s own synthesized splash keeps playing
-   * instead — the recording was never meant to stand in for that one.
+   * One footfall from the recorded walk/run clip — called on `main.ts`'s own
+   * `crossedFootstep()`, the exact same trigger `footstep()` above fires on
+   * for the synthesized substrates, so this one lands on a real footfall
+   * instead of drifting on its own clock. Retriggers from the clip's own
+   * offset 0 every time (a fresh `AudioBufferSourceNode` — Web Audio sources
+   * are one-shot, cannot be rewound and replayed) rather than looping
+   * continuously in the background, which a live report caught: a
+   * free-running loop gated only by volume never lined up with an actual
+   * step. A short gain ramp at the tail avoids a click if the clip is cut off
+   * mid-sound at `FOOTSTEP_CLIP_DURATION`.
    */
-  updateFootstepLoop(moving: boolean, sprinting: boolean, silence: boolean): void {
-    if (!this.ctx) return
-    this.ensureFootstepSources()
-    const t = this.ctx.currentTime
-    const on = moving && !silence
-    if (this.walkGain) this.walkGain.gain.setTargetAtTime(on && !sprinting ? 1 : 0, t, 0.1)
-    if (this.runGain) this.runGain.gain.setTargetAtTime(on && sprinting ? 1 : 0, t, 0.1)
+  footstepClip(sprinting: boolean): void {
+    if (!this.ctx || !this.footstepGain || this.footstepVolume <= 0) return
+    const buffer = sprinting ? this.runBuffer : this.walkBuffer
+    if (!buffer) return
+    const ctx = this.ctx
+    const t = ctx.currentTime
+    const duration = sprinting ? AudioEngine.FOOTSTEP_CLIP_DURATION.run : AudioEngine.FOOTSTEP_CLIP_DURATION.walk
+
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    const g = ctx.createGain()
+    g.gain.setValueAtTime(1, t)
+    g.gain.setValueAtTime(1, t + Math.max(0, duration - 0.05))
+    g.gain.linearRampToValueAtTime(0, t + duration)
+
+    src.connect(g)
+    g.connect(this.footstepGain)
+    src.start(t, 0, duration)
   }
 
   /** One filtered-noise-plus-LFO recipe per water kind — a stream reads as

@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.80.1
+Fix: the walk/run footstep sound now retriggers on the actual footfall
+instead of running as its own free-running background loop.
+
 ## v0.80.0
 Real recorded music (day/night/campfire) and a walk/run footstep loop, plus
 a new sprint (Shift).

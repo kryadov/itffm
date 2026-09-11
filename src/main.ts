@@ -746,19 +746,15 @@ async function main(): Promise<void> {
 
       // In/near water keeps the old synthesized splash (audio/audio.ts's
       // footstep() — see FOOTSTEP_PARAMS.water) rather than the recorded
-      // walk/run loop below: the loop was never meant to stand in for that
-      // one, so it stays muted whenever this is true.
-      const nearWater = (source.water ?? []).some(
-        (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
-      )
-      if (nearWater && crossedFootstep(prevBobPhase, player.bobPhase)) {
-        audio.footstep(footstepSubstrate(biome, nearWater))
+      // walk/run clip below: the recording was never meant to stand in for
+      // that one.
+      if (crossedFootstep(prevBobPhase, player.bobPhase)) {
+        const nearWater = (source.water ?? []).some(
+          (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
+        )
+        if (nearWater) audio.footstep(footstepSubstrate(biome, nearWater))
+        else audio.footstepClip(input.sprinting)
       }
-      // Continuous, unlike the splash above: on for every frame the player
-      // actually covers ground (bobPhase only advances while grounded and
-      // moving — see PlayerState's own doc comment), off the instant they
-      // stop or step into water.
-      audio.updateFootstepLoop(player.bobPhase !== prevBobPhase, input.sprinting, nearWater)
 
       birdCallTimer -= dt
       if (birdCallTimer <= 0) {
