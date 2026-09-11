@@ -15,7 +15,10 @@ import { placeGrass, buildGrassMesh } from '../world/grass'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
 import { buildPlacementObject } from '../collectible/placement'
 import { loadSpecies } from '../species/load'
-import { CHUNK_SIZE, chunkCoordAt, chunkOrigin, chunkSeed, chunksInRadius, chunkKey, type ChunkCoord } from '../world/chunking'
+import {
+  CHUNK_SIZE, CHUNK_GROUND_SEGMENTS, chunkCoordAt, chunkOrigin, chunkSeed, chunksInRadius, chunkKey,
+  type ChunkCoord,
+} from '../world/chunking'
 import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Species } from '../species/schema'
@@ -39,12 +42,6 @@ const UNLOAD_RADIUS = 2
  *  A proper fix (building off the main thread, or in slices within a
  *  frame's own time budget) is real future work, logged in TODO.md. */
 const BUILD_BUDGET_PER_UPDATE = 1
-
-/** Ground mesh resolution for a streamed chunk — coarser than the curated
- *  home plot's own (`groundSegmentsFor`, up to 220): wilderness further out
- *  does not need the same fidelity, the same "detail falls off with
- *  distance" principle the mushroom LOD already uses. */
-const CHUNK_GROUND_SEGMENTS = 60
 
 /** Sites per chunk — a flat count, not scaled to the chunk's (much bigger)
  *  area the way the home plot's own count is: with up to nine chunks live
@@ -173,7 +170,15 @@ export function createWorldStream(
 
     const group = new THREE.Group()
     group.name = `chunk:${chunkKey(coord)}`
-    group.add(buildGround(baseTerrain, half, CHUNK_GROUND_SEGMENTS, biomeAt, seed, origin))
+    // Litter colour is a continuous field over the whole world, not per-chunk
+    // content — it has to share one seed everywhere (globalSeed + 17, the
+    // same convention game/scene.ts's home plot uses) rather than this
+    // chunk's own chunkSeed. fbm2 with two different seeds is two unrelated
+    // noise fields, so passing the chunk seed here made the ground colour
+    // jump at every chunk border even though the world (x, z) coordinates on
+    // both sides line up exactly — see TODO.md's "Швы между чанками карты
+    // видны".
+    group.add(buildGround(baseTerrain, half, CHUNK_GROUND_SEGMENTS, biomeAt, globalSeed + 17, origin))
 
     const trees = placeTrees(baseTerrain, half, seed + 1, mix, TREE_DENSITY, origin)
     group.add(buildTreeMeshes(trees))

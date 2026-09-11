@@ -23,6 +23,16 @@ import { hashString } from '../util/rng'
  *  plot and a chunk seam is never the reason something pops in mid-view. */
 export const CHUNK_SIZE = 400
 
+/** Ground-mesh resolution every streamed chunk builds at (`game/worldStream.ts`).
+ *  The reserved home-plot chunk (0, 0) has to build its own ground mesh at
+ *  exactly this same resolution too, whenever it neighbours streamed chunks
+ *  (`game/loadForest.ts`'s demo-wood path, threaded through
+ *  `game/scene.ts`'s `createForest`) — otherwise the two meshes tessellate
+ *  the shared edge at different vertex spacings and a real crack opens up
+ *  even though the underlying height field is perfectly continuous. See
+ *  TODO.md's "Швы между чанками карты видны". */
+export const CHUNK_GROUND_SEGMENTS = 60
+
 export interface ChunkCoord {
   cx: number
   cz: number
