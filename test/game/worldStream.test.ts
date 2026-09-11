@@ -115,6 +115,67 @@ describe('createWorldStream', () => {
     expect(Number.isFinite(wellOutside)).toBe(true)
   })
 
+  it('keeps ground height continuous at the shared edge between two streamed chunks', () => {
+    const scene = new THREE.Scene()
+    const stream = createWorldStream(scene, 9, flatHome, HOME_RADIUS)
+    settle(stream, CHUNK_SIZE * 2, 0) // loads chunks (1,0)..(3,0) among others
+    const left = scene.children.find((c) => c.name === 'chunk:1:0') as THREE.Group
+    const right = scene.children.find((c) => c.name === 'chunk:2:0') as THREE.Group
+    const leftGround = left.children.find((c) => c.name === 'ground') as THREE.Mesh
+    const rightGround = right.children.find((c) => c.name === 'ground') as THREE.Mesh
+    const leftPos = leftGround.geometry.getAttribute('position')
+    const rightPos = rightGround.geometry.getAttribute('position')
+    // Chunk (1,0)'s right edge (local x = +halfSize) and chunk (2,0)'s left
+    // edge (local x = -halfSize) sit at the same world x — same segment
+    // count and origin spacing means every z row lines up exactly too.
+    const rightEdgeByZ = new Map<number, number>()
+    for (let i = 0; i < leftPos.count; i++) {
+      if (leftPos.getX(i) === 200) rightEdgeByZ.set(leftPos.getZ(i), leftPos.getY(i))
+    }
+    expect(rightEdgeByZ.size).toBeGreaterThan(0)
+    let compared = 0
+    for (let i = 0; i < rightPos.count; i++) {
+      if (rightPos.getX(i) !== -200) continue
+      const z = rightPos.getZ(i)
+      expect(rightEdgeByZ.has(z)).toBe(true)
+      expect(rightPos.getY(i)).toBeCloseTo(rightEdgeByZ.get(z)!, 5)
+      compared++
+    }
+    expect(compared).toBe(rightEdgeByZ.size)
+  })
+
+  it('keeps ground litter colour continuous at the shared edge between two streamed chunks', () => {
+    const scene = new THREE.Scene()
+    const stream = createWorldStream(scene, 9, flatHome, HOME_RADIUS)
+    settle(stream, CHUNK_SIZE * 2, 0)
+    const left = scene.children.find((c) => c.name === 'chunk:1:0') as THREE.Group
+    const right = scene.children.find((c) => c.name === 'chunk:2:0') as THREE.Group
+    const leftGround = left.children.find((c) => c.name === 'ground') as THREE.Mesh
+    const rightGround = right.children.find((c) => c.name === 'ground') as THREE.Mesh
+    const leftPos = leftGround.geometry.getAttribute('position')
+    const leftColor = leftGround.geometry.getAttribute('color')
+    const rightPos = rightGround.geometry.getAttribute('position')
+    const rightColor = rightGround.geometry.getAttribute('color')
+    const rightEdgeByZ = new Map<number, [number, number, number]>()
+    for (let i = 0; i < leftPos.count; i++) {
+      if (leftPos.getX(i) === 200) {
+        rightEdgeByZ.set(leftPos.getZ(i), [leftColor.getX(i), leftColor.getY(i), leftColor.getZ(i)])
+      }
+    }
+    expect(rightEdgeByZ.size).toBeGreaterThan(0)
+    let compared = 0
+    for (let i = 0; i < rightPos.count; i++) {
+      if (rightPos.getX(i) !== -200) continue
+      const z = rightPos.getZ(i)
+      const expected = rightEdgeByZ.get(z)!
+      expect(rightColor.getX(i)).toBeCloseTo(expected[0], 5)
+      expect(rightColor.getY(i)).toBeCloseTo(expected[1], 5)
+      expect(rightColor.getZ(i)).toBeCloseTo(expected[2], 5)
+      compared++
+    }
+    expect(compared).toBe(rightEdgeByZ.size)
+  })
+
   it('collects placements only from currently-loaded chunks', () => {
     const scene = new THREE.Scene()
     const stream = createWorldStream(scene, 7, flatHome, HOME_RADIUS)

@@ -36,9 +36,47 @@ UX/фичи покрупнее.
       `distanceToPolyline`), рельсы должны продолжаться без края (тот же
       бесконечный-мир вопрос, что и у остального стриминга), сам поезд —
       редкое явление, а не то, что должно быть видно почти всегда.
-- [ ] **Швы между чанками карты видны** — перепады высоты/цвета земли и щели/
-      разрывы меша на границе. `game/worldStream.ts`/`world/chunking.ts`:
-      соседние чанки, похоже, не согласуют высоту/цвет на общей границе.
+- [x] **Швы между чанками карты видны.** Done — two separate root causes,
+      found by reproducing the seam numerically before touching anything
+      (sampling both neighbours' own coordinate frames at the shared edge
+      and asserting they agree): (1) **Colour.** `world/ground.ts`'s
+      `litterColor()` folds its `seed` argument straight into `fbm2` — not
+      as an offset within one continuous field, but as the hash seed of an
+      entirely different, uncorrelated noise field. `game/worldStream.ts`'s
+      `buildChunk` was passing each chunk's own `chunkSeed(coord,
+      globalSeed)` as that argument, so the litter pattern jumped at every
+      single streamed-chunk border (and at the home-plot border too) even
+      though the underlying world (x, z) coordinates lined up exactly.
+      Fixed by passing one shared `globalSeed + 17` everywhere — the same
+      convention `game/scene.ts`'s home plot already used — so the colour
+      field is one continuous surface over the whole world, the way height
+      already was. (2) **Geometry/height, home-plot border specifically.**
+      The reserved home chunk (0, 0) built its own ground mesh through a
+      completely separate path (`game/loadForest.ts`'s `proceduralGround`
+      → `game/scene.ts`'s `createForest`) at `groundSegmentsFor(200)` = 220
+      segments, while every streamed neighbour chunk
+      (`game/worldStream.ts`) built at `CHUNK_GROUND_SEGMENTS` = 60 — two
+      independently-tessellated meshes at different vertex spacings sharing
+      one edge, a real crack (T-junction) regardless of how well the
+      height *values* agreed. Fixed by threading the streamed chunks' own
+      resolution into the home plot's mesh whenever it neighbours them:
+      `createForest` (`game/scene.ts`) and `proceduralGround`
+      (`game/loadForest.ts`) both gained an optional `groundSegments`
+      override, `loadForestData`'s `LoadResult` now reports which
+      resolution it actually built at, and the demo-wood branch passes
+      `CHUNK_GROUND_SEGMENTS` (moved to `world/chunking.ts` so both call
+      sites share the one constant) through `main.ts` to `createForest`. A
+      real, bounded place still keeps its own finer
+      `groundSegmentsFor(halfSize)` — it never streams, so nothing borders
+      it. Verified: two new `worldStream.test.ts` tests assert every
+      vertex on the shared edge between two loaded streamed chunks matches
+      in both height and colour (the colour one reproduced the bug first,
+      red before the fix); a new `loadForest.test.ts` test asserts the demo
+      wood's `groundSegments` actually equals `CHUNK_GROUND_SEGMENTS`; and a
+      live headless screenshot with a temporary teleport to the home-plot/
+      streamed-chunk boundary (TEMP DEBUG, reverted, `git diff` empty
+      before commit) shows a mushroom and undergrowth sitting naturally
+      across the seam — smooth ground, no crack, no colour band.
 - [ ] **Real-place (настоящая локация) — бесконечный мир не работает,
       игрок упирается в край загруженной области.** Это открытый пункт
       «Real-place chunking» из раздела «Infinite world» ниже — то же самое,

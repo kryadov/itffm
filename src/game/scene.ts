@@ -171,7 +171,12 @@ export interface Forest {
  * The season follows the real calendar month; days-since-rain is fixed for now
  * — a real weather system is future work (see TODO.md).
  */
-export function createForest(source: ForestSource, seed: number, halfSize: number = DEFAULT_HALF_SIZE): Forest {
+export function createForest(
+  source: ForestSource,
+  seed: number,
+  halfSize: number = DEFAULT_HALF_SIZE,
+  groundSegments?: number,
+): Forest {
   const scene = new THREE.Scene()
   scene.fog = new THREE.Fog(0xa8c0a2, 30, 140)
 
@@ -276,7 +281,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
     flashlight.target.position.copy(camPos).add(camDir)
   }
 
-  scene.add(buildGround(source.ground, halfSize, groundSegmentsFor(halfSize), source.biomeAt, seed + 17))
+  scene.add(buildGround(source.ground, halfSize, groundSegments ?? groundSegmentsFor(halfSize), source.biomeAt, seed + 17))
   scene.add(buildPathMeshes(source.paths ?? [], source.ground, halfSize))
 
   // A narrow-gauge line and a small train shuttling along it — the lowest-

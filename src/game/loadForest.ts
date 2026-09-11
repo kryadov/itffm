@@ -14,7 +14,7 @@ import { placeOsmTrees } from '../world/osmTrees'
 import { buildBiomeMap } from '../world/biome'
 import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
-import { CHUNK_SIZE } from '../world/chunking'
+import { CHUNK_SIZE, CHUNK_GROUND_SEGMENTS } from '../world/chunking'
 import { DEFAULT_HALF_SIZE, groundSegmentsFor, type ForestSource } from './scene'
 import type { WorldData, BBox } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
@@ -42,8 +42,12 @@ export function chooseFallback(world: WorldData): 'demo' | null {
   return world.woods.length === 0 && world.open.length === 0 ? 'demo' : null
 }
 
-function proceduralGround(seed: number, halfSize: number): ElevationProvider {
-  return griddedProvider(withPits(proceduralTerrain(seed), seed + 3), halfSize, groundSegmentsFor(halfSize))
+function proceduralGround(
+  seed: number,
+  halfSize: number,
+  segments: number = groundSegmentsFor(halfSize),
+): ElevationProvider {
+  return griddedProvider(withPits(proceduralTerrain(seed), seed + 3), halfSize, segments)
 }
 
 /**
@@ -120,6 +124,16 @@ export interface LoadResult {
   /** The plot half-size this source was actually built at — pass straight
    *  through to createForest, same as the seed. */
   halfSize: number
+  /** The ground mesh's own segment count — pass straight through to
+   *  createForest too. For the demo wood this is `CHUNK_GROUND_SEGMENTS`,
+   *  not `groundSegmentsFor(halfSize)`'s usual finer figure: the demo wood's
+   *  home plot is exactly the streamed chunk grid's reserved chunk (0, 0)
+   *  (see `demoHalfSize` below), and its neighbours are streamed chunks
+   *  built at that same coarser resolution — matching it here is what keeps
+   *  the shared edge one continuous mesh instead of a crack (see TODO.md's
+   *  "Швы между чанками карты видны"). A real, bounded place never streams,
+   *  so it keeps the usual finer resolution. */
+  groundSegments: number
 }
 
 /**
@@ -154,7 +168,13 @@ export async function loadForestData(
         onStage('terrain')
         const ground = await realGround(bbox, projector, seed, halfSize)
         onStage('build')
-        return { source: buildSource(world, ground, center.lat, seed, halfSize), fellBackTo: null, seed, halfSize }
+        return {
+          source: buildSource(world, ground, center.lat, seed, halfSize),
+          fellBackTo: null,
+          seed,
+          halfSize,
+          groundSegments: groundSegmentsFor(halfSize),
+        }
       }
       // Tagging here was too sparse to build anything from. Rather than mix a
       // demo wood's invented layout with this place's real elevation, show the
@@ -174,10 +194,17 @@ export async function loadForestData(
   // regardless of the world-size picker (ui/worldSize.ts) — that picker's
   // choice keeps its old meaning only for a real, bounded, named place.
   const demoHalfSize = CHUNK_SIZE / 2
+  // See CHUNK_GROUND_SEGMENTS's own comment (world/chunking.ts): the demo
+  // wood's home plot mesh has to share the streamed chunks' own resolution,
+  // not the usual groundSegmentsFor(halfSize), or the shared edge cracks.
+  const groundSegments = CHUNK_GROUND_SEGMENTS
   return {
-    source: buildSource(world, proceduralGround(DEMO_SEED, demoHalfSize), center.lat, DEMO_SEED, demoHalfSize),
+    source: buildSource(
+      world, proceduralGround(DEMO_SEED, demoHalfSize, groundSegments), center.lat, DEMO_SEED, demoHalfSize,
+    ),
     fellBackTo: 'demo',
     seed: DEMO_SEED,
     halfSize: demoHalfSize,
+    groundSegments,
   }
 }

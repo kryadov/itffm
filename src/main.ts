@@ -123,7 +123,7 @@ async function main(): Promise<void> {
   }
 
   const loading = showLoading(t(STAGE_KEY.geocode), stageFraction('geocode'))
-  const { source, fellBackTo, seed, halfSize } = await loadForestData(
+  const { source, fellBackTo, seed, halfSize, groundSegments } = await loadForestData(
     query,
     (stage) => {
       loading.update(t(STAGE_KEY[stage]), stageFraction(stage))
@@ -140,7 +140,7 @@ async function main(): Promise<void> {
   // `halfSize` is what was actually built, not necessarily `pickedHalfSize`,
   // or the home plot and its streamed surroundings below would disagree
   // about where the reserved chunk (0, 0) actually ends.
-  const forest = createForest(source, seed, halfSize)
+  const forest = createForest(source, seed, halfSize, groundSegments)
   forest.setWeather(save.prefs.weather)
   // Infinite wilderness beyond the home plot — the demo wood only
   // (fellBackTo === 'demo' covers both a deliberate "just show the forest"
