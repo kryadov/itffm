@@ -6,6 +6,11 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.83.0
+Fix: footstep sound while walking was pure silence (a leading silent gap in
+the recording, not a code bug). Fix: broadleaf tree crowns are now scaled
+by their real genus size instead of a fixed tiny radius.
+
 ## v0.82.1
 Fix: a flaky CI perf-guard threshold was blocking the last few deploys.
 

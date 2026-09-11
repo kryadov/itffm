@@ -355,8 +355,15 @@ export function buildTreeMeshes(trees: Tree[], shadowRadius = 0): THREE.Group {
       const shape = BROADLEAF_CROWNS[vi]
       addSplit(shape.geometry, crownMat, variantTrees, (t, d) => {
         const spread = 0.75 + ((t.height - look.height[0]) / (look.height[1] - look.height[0])) * 0.5
+        // Live report: "дерево — палка с крошечной кроной". Root cause —
+        // unlike the conifer branch above (`crownR = spread * look.crown *
+        // shape.xzScale`), this scale never multiplied by the genus's own
+        // `look.crown` radius at all: every broadleaf genus got the same
+        // ~1-unit crown regardless of whether it was meant to be a slender
+        // birch (2.4) or a wide oak (3.4), reading as a twig-sized ball.
+        const r = spread * look.crown
         d.position.set(t.x, t.y + t.height * shape.heightFrac, t.z)
-        d.scale.set(spread * shape.xzScale, spread * shape.yScale, spread * shape.xzScale)
+        d.scale.set(r * shape.xzScale, r * shape.yScale, r * shape.xzScale)
       })
     })
   }

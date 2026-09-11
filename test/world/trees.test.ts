@@ -129,6 +129,27 @@ describe('buildTreeMeshes', () => {
     expect(totalInstances(group)).toBe(trees.length * 2) // trunk + one crown mesh per tree's variant
   })
 
+  it('scales a broadleaf crown by the genus’s own crown size, not a fixed small radius', () => {
+    // Live report: "дерево — палка с крошечной кроной, посаженной не на
+    // верхушке." Root cause: conifer crowns multiply their radius by the
+    // genus's own LOOK.crown constant (2.4m for a birch, 3.4m for an oak),
+    // but the broadleaf branch below never did — every broadleaf genus got
+    // the same near-1-unit crown regardless of how wide its real canopy is
+    // meant to be, reading as a twig-sized ball on a tall trunk.
+    const crownXZScale = (genus: 'betula' | 'quercus', height: number): number => {
+      const group = buildTreeMeshes([{ x: 0, z: 0, y: 0, genus, radius: 0.2, height }])
+      const crownMesh = group.children[1] as THREE.InstancedMesh
+      const m = new THREE.Matrix4()
+      crownMesh.getMatrixAt(0, m)
+      const scale = new THREE.Vector3()
+      m.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale)
+      return scale.x
+    }
+    const birch = crownXZScale('betula', 18) // LOOK.betula.crown = 2.4
+    const oak = crownXZScale('quercus', 18) // LOOK.quercus.crown = 3.4
+    expect(oak).toBeGreaterThan(birch * 1.2)
+  })
+
   it('casts shadows only from trees within shadowRadius of the origin', () => {
     const trees = placeTrees(terrain, 90, 3, ['betula', 'picea'])
     const nearCount = trees.filter((t) => Math.hypot(t.x, t.z) <= 30).length
