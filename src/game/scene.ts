@@ -27,7 +27,7 @@ import {
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
 import { placeMine, mineObstacles, buildMineMesh } from '../world/mine'
-import { placeRailLine, buildRailMesh, createTrain } from '../world/railway'
+import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation } from '../world/daynight'
 import { moonPhase } from '../world/moonPhase'
@@ -94,6 +94,12 @@ export interface ForestSource {
    *  local metres — empty for a source with none, which is every source
    *  before plan 2 and the offline demo wood (`world/demoForest.ts`) always. */
   caves?: Vec2[]
+  /** The rail line (`world/railway.ts`), sited by `game/loadForest.ts`
+   *  before `trees` so `placeOsmTrees` could keep trees off it — reused
+   *  here rather than sited a second time. Undefined only for a source built
+   *  by hand (tests) rather than through `loadForestData`, in which case
+   *  this falls back to siting one of its own. */
+  railLine?: RailLine
 }
 
 export interface Forest {
@@ -282,7 +288,7 @@ export function createForest(source: ForestSource, seed: number, halfSize: numbe
   // A narrow-gauge line and a small train shuttling along it — the lowest-
   // priority TODO item, a live request ported from race-the-city's own
   // idea, not its city-scale code (see world/railway.ts's own doc comment).
-  const railLine = placeRailLine(source.ground, halfSize, seed + 29)
+  const railLine = source.railLine ?? placeRailLine(source.ground, halfSize, seed + RAIL_SEED_OFFSET)
   scene.add(buildRailMesh(railLine))
   const train = createTrain(scene, railLine, seed + 30)
   const updateTrain = (dt: number): void => train.update(dt)

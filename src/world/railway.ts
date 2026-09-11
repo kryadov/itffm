@@ -12,10 +12,22 @@ export interface RailLine {
   points: RailPoint[]
 }
 
-/** How many ground-height samples a line is built from — enough that a
- *  gentle rise or dip along the wood reads on the rails, without pretending
- *  to survey-grade fidelity. */
-const RAIL_SEGMENTS = 12
+/** The seed offset `game/scene.ts` uses for `placeRailLine`, exported so
+ *  `game/loadForest.ts` can compute the very same line — the one that
+ *  actually gets rendered and shuttled along — early enough to keep trees
+ *  off it (`world/osmTrees.ts`'s `RAIL_CLEARANCE`), rather than each of the
+ *  two call sites carrying its own copy of the same magic number. */
+export const RAIL_SEED_OFFSET = 29
+
+/** How far apart ground-height samples sit along the line, metres — the same
+ *  "dense enough to follow the ground, not cut a chord over it" reasoning
+ *  `world/paths.ts`'s `RIBBON_STEP` uses (and `util/geometry.ts`'s
+ *  `densify`), tightened a little further: a live report found a fixed
+ *  12-sample line (regardless of length) visibly sagging into or floating
+ *  above real, bumpy procedural terrain — a rail sitting 8cm above its own
+ *  sleepers (RAIL_HEIGHT) shows a mismatch tenths-of-a-metre wide that a
+ *  wider path ribbon can shrug off. */
+const RAIL_STEP = 3
 /** How far out along its own straight bearing the line reaches, as a
  *  fraction of halfSize either way — short of the true edge, the same
  *  "leave the plot's own boundary alone" margin the shelter search uses. */
@@ -40,9 +52,10 @@ export function placeRailLine(ground: ElevationProvider, halfSize: number, seed:
   const z = side * halfSize * (OFFSET_MIN + rng() * (OFFSET_MAX - OFFSET_MIN))
   const x0 = -halfSize * SPAN_FRAC
   const x1 = halfSize * SPAN_FRAC
+  const segments = Math.max(1, Math.ceil((x1 - x0) / RAIL_STEP))
   const points: RailPoint[] = []
-  for (let i = 0; i <= RAIL_SEGMENTS; i++) {
-    const x = x0 + (i / RAIL_SEGMENTS) * (x1 - x0)
+  for (let i = 0; i <= segments; i++) {
+    const x = x0 + (i / segments) * (x1 - x0)
     points.push({ x, z, y: ground.heightAt(x, z) })
   }
   return { points }

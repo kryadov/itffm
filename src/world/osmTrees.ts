@@ -21,6 +21,12 @@ const MAX_TREES = 4000
  *  hair. A mapped tree (below) is never moved for this: a real survey beats
  *  our own guess about where the path runs. */
 const PATH_CLEARANCE = 1.8
+/** Same idea as PATH_CLEARANCE, for the rail line (`world/railway.ts`) — a
+ *  live report found trees growing straight through the rails, because
+ *  nothing here knew the line existed. Clear of the sleepers' own span
+ *  (SLEEPER_LENGTH there is 1.1m, so a half-width of 0.55m) with the same
+ *  "room to actually walk it" margin PATH_CLEARANCE uses. */
+const RAIL_CLEARANCE = 1.8
 
 /**
  * Which genera grow at this latitude.
@@ -85,6 +91,7 @@ export function placeOsmTrees(
   lat: number,
   seed: number,
   halfSize: number,
+  railLine?: { points: { x: number; z: number }[] },
 ): Tree[] {
   const rng = mulberry32(seed)
   const trees: Tree[] = []
@@ -93,7 +100,8 @@ export function placeOsmTrees(
   const grid = new Map<string, Tree[]>()
 
   const nearPath = (x: number, z: number): boolean =>
-    world.paths.some((p) => distanceToPolyline(x, z, p.points) < PATH_CLEARANCE)
+    world.paths.some((p) => distanceToPolyline(x, z, p.points) < PATH_CLEARANCE) ||
+    (railLine !== undefined && distanceToPolyline(x, z, railLine.points) < RAIL_CLEARANCE)
 
   const tooClose = (x: number, z: number): boolean => {
     const gx = Math.floor(x / cell)
