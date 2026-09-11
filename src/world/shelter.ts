@@ -522,15 +522,26 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   // outward by hand is exactly the kind of sign error that had a window
   // invisible from outside the hut and fine from in.
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a1f14, roughness: 1, side: THREE.DoubleSide })
+  // A live report: the glass read as small and opaque — a flat colour patch,
+  // not something you could see through even faintly. It never set
+  // `transparent`/`opacity` at all (a MeshStandardMaterial defaults to fully
+  // opaque), so "glass" was just a pale square that happened to glow at
+  // night. Real window glass is never perfectly clear either, so this stays
+  // short of fully see-through — enough tint/reflection to read as glass,
+  // not a hole in the wall.
   const glassMat = new THREE.MeshStandardMaterial({
     color: 0x8fa8ac,
     roughness: 0.3,
+    transparent: true,
+    opacity: 0.4,
     emissive: 0xffcf8a,
     emissiveIntensity: 0,
     side: THREE.DoubleSide,
   })
-  const frameGeo = new THREE.PlaneGeometry(0.5, 0.5)
-  const glassGeo = new THREE.PlaneGeometry(0.38, 0.38)
+  // Grown from 0.5x0.5 (frame) / 0.38x0.38 (glass) — on a 2.6m-tall wall
+  // that read as a tiny porthole, not a cottage window.
+  const frameGeo = new THREE.PlaneGeometry(0.85, 0.95)
+  const glassGeo = new THREE.PlaneGeometry(0.71, 0.81)
   // A cross-shaped muntin bar over the glass — real boxes, not planes, so
   // they read as wood from every angle without the same one-sided-plane
   // trap the glass itself already ran into once. A flat frame with plain
@@ -538,9 +549,9 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   // pale, borderless patch on the wall — a real cottage window is panes
   // separated by a bar, and that bar is most of what the eye recognises.
   const muntinMat = frameMat
-  const muntinThickness = 0.028
-  const vMuntinGeo = new THREE.BoxGeometry(muntinThickness, 0.4, 0.03)
-  const hMuntinGeo = new THREE.BoxGeometry(0.4, muntinThickness, 0.03)
+  const muntinThickness = 0.032
+  const vMuntinGeo = new THREE.BoxGeometry(muntinThickness, 0.75, 0.03)
+  const hMuntinGeo = new THREE.BoxGeometry(0.75, muntinThickness, 0.03)
   const buildWindow = (x: number, faceOut: number): THREE.Group => {
     const win = new THREE.Group()
     const frame = new THREE.Mesh(frameGeo, frameMat)

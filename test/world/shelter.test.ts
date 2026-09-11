@@ -82,6 +82,18 @@ describe('buildShelterMesh', () => {
     expect(group.position.z).toBe(-2)
   })
 
+  it('lets some light through its glass instead of reading as a solid patch', () => {
+    // Live report: windows looked small and opaque — the glass material
+    // never set transparent/opacity at all (a MeshStandardMaterial defaults
+    // fully opaque), so it read as a flat-coloured square, not glass.
+    const { group } = buildShelterMesh(s)
+    const glass = group.getObjectByName('glass') as THREE.Mesh
+    const mat = glass.material as THREE.MeshStandardMaterial
+    expect(mat.transparent).toBe(true)
+    expect(mat.opacity).toBeLessThan(1)
+    expect(mat.opacity).toBeGreaterThan(0)
+  })
+
   it('stays dark by day and glows at full night', () => {
     const { group, setNight } = buildShelterMesh(s)
     const glass = group.getObjectByName('glass') as THREE.Mesh

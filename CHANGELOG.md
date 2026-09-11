@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.83.1
+The shelter's windows are bigger and their glass is actually translucent
+now, instead of a small, fully opaque coloured square.
+
 ## v0.83.0
 Fix: footstep sound while walking was pure silence (a leading silent gap in
 the recording, not a code bug). Fix: broadleaf tree crowns are now scaled
