@@ -1,6 +1,45 @@
 import type { FootstepSubstrate } from './footsteps'
 
 /**
+ * One filtered-noise recipe per substrate for `AudioEngine.footstep()` below —
+ * same "short burst, fast decay" shape as `collect()`, just a different
+ * filter and length so each reads as a distinct footstep rather than four
+ * volumes of the same thud.
+ *
+ * Live report 2026-09-11: "footsteps sound loud and unatmospheric." Footsteps
+ * fire roughly twice a second while walking — unlike `collect()`'s one-off
+ * 0.9 peak gain, that repetition means the ear needs a much quieter, tighter
+ * sound or it fatigues fast. Two changes from the first pass: peak gains
+ * dropped to a fifth-to-a-third of `collect()`'s (0.14-0.22, was 0.32-0.5),
+ * and every filter moved to `bandpass` (or stayed narrow-Q `lowpass` for
+ * water, where the broadband spray itself needs to survive) with Q raised
+ * to ~1-1.3 (was 0.4-0.8) — a higher Q narrows the passband, which is what
+ * turns a wash of broadband noise (reads as hiss) into a resonant "tap"
+ * (reads as a footfall). Durations also came down (0.09s → 0.04-0.06s) so
+ * the decay reads as percussive rather than sustained. Exported (not a
+ * private class field) so `test/audio/audio.test.ts` can assert the bounds
+ * without an `AudioContext` — whether it actually *sounds* better is a
+ * judgment call verified by ear, not something a unit test can prove.
+ */
+export const FOOTSTEP_PARAMS: Record<
+  FootstepSubstrate,
+  { filterType: BiquadFilterType; frequency: number; q: number; duration: number; peakGain: number }
+> = {
+  // Leaf litter: a soft, dull thud — narrow-band around a low tap frequency,
+  // nothing broadband or sharp in it.
+  litter: { filterType: 'bandpass', frequency: 700, q: 1.1, duration: 0.05, peakGain: 0.22 },
+  // Moss: even softer and quieter — a damp cushion, not bare ground.
+  moss: { filterType: 'bandpass', frequency: 350, q: 1.0, duration: 0.06, peakGain: 0.14 },
+  // Sand: a gritty crunch — higher-band and slightly tighter-Q than litter,
+  // but still well below collect()'s gain so the grit doesn't turn harsh.
+  sand: { filterType: 'bandpass', frequency: 2400, q: 1.3, duration: 0.04, peakGain: 0.18 },
+  // Water: the noise burst carries the splash's own broadband spray, kept as
+  // a narrow-Q lowpass rather than bandpass so it stays soft; the short
+  // descending tone in footstep() below is what actually reads as "wet".
+  water: { filterType: 'lowpass', frequency: 1200, q: 0.7, duration: 0.055, peakGain: 0.16 },
+}
+
+/**
  * Sound in the wood. Only the mixer plumbing is ported from race-the-city's
  * own `src/audio/audio.ts` — one `AudioContext`, a single volume-controlled
  * gain node, resumed from a user gesture (autoplay policy). Its music/radio
@@ -83,25 +122,6 @@ export class AudioEngine {
     noise.stop(t + 0.09)
   }
 
-  /** One filtered-noise recipe per substrate — same "short burst, fast decay"
-   *  shape as `collect()`, just a different filter and length so each reads
-   *  as a distinct footstep rather than four volumes of the same thud. */
-  private static readonly FOOTSTEP_PARAMS: Record<
-    FootstepSubstrate,
-    { filterType: BiquadFilterType; frequency: number; q: number; duration: number; peakGain: number }
-  > = {
-    // Leaf litter: a soft, dull thud — low-passed, nothing sharp in it.
-    litter: { filterType: 'lowpass', frequency: 900, q: 0.5, duration: 0.07, peakGain: 0.5 },
-    // Moss: even softer and quieter — a damp cushion, not bare ground.
-    moss: { filterType: 'lowpass', frequency: 450, q: 0.4, duration: 0.09, peakGain: 0.32 },
-    // Sand: a gritty, broader-spectrum crunch instead of one dull tone.
-    sand: { filterType: 'bandpass', frequency: 3000, q: 0.8, duration: 0.05, peakGain: 0.42 },
-    // Water: the noise burst carries the splash's own broadband spray; the
-    // short descending tone in footstep() below is what actually reads as
-    // "wet", not this filter alone.
-    water: { filterType: 'lowpass', frequency: 1800, q: 0.6, duration: 0.08, peakGain: 0.4 },
-  }
-
   /**
    * One footstep, timed from the camera bob's own rhythm
    * (`audio/footsteps.ts`'s `crossedFootstep`, called once per foot) —
@@ -112,7 +132,7 @@ export class AudioEngine {
     if (!this.ctx || !this.sfxGain || this.volume <= 0) return
     const ctx = this.ctx
     const t = ctx.currentTime
-    const p = AudioEngine.FOOTSTEP_PARAMS[substrate]
+    const p = FOOTSTEP_PARAMS[substrate]
 
     const noise = ctx.createBufferSource()
     noise.buffer = this.noiseBurst(p.duration)
@@ -136,8 +156,8 @@ export class AudioEngine {
       plop.frequency.setValueAtTime(650, t)
       plop.frequency.exponentialRampToValueAtTime(140, t + 0.07)
       const plopGain = ctx.createGain()
-      plopGain.gain.setValueAtTime(0.18, t)
-      plopGain.gain.exponentialRampToValueAtTime(0.0008, t + 0.08)
+      plopGain.gain.setValueAtTime(0.09, t)
+      plopGain.gain.exponentialRampToValueAtTime(0.0008, t + 0.06)
       plop.connect(plopGain)
       plopGain.connect(this.sfxGain)
       plop.start(t)

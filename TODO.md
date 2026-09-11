@@ -180,9 +180,24 @@ UX/фичи покрупнее.
       Решено идти на компромисс, знакомый по деревьям
       (`shadowRadius`-ограничение) — не все 1500+ объектов сразу, точечно и
       измеримо.
-- [ ] **Шаги звучат плохо** — громко и неатмосферно. Перебалансировать
-      синтез в `audio/audio.ts`'s `footstep()` (громкость, фильтры), не
-      менять саму механику триггера (`audio/footsteps.ts`).
+- [x] **Шаги звучат плохо** — громко и неатмосферно. Готово: rebalanced only
+      the synthesis in `audio/audio.ts`'s `footstep()` — trigger mechanism
+      (`audio/footsteps.ts`) untouched. Peak gain dropped to 0.14-0.22 (was
+      0.32-0.5, `collect()`'s own one-off gain is 0.9 — footsteps repeat
+      ~twice a second while walking, so they need to sit far below a rare
+      event's loudness or the ear fatigues). Filters moved from low/high-Q
+      lowpass/bandpass to a narrower bandpass (Q 1.0-1.3, was 0.4-0.8) for
+      litter/moss/sand — a higher Q narrows the passband, which is what
+      turns broadband noise (reads as hiss) into a resonant "tap" (reads as
+      a footfall); water kept a narrow-Q lowpass so its broadband splash
+      survives. Duration down to 0.04-0.06s (was 0.05-0.09s) for a tighter,
+      more percussive decay. `FOOTSTEP_PARAMS` exported from `audio.ts` so
+      `test/audio/audio.test.ts` can assert the bounds (peak gain, Q,
+      duration, frequency range) without an `AudioContext` — no test in
+      `test/audio/` mocks one, only pure helpers are exercised. Honest
+      caveat, same voice as this file's other not-runtime-testable entries:
+      whether it actually *sounds* better is a judgment call verified by
+      ear/playing the game, not provable by a unit test.
 - [ ] **Звук воды** — генерируем синтезом (тем же приёмом, что и остальной
       звук игры, не CC0-запись) — журчание ручья/тишина у пруда, слышно
       раньше, чем видно, громче вблизи. Фон леса (ветер/скрип) — НЕ в этом
