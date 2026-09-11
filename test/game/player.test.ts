@@ -79,6 +79,23 @@ describe('stepPlayer', () => {
     expect(Math.hypot(s.x - tree.x, s.z - tree.z)).toBeGreaterThanOrEqual(0.69)
   })
 
+  it('does not block movement through a zero-radius obstacle (an opened door)', () => {
+    // A closed shelter door is a real obstacle (world/shelter.ts's
+    // doorObstacle); `toggleDoor()` opens it by zeroing that SAME object's
+    // radius rather than removing it from the obstacle list. The collision
+    // loop used to add PLAYER_RADIUS to every obstacle's radius regardless,
+    // so a radius-0 "open door" still blocked anyone walking dead straight
+    // at its centre within PLAYER_RADIUS (0.3m) — exactly what a player
+    // aiming for the middle of a doorway does. Radius 0 must mean "no
+    // obstacle here" plainly, not "a point-sized obstacle".
+    const openDoor = { x: 0, z: -2, radius: 0 }
+    let s = start
+    for (let i = 0; i < 120; i++) {
+      s = stepPlayer(s, { ...idle, forward: 1, dt: 1 / 30 }, flat, [openDoor])
+    }
+    expect(s.z).toBeLessThan(-2)
+  })
+
   it('lowers the eye when crouching', () => {
     let s = start
     for (let i = 0; i < 60; i++) s = stepPlayer(s, { ...idle, crouching: true }, flat, [])

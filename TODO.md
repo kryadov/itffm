@@ -16,14 +16,29 @@
 оказались тем же классом работы). Порядок: сначала баги, потом перф, потом
 UX/фичи покрупнее.
 
-- [ ] **Дверь землянки — видимая стена-невидимка в проёме, зайти нельзя.**
-      Регрессия к уже решённому багу (v0.60.0, см. ниже «Заходить в
-      землянку») — тогда `wallObstacles`/`doorObstacle` уже чинили ровно это.
-      Разобраться, что случилось: либо изменилась геометрия дома
-      (`world/shelter.ts`'s `wallHeight`/`WIDTH` с тех пор трогали ещё раз,
-      см. «Землянка — доработка»), либо коллизия дома в стриминг-чанках
-      (`game/worldStream.ts`) не согласована с той, что строит
-      `placeShelter` для домашнего участка.
+- [x] **Дверь землянки — видимая стена-невидимка в проёме, зайти нельзя.**
+      Done. Neither hypothesis in the original note held: `WIDTH`/`wallHeight`
+      hadn't moved since v0.60.0, and `game/worldStream.ts`'s chunk collision
+      never touches the shelter at all (it only owns the streamed wilderness
+      beyond the home plot; `game/scene.ts` wires `wallObstacles`/
+      `doorObstacle` into `extraObstacles` correctly). The real bug was in
+      `game/player.ts`'s `stepPlayer`: `toggleDoor()` opens the door by
+      zeroing the shared `doorObstacle`'s radius rather than removing it from
+      the obstacle list, but the collision loop still computed
+      `min = o.radius + PLAYER_RADIUS` for it — so an "open" door was still a
+      solid point 0.3m (`PLAYER_RADIUS`) across. A player aiming for the
+      middle of the doorway (exactly what a real doorway invites) walked
+      straight into that point and got pinned just short of it, reading as an
+      invisible wall in a visibly open door. Fixed by skipping any obstacle
+      with `radius <= 0` outright — a zero radius now means no obstacle, not
+      a point-sized one. New failing-first test in `test/game/player.test.ts`
+      ("does not block movement through a zero-radius obstacle"); the
+      existing `test/world/shelter.test.ts` integration test still covers the
+      closed-door case. Verified live: a headless-Chrome run (temporary
+      `?__DOORWALK` teleport hook, reverted before commit, `git diff` on
+      `main.ts` clean) walked the player from outside the door dead-centre
+      through the open doorway and screenshotted it standing just inside,
+      looking back out at the open door and the wood beyond.
 - [ ] **Загадочный звук каждые 10-15с, не похож на природу, идёт даже когда
       игрок стоит.** Не птичий крик (`audio/birdCalls.ts`, интервал 4-11с) —
       что-то ещё держит собственный таймер в `audio/` или `game/`, найти
@@ -77,9 +92,19 @@ UX/фичи покрупнее.
       стартовом меню: продолжить, настройки (то, что уже есть), сменить
       локацию (вернуться к выбору места), энциклопедия и корзина — прямо из
       меню, не только по хоткеям `Tab`/`Q`.
-- [ ] **Дом и дверь ещё крупнее.** Раз в дверь физически не пройти (см. баг
-      коллизии выше), заодно увеличить сам дом и дверной проём ещё раз —
-      уже росли в v0.48.0/v0.60.0, но, похоже, недостаточно.
+- [x] **Дом и дверь ещё крупнее.** Done, same pass as the door-collision fix
+      above. `world/shelter.ts`'s `WIDTH` 3.0→3.6m, `DEPTH` 2.6→3.1m,
+      `WALL_HEIGHT` 2.3→2.6m, `DOOR_WIDTH` 0.95→1.1m, `DOOR_HEIGHT` 2.0→2.2m
+      — a further ~15-20% step past the v0.48.0/v0.60.0 sizes. `SHELTER_RADIUS`
+      grew 2.1→2.5m the same way the v0.60.0 fix derived it: the box's own
+      half-diagonal at the new dimensions (~2.38m) plus a margin, not a blind
+      multiply. Interior furniture (`BED_X`/`TABLE_X`/painting position) and
+      the roof span are all formulas off `WIDTH`/`DEPTH` already, so they
+      stayed in proportion without their own edit — confirmed by the existing
+      `buildShelterMesh` furniture tests and the door-walk screenshot above,
+      nothing clips through the bigger walls. `test/world/shelter.test.ts`'s
+      door-walk integration test had two hardcoded z-bounds tied to the old
+      `DEPTH`; updated to the new doorway position (`-DEPTH/2` = -1.55).
 
 ### Старые открытые пункты, взятые в этот же заход
 
