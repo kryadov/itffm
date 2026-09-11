@@ -16,28 +16,37 @@ export interface Shelter {
 const SHELTER_CLEARANCE = 2.5
 /** Its own footprint, for siting anything else (the campfire) well clear of
  *  it — a circle wide enough to cover the box's own far corner (half-diagonal
- *  ~1.99m at the wall dimensions below). NOT what the player collides with
+ *  ~2.38m at the wall dimensions below). NOT what the player collides with
  *  any more (see `wallObstacles`/`doorObstacle` below) — a circle this size
  *  would block the doorway along with everything else. */
-const SHELTER_RADIUS = 2.1
+const SHELTER_RADIUS = 2.5
 
 // Wall/door dimensions, shared between the mesh (buildShelterMesh) and the
 // player's own collision (wallObstacles/doorObstacle) — kept as one set of
 // module constants rather than two copies, so the two can never drift apart
 // the way the firewood pile once quietly did (see TODO.md, 2026-09-09).
-const WIDTH = 3.0
-const DEPTH = 2.6
+//
+// Grown a further step (live report, 2026-09-11): the door being walkable
+// again (see the radius-0-obstacle fix in game/player.ts) still left the hut
+// itself reading as on the small side. WIDTH/DEPTH/WALL_HEIGHT/door size all
+// grew ~15-20% from their v0.60.0 values; SHELTER_RADIUS above follows the
+// same half-diagonal-plus-margin rule the v0.60.0 fix already established,
+// not just multiplied blind — everything that depends on these constants
+// (interior furniture positions, roof span, wall-panel geometry) is a
+// formula off them already, so it stays in proportion without its own edit.
+const WIDTH = 3.6
+const DEPTH = 3.1
 // A live report (2026-09-09) found the hut reading as toy-sized, with the
 // player's own eye level (game/player.ts's STAND_EYE, 1.65m) sitting above
 // the door — the old 1.7m wall was barely taller than the player, let alone
 // the door cut into it. Tall enough now for real headroom above STAND_EYE.
-const WALL_HEIGHT = 2.3
+const WALL_HEIGHT = 2.6
 const WALL_THICKNESS = 0.12
 // A real human doorway, not the 0.7x1.25m child-sized slab a live report
 // (2026-09-09) caught — that made the player's own eye level sit above the
 // door entirely, part of the same "toy house" bug as the wall height above.
-const DOOR_WIDTH = 0.95
-const DOOR_HEIGHT = 2.0
+const DOOR_WIDTH = 1.1
+const DOOR_HEIGHT = 2.2
 
 /** Spacing of the small circles standing in for a real (thin, straight) wall
  *  in the player's own circle-based collision (game/player.ts's `Obstacle`

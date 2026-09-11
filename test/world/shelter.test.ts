@@ -238,9 +238,12 @@ describe('walking through the doorway (integration)', () => {
     }
     for (let i = 0; i < 200; i++) player = stepPlayer(player, neutralInput, ground, obstacles)
     // Door closed: actually walked up to the doorway's own blocker (not just
-    // sitting wherever it started) but never through it, into the hut.
-    expect(player.z).toBeGreaterThan(-2.5)
-    expect(player.z).toBeLessThan(-1.3)
+    // sitting wherever it started) but never through it, into the hut. The
+    // doorway itself sits at local z = -DEPTH/2 (2026-09-11 growth step put
+    // DEPTH at 3.1, so z = -1.55) — bounds below follow from that, not the
+    // hut's old size.
+    expect(player.z).toBeGreaterThan(-2.8)
+    expect(player.z).toBeLessThan(-1.55)
 
     toggleDoor()
     let opened: PlayerState = {
@@ -248,7 +251,7 @@ describe('walking through the doorway (integration)', () => {
     }
     for (let i = 0; i < 200; i++) opened = stepPlayer(opened, neutralInput, ground, obstacles)
     // Door open: the same walk now actually enters the hut.
-    expect(opened.z).toBeGreaterThan(-1.3)
+    expect(opened.z).toBeGreaterThan(-1.55)
   })
 })
 

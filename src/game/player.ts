@@ -181,6 +181,14 @@ export function stepPlayer(
   let z = s.z + rawZ * speed
 
   for (const o of obstacles) {
+    // A radius of 0 (or less) means no obstacle at all, not a point-sized
+    // one — world/shelter.ts's doorObstacle opens a door by zeroing this
+    // SAME shared object's radius rather than removing it from the list.
+    // Without this check `min` below still came out to PLAYER_RADIUS, so a
+    // player walking dead straight at the centre of an OPEN doorway (exactly
+    // what aiming for the middle of an opening looks like) still got pushed
+    // back — an "invisible wall" in a door that visually stood wide open.
+    if (o.radius <= 0) continue
     const climbable = o.topHeight !== undefined && o.topHeight <= MAX_STEP_HEIGHT
     if (climbable) continue
     const dx = x - o.x
