@@ -6,6 +6,11 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.85.0
+A self-running accelerated calendar (1 real hour = 1 game day) now drives
+mushroom season and drought instead of the real wall-clock date and a
+hardcoded constant.
+
 ## v0.84.0
 Walking now derives its footstep sound from the (better-sounding) run
 recording, slowed down, instead of a separate, worse-sounding clip.

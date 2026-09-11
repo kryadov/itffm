@@ -13,6 +13,7 @@ import { placeBushes, buildBushMeshes } from '../world/undergrowth'
 import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import { spawnMushrooms, type Placement } from '../ecology/spawn'
+import { gameMonth, daysSinceRain } from '../world/calendar'
 import { buildPlacementObject } from '../collectible/placement'
 import { loadSpecies } from '../species/load'
 import {
@@ -187,6 +188,10 @@ export function createWorldStream(
   homeGround: ElevationProvider,
   homeRadius: number,
   species: Species[] = loadSpecies(),
+  /** See game/scene.ts's own `gameDays` param — the same accelerated
+   *  calendar value, threaded through so a streamed chunk's spawn agrees
+   *  with the home plot's about what month and how dry it is right now. */
+  gameDays = 0,
 ): WorldStream {
   const baseTerrain = withPits(proceduralTerrain(globalSeed), globalSeed + 3)
   const mix = regionalMix('mixed', STREAM_LAT)
@@ -244,8 +249,10 @@ export function createWorldStream(
     group.add(buildGrassMesh(placeGrass(ground, half, seed + 10, origin)))
 
     const sites = buildSites(ground, trees, half, seed + 2, biomeAt, CHUNK_SITE_COUNT, [], [], [], origin)
-    const month = new Date().getMonth() + 1
-    const placements: Placement[] = spawnMushrooms(species, sites, { month, seed: seed + 3, daysSinceRain: 2 })
+    const month = gameMonth(gameDays)
+    const placements: Placement[] = spawnMushrooms(species, sites, {
+      month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays),
+    })
 
     // Deliberately NOT built here — see PLACEMENT_BUDGET_PER_UPDATE's own
     // comment. `placements` only decides WHAT this chunk will hold; turning

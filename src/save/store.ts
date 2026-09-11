@@ -37,7 +37,7 @@ export interface Prefs {
    *  or vice versa. */
   musicVolume: number
   /** 0..1 — the walk/run footstep loop (audio/audio.ts's
-   *  `updateFootstepLoop`). Its own mixer for the same reason `musicVolume`
+   *  `footstepClip`). Its own mixer for the same reason `musicVolume`
    *  has one — a continuous loop needs a level a player can tune separately
    *  from one-off sounds. */
   footstepVolume: number
@@ -53,6 +53,12 @@ export interface SaveData {
   finds: Find[]
   lang: Lang
   prefs: Prefs
+  /** `Date.now()` the moment this save was first created — the fixed origin
+   *  `world/calendar.ts`'s `gameDaysElapsed` counts forward from, so the
+   *  wood's own accelerated calendar (season, `daysSinceRain`) keeps
+   *  advancing across sessions instead of resetting to day zero on every
+   *  reload. */
+  calendarStart: number
 }
 
 export function defaultPrefs(): Prefs {
@@ -89,7 +95,7 @@ const STORE = 'save'
 const KEY = 'current'
 
 export function emptySave(): SaveData {
-  return { discovered: [], finds: [], lang: 'ru', prefs: defaultPrefs() }
+  return { discovered: [], finds: [], lang: 'ru', prefs: defaultPrefs(), calendarStart: Date.now() }
 }
 
 /** Applies a find. Returns a new object and leaves the old one untouched. */

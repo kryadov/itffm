@@ -24,7 +24,8 @@ import { openPlacePicker, showLoading } from './ui/placePicker'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
-import { speciesById } from './species/load'
+import { gameDaysElapsed } from './world/calendar'
+import { speciesById, loadSpecies } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
@@ -160,14 +161,20 @@ async function main(): Promise<void> {
   // `halfSize` is what was actually built, not necessarily `pickedHalfSize`,
   // or the home plot and its streamed surroundings below would disagree
   // about where the reserved chunk (0, 0) actually ends.
-  const forest = createForest(source, seed, halfSize, groundSegments)
+  // The wood's own accelerated calendar (world/calendar.ts) — computed once
+  // per load rather than re-read every frame, since spawn only ever runs
+  // once per wood/chunk build anyway; the visible day/night cycle has its
+  // own separate, per-frame clock (see updateDayNight below).
+  const gameDays = gameDaysElapsed(save.calendarStart, Date.now())
+  const forest = createForest(source, seed, halfSize, groundSegments, gameDays)
   forest.setWeather(save.prefs.weather)
   // Infinite wilderness beyond the home plot — the demo wood only
   // (fellBackTo === 'demo' covers both a deliberate "just show the forest"
   // press and a real query that failed and fell back to it; either way it
   // is the same wood built the same way, see loadForestData). A named real
   // place keeps its old, bounded behaviour untouched.
-  const worldStream = fellBackTo === 'demo' ? createWorldStream(forest.scene, seed, forest.ground, halfSize) : null
+  const worldStream =
+    fellBackTo === 'demo' ? createWorldStream(forest.scene, seed, forest.ground, halfSize, loadSpecies(), gameDays) : null
   const combinedGround = worldStream ? { heightAt: worldStream.heightAt } : forest.ground
   const mushroomCandidates = (): THREE.Object3D[] =>
     worldStream ? [...forest.mushroomObjects, ...worldStream.mushroomObjects()] : forest.mushroomObjects

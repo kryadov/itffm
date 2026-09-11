@@ -31,6 +31,7 @@ import { placeMine, mineObstacles, buildMineMesh } from '../world/mine'
 import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
+import { gameMonth, daysSinceRain } from '../world/calendar'
 import { moonPhase } from '../world/moonPhase'
 import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
@@ -192,6 +193,11 @@ export function createForest(
   seed: number,
   halfSize: number = DEFAULT_HALF_SIZE,
   groundSegments?: number,
+  /** The wood's own accelerated calendar (`world/calendar.ts`'s
+   *  `gameDaysElapsed`), for spawn's `month`/`daysSinceRain` below — 0 (day
+   *  one, month one, no rain yet) is a fine default for callers (tests,
+   *  mainly) that don't care about the calendar at all. */
+  gameDays = 0,
 ): Forest {
   const scene = new THREE.Scene()
   scene.fog = new THREE.Fog(0xa8c0a2, 30, 140)
@@ -452,8 +458,10 @@ export function createForest(
     source.ground, source.trees, halfSize, seed + 2, source.biomeAt, siteCount, deadwoodPoints, mossPoints,
     source.water ?? [],
   )
-  const month = new Date().getMonth() + 1
-  const placements = spawnMushrooms(loadSpecies(), sites, { month, seed: seed + 3, daysSinceRain: 2 })
+  const month = gameMonth(gameDays)
+  const placements = spawnMushrooms(loadSpecies(), sites, {
+    month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays),
+  })
 
   for (const marker of fairyRingMarkers(placements)) {
     scene.add(buildFairyRingMesh(marker, source.ground))
