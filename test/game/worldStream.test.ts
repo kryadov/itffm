@@ -319,7 +319,12 @@ describe('createWorldStream', () => {
       stream.update(CHUNK_SIZE * 2, 0)
       worst = Math.max(worst, performance.now() - t0)
     }
-    expect(worst).toBeLessThan(80)
+    // Raised 80 → 150 (2026-09-11): flaked three CI runs running at
+    // 96-111ms, comfortably under any real regression (re-inlining the
+    // placement loop would jump into the hundreds), just over shared-runner
+    // noise this guard was never meant to be sensitive to (see the comment
+    // above). Never observed failing locally.
+    expect(worst).toBeLessThan(150)
   })
 
   // TODO.md's "…но БЕЗ отсечения по дальности": static scatter (trees,
