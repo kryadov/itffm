@@ -61,10 +61,10 @@ const MAX_STEP_HEIGHT = 0.55
 
 const WALK_SPEED = 2.4
 const CROUCH_SPEED = 1.1
-/** Sprinting speed, m/s — the ratio to WALK_SPEED is what audio/audio.ts's
- *  footstep loop also uses (indirectly, via PlayerInput.sprinting) to pick
- *  walk.mp3 vs run.mp3, so the two stay honestly matched to how much faster
- *  a sprint actually moves the player. */
+/** Sprinting speed, m/s — audio/audio.ts's footstepClip() also reads
+ *  PlayerInput.sprinting (indirectly, via crossedFootstep's own faster
+ *  cadence at this speed) to pick its run-paced clip over the slower,
+ *  walk-paced one. */
 const SPRINT_SPEED = 4.2
 const STAND_EYE = 1.65
 const CROUCH_EYE = 0.75

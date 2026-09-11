@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.84.0
+Walking now derives its footstep sound from the (better-sounding) run
+recording, slowed down, instead of a separate, worse-sounding clip.
+
 ## v0.83.1
 The shelter's windows are bigger and their glass is actually translucent
 now, instead of a small, fully opaque coloured square.

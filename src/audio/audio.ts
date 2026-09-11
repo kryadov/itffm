@@ -123,7 +123,11 @@ export class AudioEngine {
 
   private footstepGain: GainNode | null = null
   private footstepVolume = 0.6
-  private walkBuffer: AudioBuffer | null = null
+  // One recorded clip, not two: a live report ("звук ходьбы ужасен, звук
+  // бега хороший") asked to derive the walk sound from the run recording
+  // instead of the separate, worse-sounding walk.mp3 — see
+  // FOOTSTEP_CLIP_PARAMS below for how a slower playbackRate on the same
+  // clip stands in for a walk.
   private runBuffer: AudioBuffer | null = null
 
   /** Create/resume the AudioContext. Call from a click/keydown handler —
@@ -194,9 +198,7 @@ export class AudioEngine {
   }
 
   private async loadFootsteps(): Promise<void> {
-    const [walk, run] = await Promise.all([this.loadClip('./audio/walk.mp3'), this.loadClip('./audio/run.mp3')])
-    this.walkBuffer = walk
-    this.runBuffer = run
+    this.runBuffer = await this.loadClip('./audio/run.mp3')
   }
 
   /** One looping source, gain-nulled until the first real `updateMusic()`
@@ -244,44 +246,58 @@ export class AudioEngine {
     if (this.campfireLoopGain) this.campfireLoopGain.gain.setTargetAtTime(fireGain, t, 0.8)
   }
 
-  /** How much of walk.mp3/run.mp3, from its own start, plays per footfall —
-   *  short enough that a faster cadence (sprinting, or just a quick step)
-   *  doesn't pile several overlapping copies on top of each other, the same
-   *  concern `FOOTSTEP_PARAMS`' own short durations above already solve for
-   *  the synthesized substrates. Run gets the shorter slice: sprint footfalls
-   *  land closer together (`SPRINT_SPEED`/`WALK_SPEED` in game/player.ts). */
-  private static readonly FOOTSTEP_CLIP_DURATION = { walk: 0.4, run: 0.3 }
+  /**
+   * Walk and run both play a slice of the SAME recording — run.mp3 — rather
+   * than two separate files. A live report: "звук ходьбы ужасен, звук бега
+   * хороший, можем из звука бега сделать ходьбу?" walk.mp3 was a distinct,
+   * worse-sounding recording; run.mp3's own one clean, isolated footfall
+   * (found the same way the silent lead-in bug was — `ffmpeg silencedetect`,
+   * not by ear: audible 0.202-0.554s, silence on both sides) stands in for
+   * BOTH gaits, walk just slower and a touch quieter (`rate`/`gain` below) —
+   * a lower `playbackRate` drops the pitch and stretches the hit the way an
+   * unhurried footstep actually sounds next to a running one, not merely
+   * "the same sound, turned down." `offset`/`duration` are in the buffer's
+   * own time (unaffected by `rate` — see `footstepClip` below); actual
+   * real-time length is `duration / rate`. Run reuses the original near-the-
+   * start slice this file always used, offset 0 for its own reason (still a
+   * clean isolated hit there, and starting immediately suits a faster
+   * cadence's tighter footfall spacing better than reaching further into the
+   * clip would). */
+  private static readonly FOOTSTEP_CLIP_PARAMS = {
+    walk: { offset: 0.2, duration: 0.35, rate: 0.8, gain: 0.8 },
+    run: { offset: 0, duration: 0.3, rate: 1, gain: 1 },
+  }
 
   /**
-   * One footfall from the recorded walk/run clip — called on `main.ts`'s own
+   * One footfall from the recorded run clip — called on `main.ts`'s own
    * `crossedFootstep()`, the exact same trigger `footstep()` above fires on
    * for the synthesized substrates, so this one lands on a real footfall
    * instead of drifting on its own clock. Retriggers from the clip's own
-   * offset 0 every time (a fresh `AudioBufferSourceNode` — Web Audio sources
+   * offset every time (a fresh `AudioBufferSourceNode` — Web Audio sources
    * are one-shot, cannot be rewound and replayed) rather than looping
-   * continuously in the background, which a live report caught: a
+   * continuously in the background, which an earlier live report caught: a
    * free-running loop gated only by volume never lined up with an actual
    * step. A short gain ramp at the tail avoids a click if the clip is cut off
-   * mid-sound at `FOOTSTEP_CLIP_DURATION`.
+   * mid-sound.
    */
   footstepClip(sprinting: boolean): void {
-    if (!this.ctx || !this.footstepGain || this.footstepVolume <= 0) return
-    const buffer = sprinting ? this.runBuffer : this.walkBuffer
-    if (!buffer) return
+    if (!this.ctx || !this.footstepGain || this.footstepVolume <= 0 || !this.runBuffer) return
     const ctx = this.ctx
     const t = ctx.currentTime
-    const duration = sprinting ? AudioEngine.FOOTSTEP_CLIP_DURATION.run : AudioEngine.FOOTSTEP_CLIP_DURATION.walk
+    const p = sprinting ? AudioEngine.FOOTSTEP_CLIP_PARAMS.run : AudioEngine.FOOTSTEP_CLIP_PARAMS.walk
+    const realDuration = p.duration / p.rate
 
     const src = ctx.createBufferSource()
-    src.buffer = buffer
+    src.buffer = this.runBuffer
+    src.playbackRate.value = p.rate
     const g = ctx.createGain()
-    g.gain.setValueAtTime(1, t)
-    g.gain.setValueAtTime(1, t + Math.max(0, duration - 0.05))
-    g.gain.linearRampToValueAtTime(0, t + duration)
+    g.gain.setValueAtTime(p.gain, t)
+    g.gain.setValueAtTime(p.gain, t + Math.max(0, realDuration - 0.05))
+    g.gain.linearRampToValueAtTime(0, t + realDuration)
 
     src.connect(g)
     g.connect(this.footstepGain)
-    src.start(t, 0, duration)
+    src.start(t, p.offset, p.duration)
   }
 
   /** One filtered-noise-plus-LFO recipe per water kind — a stream reads as
