@@ -7,12 +7,10 @@ import { createControls } from './game/controls'
 import { createTouchControls } from './game/touchControls'
 import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
-import { birdPan, birdGain, nearestBird } from './audio/birdCalls'
 import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAmbience'
 import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
-import { mulberry32 } from './util/rng'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
@@ -76,9 +74,6 @@ const SCATTER_CULL_RADIUS = 155
  *  crossing the cull radius shows up within a third of a second, not
  *  perceptible as a pop, while cutting the sweep's own CPU cost by 20x. */
 const SCATTER_CULL_INTERVAL_FRAMES = 20
-/** How far a bird call still carries, metres — past this the flock is
- *  simply out of earshot (`audio/birdCalls.ts`'s `birdGain`/`nearestBird`). */
-const BIRD_CALL_RADIUS = 60
 /** How far water ambience carries, metres — past the fog's own near
  *  distance (30m, `game/scene.ts`) so it is audible before it is clearly
  *  visible, short of the fog's far distance (140m) so it stays a landmark
@@ -89,11 +84,6 @@ const WATER_AMBIENCE_RADIUS = 45
  *  the fire's footprint) plus enough margin that a player sitting on the
  *  bench around it is well inside, not right at the fade's own edge. */
 const CAMPFIRE_MUSIC_RADIUS = 8
-/** How long, in real seconds, between one bird call and the next roll for
- *  another — wide enough that the wood isn't a chorus every second, narrow
- *  enough that a flock nearby is heard now and then, not never. */
-const BIRD_CALL_MIN_GAP = 4
-const BIRD_CALL_MAX_GAP = 11
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
 
@@ -256,12 +246,6 @@ async function main(): Promise<void> {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
     bobPhase: 0,
   }
-  // Bird calls: a random wait, then whichever bird happens to be nearest
-  // when it elapses — same "roll a duration, count it down" shape as
-  // `world/birds.ts`'s own perch timers, just for the audio side instead.
-  const birdCallRand = mulberry32(seed + 40)
-  let birdCallTimer = BIRD_CALL_MIN_GAP + birdCallRand() * (BIRD_CALL_MAX_GAP - BIRD_CALL_MIN_GAP)
-
   let aimed: THREE.Object3D | null = null
   // Whether the player is close enough to the shelter's own doorway for `E`
   // to open/close it instead of examining an aimed mushroom — a plain
@@ -446,7 +430,6 @@ async function main(): Promise<void> {
       placement.age,
       () => {
         if (!basket.add(placement)) return
-        audio.collect()
         target.removeFromParent()
         removeMushroomTarget(target)
         leaveTrace(placement)
@@ -461,7 +444,6 @@ async function main(): Promise<void> {
         // Cut but not carried: it stays a mushroom, just a felled one — off
         // the aim list (game/pick.ts) so it can't be re-examined, but still a
         // real mesh lying where it grew, not vanished like a picked one.
-        audio.collect()
         removeMushroomTarget(target)
         const fallAxis = new THREE.Vector3(Math.cos(placement.rotationY), 0, Math.sin(placement.rotationY))
         target.rotateOnWorldAxis(fallAxis, Math.PI / 2)
@@ -756,22 +738,9 @@ async function main(): Promise<void> {
         else audio.footstepClip(input.sprinting)
       }
 
-      birdCallTimer -= dt
-      if (birdCallTimer <= 0) {
-        birdCallTimer = BIRD_CALL_MIN_GAP + birdCallRand() * (BIRD_CALL_MAX_GAP - BIRD_CALL_MIN_GAP)
-        const caller = nearestBird(forest.birdPositions(), player.x, player.z, BIRD_CALL_RADIUS)
-        if (caller) {
-          const dist = Math.hypot(caller.x - player.x, caller.z - player.z)
-          audio.birdCall(
-            birdPan(player.x, player.z, player.yaw, caller.x, caller.z),
-            birdGain(dist, BIRD_CALL_RADIUS),
-          )
-        }
-      }
-
-      // Water ambience: unlike the bird call above, this runs every frame,
-      // not on a timer — it is a continuous loop whose only job is to track
-      // the player's own distance to the nearest pond/stream edge.
+      // Water ambience runs every frame, not on a timer — it is a
+      // continuous loop whose only job is to track the player's own
+      // distance to the nearest pond/stream edge.
       const nearestW = nearestWater(player.x, player.z, waterBodies)
       audio.updateWaterAmbience(
         nearestW ? waterAmbienceGain(nearestW.distance, WATER_AMBIENCE_RADIUS) : 0,

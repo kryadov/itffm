@@ -213,6 +213,17 @@ describe('buildShelterMesh — door state', () => {
     expect(obstacle.radius).toBeGreaterThan(0)
   })
 
+  it('shows a handle and plank grooves on both faces, not just the inside', () => {
+    // Live report: the original relief (grooves + handle) sat only at
+    // positive-z offsets — the hut-interior face of the door slab — so the
+    // door read as blank from outside. Both signs should now appear.
+    const { group } = buildShelterMesh(s)
+    const hinge = group.getObjectByName('doorHinge')!
+    const zs = hinge.children.map((c) => c.position.z).filter((z) => z !== 0)
+    expect(zs.some((z) => z > 0)).toBe(true)
+    expect(zs.some((z) => z < 0)).toBe(true)
+  })
+
   it('swings the visible door leaf toward open over time, not instantly', () => {
     const { group, toggleDoor, update } = buildShelterMesh(s)
     const hinge = group.getObjectByName('doorHinge')!

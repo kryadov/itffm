@@ -422,16 +422,26 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   const doorFace = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, doorHeight, 0.06), doorMat)
   doorFace.position.x = doorWidth / 2
   doorHinge.add(doorFace)
+  // Both faces get the plank grooves and a handle — a live report caught
+  // the original as inside-only (relief and handle both sat at z=+0.035/
+  // +0.05, the hut-interior side of the 0.06-thick slab): a door walked up
+  // to from outside showed a blank back, which does not read as a door at
+  // all until you are already through it. Mirrored at z=-0.035/-0.05 for
+  // the outside face, same x placement both sides.
   const grooveMat = new THREE.MeshStandardMaterial({ color: 0x1f150c, roughness: 1 })
-  for (const gx of [doorWidth / 2 - 0.17, doorWidth / 2 + 0.17]) {
-    const groove = new THREE.Mesh(new THREE.BoxGeometry(0.02, doorHeight * 0.96, 0.01), grooveMat)
-    groove.position.set(gx, 0, 0.035)
-    doorHinge.add(groove)
+  for (const gz of [0.035, -0.035]) {
+    for (const gx of [doorWidth / 2 - 0.17, doorWidth / 2 + 0.17]) {
+      const groove = new THREE.Mesh(new THREE.BoxGeometry(0.02, doorHeight * 0.96, 0.01), grooveMat)
+      groove.position.set(gx, 0, gz)
+      doorHinge.add(groove)
+    }
   }
   const handleMat = new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 0.4, metalness: 0.3 })
-  const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), handleMat)
-  handle.position.set(doorWidth - 0.15, -0.05, 0.05)
-  doorHinge.add(handle)
+  for (const hz of [0.05, -0.05]) {
+    const handle = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), handleMat)
+    handle.position.set(doorWidth - 0.15, -0.05, hz)
+    doorHinge.add(handle)
+  }
   group.add(doorHinge)
 
   let doorOpen = false

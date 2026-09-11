@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.81.0
+The shelter door now has its handle and plank relief on both faces, not
+just the inside. Bird calls and the mushroom collect/cut sound are off.
+
 ## v0.80.1
 Fix: the walk/run footstep sound now retriggers on the actual footfall
 instead of running as its own free-running background loop.
