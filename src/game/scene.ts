@@ -30,7 +30,7 @@ import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } 
 import { placeMine, mineObstacles, buildMineMesh } from '../world/mine'
 import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine } from '../world/railway'
 import { buildSky } from '../world/sky'
-import { sampleDayNight, sunElevation } from '../world/daynight'
+import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
 import { moonPhase } from '../world/moonPhase'
 import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
@@ -119,6 +119,10 @@ export interface Forest {
   extraObstacles: { x: number; z: number; radius: number; topHeight?: number }[]
   /** The wood's one hut — game/main.ts starts the player beside it. */
   shelter: { x: number; z: number }
+  /** The wood's one campfire — audio/audio.ts's music bed checks the
+   *  player's distance to this to swap the day/night ambience for
+   *  campfire.mp3. */
+  campfire: { x: number; z: number }
   /** Where the hut's own doorway is, in world space — main.ts checks the
    *  player's plain distance to this to decide whether `E` should open/close
    *  the door instead of examining a mushroom. */
@@ -253,7 +257,7 @@ export function createForest(
     // star field and moon fade in over the same stretch, not instantly —
     // dusk should read as a gradient, not a light switch.
     const sunVis = Math.max(0, elevation)
-    const night = Math.max(0, Math.min(1, -elevation * 1.5))
+    const night = nightFactor(t)
     sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow)
     shelterFx?.setNight(night)
   }
@@ -484,6 +488,7 @@ export function createForest(
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
+    campfire: { x: campfire.x, z: campfire.z },
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds,

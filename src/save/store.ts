@@ -31,6 +31,16 @@ export interface Prefs {
   /** 0..1 — the collect/cut sound (audio/audio.ts). 0 is silent; there is no
    *  separate on/off toggle for one short effect. */
   soundVolume: number
+  /** 0..1 — the day/night/campfire ambience bed (audio/audio.ts's
+   *  `updateMusic`). Its own mixer, independent of `soundVolume`, so a
+   *  player can run the wood's own music without the mushroom-collect snap
+   *  or vice versa. */
+  musicVolume: number
+  /** 0..1 — the walk/run footstep loop (audio/audio.ts's
+   *  `updateFootstepLoop`). Its own mixer for the same reason `musicVolume`
+   *  has one — a continuous loop needs a level a player can tune separately
+   *  from one-off sounds. */
+  footstepVolume: number
   /** Off by default — flips the sign of vertical look (game/controls.ts's
    *  and game/touchControls.ts's own dPitch), for players who read "up" on
    *  the stick/mouse as "look down" (a common flight-sim-style preference). */
@@ -56,6 +66,8 @@ export function defaultPrefs(): Prefs {
     weather: 'clear',
     minimap: false,
     soundVolume: 0.7,
+    musicVolume: 0.5,
+    footstepVolume: 0.6,
     invertMouseY: false,
   }
 }

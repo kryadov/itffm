@@ -9,6 +9,7 @@ import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
 import { birdPan, birdGain, nearestBird } from './audio/birdCalls'
 import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAmbience'
+import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import { mulberry32 } from './util/rng'
@@ -24,7 +25,7 @@ import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
-import { timeFor, DAY_TIME } from './world/daynight'
+import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
 import { speciesById } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
@@ -83,6 +84,11 @@ const BIRD_CALL_RADIUS = 60
  *  visible, short of the fog's far distance (140m) so it stays a landmark
  *  rather than a constant hum everywhere in the wood. */
 const WATER_AMBIENCE_RADIUS = 45
+/** How close to the campfire its own music track takes over from the
+ *  day/night bed, metres — world/campfire.ts's own CAMPFIRE_RADIUS (1.3m,
+ *  the fire's footprint) plus enough margin that a player sitting on the
+ *  bench around it is well inside, not right at the fade's own edge. */
+const CAMPFIRE_MUSIC_RADIUS = 8
 /** How long, in real seconds, between one bird call and the next roll for
  *  another — wide enough that the wood isn't a chorus every second, narrow
  *  enough that a flock nearby is heard now and then, not never. */
@@ -201,6 +207,8 @@ async function main(): Promise<void> {
   const audio = new AudioEngine()
   audio.resume()
   audio.setVolume(save.prefs.soundVolume)
+  audio.setMusicVolume(save.prefs.musicVolume)
+  audio.setFootstepVolume(save.prefs.footstepVolume)
   const basket = createBasket(BASKET_CAPACITY)
   // Which save/store.ts Find a basket item's note belongs to — a Placement
   // carries no identity of its own, but it is the very object the collect
@@ -480,6 +488,8 @@ async function main(): Promise<void> {
         controls.setInvertY(prefs.invertMouseY)
         touch.setInvertY(prefs.invertMouseY)
         audio.setVolume(prefs.soundVolume)
+        audio.setMusicVolume(prefs.musicVolume)
+        audio.setFootstepVolume(prefs.footstepVolume)
         forest.setWeather(prefs.weather)
         minimap.setVisible(prefs.minimap)
         void persistSave(save)
@@ -734,12 +744,21 @@ async function main(): Promise<void> {
       }
       worldStream?.update(player.x, player.z)
 
-      if (crossedFootstep(prevBobPhase, player.bobPhase)) {
-        const nearWater = (source.water ?? []).some(
-          (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
-        )
+      // In/near water keeps the old synthesized splash (audio/audio.ts's
+      // footstep() — see FOOTSTEP_PARAMS.water) rather than the recorded
+      // walk/run loop below: the loop was never meant to stand in for that
+      // one, so it stays muted whenever this is true.
+      const nearWater = (source.water ?? []).some(
+        (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
+      )
+      if (nearWater && crossedFootstep(prevBobPhase, player.bobPhase)) {
         audio.footstep(footstepSubstrate(biome, nearWater))
       }
+      // Continuous, unlike the splash above: on for every frame the player
+      // actually covers ground (bobPhase only advances while grounded and
+      // moving — see PlayerState's own doc comment), off the instant they
+      // stop or step into water.
+      audio.updateFootstepLoop(player.bobPhase !== prevBobPhase, input.sprinting, nearWater)
 
       birdCallTimer -= dt
       if (birdCallTimer <= 0) {
@@ -788,7 +807,10 @@ async function main(): Promise<void> {
       minimap.update({ x: player.x, z: player.z, heading: headingFromYaw(player.yaw) })
     }
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
-    forest.updateDayNight(timeFor(save.prefs.timeMode, cycleT), camera.position)
+    const clockT = timeFor(save.prefs.timeMode, cycleT)
+    forest.updateDayNight(clockT, camera.position)
+    const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
+    audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
     forest.updateClouds(camera.position, dt)
     forest.updateWeather(camera.position, dt)
     forest.updateShelter(dt)

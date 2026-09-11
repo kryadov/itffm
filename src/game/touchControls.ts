@@ -13,7 +13,11 @@ const TAP_MOVE_THRESHOLD = 12
  *  moved — a deliberate hold reads as something else, not an accidental tap. */
 const TAP_TIME_THRESHOLD = 350
 
-const NEUTRAL: PlayerInput = { forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 0 }
+// No touch sprint control — the crouch button is the only gesture this
+// scheme spends a dedicated screen element on; a run is out of scope here.
+const NEUTRAL: PlayerInput = {
+  forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, sprinting: false, jumping: false, dt: 0,
+}
 
 /**
  * The walking stick's forward/strafe from how far a thumb has dragged off
@@ -220,7 +224,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       const { forward, strafe } = stick
         ? joystickVector(stick.curX - stick.startX, stick.curY - stick.startY, STICK_RADIUS)
         : { forward: 0, strafe: 0 }
-      const input: PlayerInput = { forward, strafe, dYaw, dPitch, crouching, jumping: false, dt }
+      const input: PlayerInput = { forward, strafe, dYaw, dPitch, crouching, sprinting: false, jumping: false, dt }
       dYaw = 0
       dPitch = 0
       return input

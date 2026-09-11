@@ -13,7 +13,7 @@ const start: PlayerState = {
   x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0, bobPhase: 0,
 }
 const idle: PlayerInput = {
-  forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 60,
+  forward: 0, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, sprinting: false, jumping: false, dt: 1 / 60,
 }
 
 describe('biomeSpeedFactor', () => {
@@ -107,6 +107,19 @@ describe('stepPlayer', () => {
     const fast = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
     const slow = stepPlayer(crouched, { ...idle, forward: 1, dt: 1 }, flat, [])
     expect(Math.hypot(slow.x, slow.z)).toBeLessThan(Math.hypot(fast.x, fast.z))
+  })
+
+  it('runs faster while sprinting', () => {
+    const walked = stepPlayer(start, { ...idle, forward: 1, dt: 1 }, flat, [])
+    const sprinted = stepPlayer(start, { ...idle, forward: 1, sprinting: true, dt: 1 }, flat, [])
+    expect(Math.hypot(sprinted.x, sprinted.z)).toBeGreaterThan(Math.hypot(walked.x, walked.z))
+  })
+
+  it('refuses to sprint while crouched', () => {
+    const crouched = { ...start, crouch: 1 }
+    const notSprinting = stepPlayer(crouched, { ...idle, forward: 1, dt: 1 }, flat, [])
+    const trySprint = stepPlayer(crouched, { ...idle, forward: 1, sprinting: true, dt: 1 }, flat, [])
+    expect(Math.hypot(trySprint.x, trySprint.z)).toBeCloseTo(Math.hypot(notSprinting.x, notSprinting.z), 5)
   })
 
   it('slides along an obstacle rather than sticking to it', () => {

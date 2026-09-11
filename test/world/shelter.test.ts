@@ -229,7 +229,9 @@ describe('walking through the doorway (integration)', () => {
     const { toggleDoor, doorObstacle: obstacle } = buildShelterMesh(s)
     const obstacles: Circle[] = [...wallObstacles(s), obstacle]
 
-    const neutralInput = { forward: 1, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, jumping: false, dt: 1 / 30 }
+    const neutralInput = {
+      forward: 1, strafe: 0, dYaw: 0, dPitch: 0, crouching: false, sprinting: false, jumping: false, dt: 1 / 30,
+    }
     // yaw Math.PI walks toward +Z in game/player.ts's own convention (rawZ =
     // -cos(yaw)*forward) — the doorway sits at z=-1.3, the hut interior at
     // z>-1.3, so this walks from outside straight at the door.

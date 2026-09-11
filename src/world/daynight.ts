@@ -31,6 +31,17 @@ export function sunElevation(t: number): number {
   return Math.sin((t - 0.25) * Math.PI * 2)
 }
 
+/**
+ * How "night" it is, 0 (sun above the horizon) to 1 (well below it) — the
+ * same clamp `game/scene.ts` already applied inline to its own `sunVisible`
+ * for the sky/shelter fade, pulled out here so `audio/audio.ts`'s music
+ * crossfade (day.mp3 vs night.mp3) can read the identical value instead of
+ * re-deriving its own notion of "night" from the clock.
+ */
+export function nightFactor(t: number): number {
+  return Math.max(0, Math.min(1, -sunElevation(t) * 1.5))
+}
+
 const lerp = (a: number, b: number, x: number): number => a + (b - a) * x
 
 function lerpColor(a: number, b: number, x: number): number {

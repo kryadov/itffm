@@ -65,6 +65,17 @@ export const FOOTSTEP_PARAMS: Record<
  * just enough texture and movement to read as "water, over there" from a
  * distance. TODO.md's 🔊 section's forest ambience (wind, creaks) is still
  * open and still undecided between the two.
+ *
+ * `updateMusic()`/`updateFootstepLoop()` below are a deliberate, later
+ * exception to the "no CC0 recording" rule above, not an erosion of it: a
+ * real 2026-09-11 request asked specifically for real recordings (zvukbox.ru,
+ * metadata and cover art stripped before they entered the repo) for the
+ * wood's own day/night/campfire music bed and its walk/run footstep loop —
+ * every other sound in this file is still synthesis, and stays that way.
+ * Both play through their own `Prefs`-driven volume (`musicVolume`,
+ * `footstepVolume`), independent of `sfxGain`'s `soundVolume` — a player who
+ * wants the mushroom-collect snap without the music, or the reverse, can
+ * have it.
  */
 export class AudioEngine {
   private ctx: AudioContext | null = null
@@ -84,6 +95,28 @@ export class AudioEngine {
   private waterAmpLfoDepth: GainNode | null = null
   private waterDistanceGain: GainNode | null = null
 
+  // The music bed (day/night/campfire) and the footstep loop (walk/run) are
+  // both real recordings (see the class doc comment above) rather than
+  // synthesis — three/two looping AudioBufferSourceNodes each, decoded once
+  // and left running for the whole session; only their own gain crosses
+  // fade in and out, the same "never tear the graph down, just ramp toward
+  // silence" choice updateWaterAmbience() makes.
+  private musicGain: GainNode | null = null
+  private musicVolume = 0.5
+  private dayBuffer: AudioBuffer | null = null
+  private nightBuffer: AudioBuffer | null = null
+  private campfireBuffer: AudioBuffer | null = null
+  private dayGain: GainNode | null = null
+  private nightGain: GainNode | null = null
+  private campfireLoopGain: GainNode | null = null
+
+  private footstepGain: GainNode | null = null
+  private footstepVolume = 0.6
+  private walkBuffer: AudioBuffer | null = null
+  private runBuffer: AudioBuffer | null = null
+  private walkGain: GainNode | null = null
+  private runGain: GainNode | null = null
+
   /** Create/resume the AudioContext. Call from a click/keydown handler —
    *  browsers refuse to start audio before one. */
   resume(): void {
@@ -98,11 +131,132 @@ export class AudioEngine {
     this.sfxGain = this.ctx.createGain()
     this.sfxGain.gain.value = this.volume
     this.sfxGain.connect(this.ctx.destination)
+
+    this.musicGain = this.ctx.createGain()
+    this.musicGain.gain.value = this.musicVolume
+    this.musicGain.connect(this.ctx.destination)
+    this.footstepGain = this.ctx.createGain()
+    this.footstepGain.gain.value = this.footstepVolume
+    this.footstepGain.connect(this.ctx.destination)
+    void this.loadMusic()
+    void this.loadFootsteps()
   }
 
   setVolume(v: number): void {
     this.volume = Math.max(0, Math.min(1, v))
     if (this.sfxGain) this.sfxGain.gain.value = this.volume
+  }
+
+  setMusicVolume(v: number): void {
+    this.musicVolume = Math.max(0, Math.min(1, v))
+    if (this.musicGain) this.musicGain.gain.value = this.musicVolume
+  }
+
+  setFootstepVolume(v: number): void {
+    this.footstepVolume = Math.max(0, Math.min(1, v))
+    if (this.footstepGain) this.footstepGain.gain.value = this.footstepVolume
+  }
+
+  /** Fetch + decode one recorded clip. Never throws — a failed fetch (the
+   *  file missing, a network hiccup) just leaves that track silent forever,
+   *  the same honest-fallback spirit as `terrain/provider.ts`'s own offline
+   *  demo wood, not a reason to break the rest of the mixer. */
+  private async loadClip(url: string): Promise<AudioBuffer | null> {
+    if (!this.ctx) return null
+    try {
+      const res = await fetch(url)
+      const bytes = await res.arrayBuffer()
+      return await this.ctx.decodeAudioData(bytes)
+    } catch {
+      return null
+    }
+  }
+
+  private async loadMusic(): Promise<void> {
+    const [day, night, campfire] = await Promise.all([
+      this.loadClip('./audio/day.mp3'),
+      this.loadClip('./audio/night.mp3'),
+      this.loadClip('./audio/campfire.mp3'),
+    ])
+    this.dayBuffer = day
+    this.nightBuffer = night
+    this.campfireBuffer = campfire
+    this.ensureMusicSources()
+  }
+
+  private async loadFootsteps(): Promise<void> {
+    const [walk, run] = await Promise.all([this.loadClip('./audio/walk.mp3'), this.loadClip('./audio/run.mp3')])
+    this.walkBuffer = walk
+    this.runBuffer = run
+    this.ensureFootstepSources()
+  }
+
+  /** One looping source, gain-nulled until the first real `updateMusic()`/
+   *  `updateFootstepLoop()` call sets a target — built once its buffer has
+   *  actually finished decoding, a no-op on every call after. */
+  private startLoop(buffer: AudioBuffer, into: GainNode): GainNode {
+    const ctx = this.ctx!
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    src.loop = true
+    const g = ctx.createGain()
+    g.gain.value = 0
+    src.connect(g)
+    g.connect(into)
+    src.start()
+    return g
+  }
+
+  private ensureMusicSources(): void {
+    if (!this.ctx || !this.musicGain) return
+    if (this.dayBuffer && !this.dayGain) this.dayGain = this.startLoop(this.dayBuffer, this.musicGain)
+    if (this.nightBuffer && !this.nightGain) this.nightGain = this.startLoop(this.nightBuffer, this.musicGain)
+    if (this.campfireBuffer && !this.campfireLoopGain) {
+      this.campfireLoopGain = this.startLoop(this.campfireBuffer, this.musicGain)
+    }
+  }
+
+  private ensureFootstepSources(): void {
+    if (!this.ctx || !this.footstepGain) return
+    if (this.walkBuffer && !this.walkGain) this.walkGain = this.startLoop(this.walkBuffer, this.footstepGain)
+    if (this.runBuffer && !this.runGain) this.runGain = this.startLoop(this.runBuffer, this.footstepGain)
+  }
+
+  /**
+   * The wood's own music bed — called every frame (`main.ts`, alongside the
+   * water-ambience/footstep wiring) with `night` (`world/daynight.ts`'s
+   * `nightFactor`, the same value the sky/shelter fade already use) and
+   * `fireGain` (`audio/musicAmbience.ts`'s `campfireGain`, the player's own
+   * distance to the campfire). `fireGain` doubles as the crossfade factor —
+   * at 1 the day/night bed is fully replaced by campfire.mp3, at 0 it is
+   * untouched — so the two never disagree about where the swap happens.
+   */
+  updateMusic(night: number, fireGain: number): void {
+    if (!this.ctx) return
+    this.ensureMusicSources()
+    const t = this.ctx.currentTime
+    const bed = Math.max(0, 1 - fireGain)
+    if (this.dayGain) this.dayGain.gain.setTargetAtTime((1 - night) * bed, t, 0.8)
+    if (this.nightGain) this.nightGain.gain.setTargetAtTime(night * bed, t, 0.8)
+    if (this.campfireLoopGain) this.campfireLoopGain.gain.setTargetAtTime(fireGain, t, 0.8)
+  }
+
+  /**
+   * The walking/running footstep loop — called every frame next to
+   * `updateMusic()`. `moving` is whether the player actually covered ground
+   * this frame (main.ts's own bob-phase delta, the same signal that already
+   * drives the water-splash's `footstep()` call); `sprinting` picks run.mp3
+   * over walk.mp3; `silence` mutes both outright while the player is in or
+   * near water, where `footstep()`'s own synthesized splash keeps playing
+   * instead — the recording was never meant to stand in for that one.
+   */
+  updateFootstepLoop(moving: boolean, sprinting: boolean, silence: boolean): void {
+    if (!this.ctx) return
+    this.ensureFootstepSources()
+    const t = this.ctx.currentTime
+    const on = moving && !silence
+    if (this.walkGain) this.walkGain.gain.setTargetAtTime(on && !sprinting ? 1 : 0, t, 0.1)
+    if (this.runGain) this.runGain.gain.setTargetAtTime(on && sprinting ? 1 : 0, t, 0.1)
   }
 
   /** One filtered-noise-plus-LFO recipe per water kind — a stream reads as

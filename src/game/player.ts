@@ -35,6 +35,10 @@ export interface PlayerInput {
   dYaw: number
   dPitch: number
   crouching: boolean
+  /** Held to move faster while upright — has no effect while crouching (see
+   *  `stepPlayer`'s own note on why a crouched sprint is refused outright,
+   *  the same reasoning a crouched jump already gets refused for). */
+  sprinting: boolean
   /** Edge-triggered: true only on the frame the jump key was pressed. */
   jumping: boolean
   dt: number
@@ -57,6 +61,11 @@ const MAX_STEP_HEIGHT = 0.55
 
 const WALK_SPEED = 2.4
 const CROUCH_SPEED = 1.1
+/** Sprinting speed, m/s — the ratio to WALK_SPEED is what audio/audio.ts's
+ *  footstep loop also uses (indirectly, via PlayerInput.sprinting) to pick
+ *  walk.mp3 vs run.mp3, so the two stay honestly matched to how much faster
+ *  a sprint actually moves the player. */
+const SPRINT_SPEED = 4.2
 const STAND_EYE = 1.65
 const CROUCH_EYE = 0.75
 const CROUCH_RATE = 6
@@ -176,7 +185,12 @@ export function stepPlayer(
   // they end it in: reading the new crouch let someone straightening up jump to
   // full speed within the same frame.
   const slope = slopeFactor(ground, s.x, s.z, dirX, dirZ)
-  const speed = (WALK_SPEED + (CROUCH_SPEED - WALK_SPEED) * s.crouch) * i.dt * slope * speedMultiplier
+  const base = WALK_SPEED + (CROUCH_SPEED - WALK_SPEED) * s.crouch
+  // A crouched sprint is refused outright rather than half-allowed, same as
+  // a crouched jump above — sprinting while ducked under something would
+  // just clip through it.
+  const sprintFactor = i.sprinting && s.crouch < 0.5 ? SPRINT_SPEED / WALK_SPEED : 1
+  const speed = base * sprintFactor * i.dt * slope * speedMultiplier
   let x = s.x + rawX * speed
   let z = s.z + rawZ * speed
 

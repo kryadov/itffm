@@ -67,7 +67,8 @@ export function createControls(
           (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
         dYaw,
         dPitch,
-        crouching: keys.has('ShiftLeft') || keys.has('ControlLeft'),
+        crouching: keys.has('ControlLeft'),
+        sprinting: keys.has('ShiftLeft'),
         jumping: jumpPending,
         dt,
       }

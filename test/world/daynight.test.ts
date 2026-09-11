@@ -1,4 +1,4 @@
-import { sunElevation, sampleDayNight, timeFor, DAY_TIME, NIGHT_TIME } from '../../src/world/daynight'
+import { sunElevation, nightFactor, sampleDayNight, timeFor, DAY_TIME, NIGHT_TIME } from '../../src/world/daynight'
 
 describe('sunElevation', () => {
   it('peaks at noon', () => {
@@ -12,6 +12,28 @@ describe('sunElevation', () => {
   it('crosses zero at dawn and dusk', () => {
     expect(sunElevation(0.25)).toBeCloseTo(0, 5)
     expect(sunElevation(0.75)).toBeCloseTo(0, 5)
+  })
+})
+
+describe('nightFactor', () => {
+  it('is zero at noon', () => {
+    expect(nightFactor(0.5)).toBe(0)
+  })
+
+  it('is fully night at midnight', () => {
+    expect(nightFactor(0)).toBe(1)
+  })
+
+  it('never goes negative just after sunrise', () => {
+    expect(nightFactor(0.26)).toBe(0)
+  })
+
+  it('stays within [0, 1]', () => {
+    for (let t = 0; t < 1; t += 0.05) {
+      const n = nightFactor(t)
+      expect(n).toBeGreaterThanOrEqual(0)
+      expect(n).toBeLessThanOrEqual(1)
+    }
   })
 })
 
