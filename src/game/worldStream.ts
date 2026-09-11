@@ -19,6 +19,7 @@ import {
   CHUNK_SIZE, CHUNK_GROUND_SEGMENTS, chunkCoordAt, chunkOrigin, chunkSeed, chunksInRadius, chunkKey,
   type ChunkCoord,
 } from '../world/chunking'
+import { collectScatterCullers, sweepAll, type ScatterCuller } from '../world/instanceCulling'
 import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Species } from '../species/schema'
@@ -42,6 +43,27 @@ const UNLOAD_RADIUS = 2
  *  A proper fix (building off the main thread, or in slices within a
  *  frame's own time budget) is real future work, logged in TODO.md. */
 const BUILD_BUDGET_PER_UPDATE = 1
+
+/** How many placement objects (one mushroom/berry/herb/nut/find's own built-
+ *  and-merged mesh, wrapped in its LOD) get actually constructed per
+ *  `update()` call, across every chunk still mid-build. Measured this
+ *  session (see TODO.md's "Chunk build cost"): building a chunk's ~130
+ *  placements is itself the dominant cost of the whole chunk build (~110ms
+ *  of a ~150-250ms total, the rest — terrain, trees, decorative scatter —
+ *  comes to a few dozen ms) — the single biggest lever a chunk build has,
+ *  bigger than any of the scatter systems combined. `buildChunk` below
+ *  builds the chunk's terrain/trees/scatter/sites (and its own ground mesh
+ *  goes on screen) synchronously, same as before, but leaves its
+ *  `placements` array to fill in over several subsequent `update()` calls
+ *  instead of building every mushroom's real geometry in the same freeze —
+ *  same idea as `BUILD_BUDGET_PER_UPDATE` above, one level deeper: even a
+ *  single chunk's own build cost is now sliced, not just the queue of
+ *  chunks. 16 keeps a single `update()` call's own placement work down
+ *  around 15-20ms even on this session's own (slower than a real GPU host's
+ *  CPU) measurement rig — a real frame budget at 60fps is ~16ms, so this is
+ *  already close to "at most one frame's worth," not free, but nothing like
+ *  the ~150ms a whole chunk's ~130 placements cost built all at once. */
+const PLACEMENT_BUDGET_PER_UPDATE = 16
 
 /** Sites per chunk — a flat count, not scaled to the chunk's (much bigger)
  *  area the way the home plot's own count is: with up to nine chunks live
@@ -81,6 +103,15 @@ interface LoadedChunk {
   lods: THREE.LOD[]
   mushroomObjects: THREE.Object3D[]
   critters: CritterGroup[]
+  scatterCullers: ScatterCuller[]
+  /** Every mushroom/berry/herb/nut/find this chunk's ecology spawned —
+   *  computed synchronously (cheap, see PLACEMENT_BUDGET_PER_UPDATE above),
+   *  but turned into real objects only `placementCursor` at a time. */
+  placements: Placement[]
+  /** How many of `placements` already have a built object in `group` and
+   *  `mushroomObjects` — `placements.length` once this chunk has fully
+   *  caught up. */
+  placementCursor: number
 }
 
 export interface WorldStream {
@@ -115,6 +146,10 @@ export interface WorldStream {
    *  never does this on its own (same reason `Forest.updateMushroomLod`
    *  exists). Call every frame. */
   updateLod(camera: THREE.Camera): void
+  /** Real distance culling for every loaded chunk's static InstancedMesh
+   *  scatter — same mechanism and same "call periodically, not every frame"
+   *  rule as `Forest.updateScatterCulling` (world/instanceCulling.ts). */
+  updateScatterCulling(camX: number, camZ: number, radius: number): void
   /** Steps every loaded chunk's hares and squirrels (state machine, pose,
    *  instanced-mesh matrices) — three.js does not do this on its own either,
    *  same reason `updateLod` above exists. Call every frame. */
@@ -212,15 +247,18 @@ export function createWorldStream(
     const month = new Date().getMonth() + 1
     const placements: Placement[] = spawnMushrooms(species, sites, { month, seed: seed + 3, daysSinceRain: 2 })
 
+    // Deliberately NOT built here — see PLACEMENT_BUDGET_PER_UPDATE's own
+    // comment. `placements` only decides WHAT this chunk will hold; turning
+    // each one into a real, merged mesh (the actually expensive step) is
+    // `advancePlacements`' job, called a few at a time from `update()` below.
     const lods: THREE.LOD[] = []
     const mushroomObjects: THREE.Object3D[] = []
-    for (const p of placements) {
-      const built = buildPlacementObject(p, ground)
-      if (!built) continue
-      lods.push(built.lod)
-      group.add(built.object)
-      mushroomObjects.push(built.object)
-    }
+
+    // Snapshotted once the chunk's own scatter (trees/boulders/deadwood/
+    // leaning-trees/undergrowth/flora/grass) already sits in `group` with its
+    // real transforms — same as game/scene.ts's home plot, see world/
+    // instanceCulling.ts.
+    const scatterCullers = collectScatterCullers(group)
 
     // Ground fauna, chunked — see docs/superpowers/specs/2026-09-10-
     // infinite-world-design.md's own follow-up note. createHares/
@@ -237,7 +275,30 @@ export function createWorldStream(
     )
 
     scene.add(group)
-    return { group, ground, trees, lods, mushroomObjects, critters: [hares, squirrels] }
+    return {
+      group, ground, trees, lods, mushroomObjects, critters: [hares, squirrels], scatterCullers,
+      placements, placementCursor: 0,
+    }
+  }
+
+  /** Builds up to `budget` of `loaded`'s still-pending placements (its own
+   *  chunk group and mushroomObjects/lods grow in place) — the actual
+   *  amortization PLACEMENT_BUDGET_PER_UPDATE exists for. Returns how many
+   *  it actually built (fewer than `budget` once this chunk's own placements
+   *  run out, so the caller can spend the rest of its budget on another
+   *  chunk in the same `update()` call). */
+  function advancePlacements(loaded: LoadedChunk, budget: number): number {
+    const end = Math.min(loaded.placements.length, loaded.placementCursor + budget)
+    let built = 0
+    for (; loaded.placementCursor < end; loaded.placementCursor++, built++) {
+      const p = loaded.placements[loaded.placementCursor]
+      const obj = buildPlacementObject(p, loaded.ground)
+      if (!obj) continue
+      loaded.lods.push(obj.lod)
+      loaded.group.add(obj.object)
+      loaded.mushroomObjects.push(obj.object)
+    }
+    return built
   }
 
   function disposeChunk(loaded: LoadedChunk): void {
@@ -292,9 +353,27 @@ export function createWorldStream(
         const coord = buildQueue.shift()!
         chunks.set(chunkKey(coord), buildChunk(coord))
       }
+
+      // Spend this call's placement budget across every chunk still mid-
+      // build, nearest-loaded-first (Map iteration order = insertion order,
+      // so the longest-waiting chunk catches up first) — see
+      // PLACEMENT_BUDGET_PER_UPDATE's own comment.
+      let remaining = PLACEMENT_BUDGET_PER_UPDATE
+      for (const loaded of chunks.values()) {
+        if (remaining <= 0) break
+        remaining -= advancePlacements(loaded, remaining)
+      }
     },
     pendingChunkCount() {
-      return buildQueue.length
+      // Not fully settled either while a chunk is still queued to be built
+      // at all, or while a loaded chunk's own placements are still mid-
+      // build — settle() (test/game/worldStream.test.ts) polls this exact
+      // count to know when to stop calling update().
+      let midBuild = 0
+      for (const loaded of chunks.values()) {
+        if (loaded.placementCursor < loaded.placements.length) midBuild++
+      }
+      return buildQueue.length + midBuild
     },
     mushroomObjects() {
       return Array.from(chunks.values()).flatMap((c) => c.mushroomObjects)
@@ -321,6 +400,9 @@ export function createWorldStream(
       for (const loaded of chunks.values()) {
         for (const c of loaded.critters) c.update(dt, playerX, playerZ)
       }
+    },
+    updateScatterCulling(camX, camZ, radius) {
+      for (const loaded of chunks.values()) sweepAll(loaded.scatterCullers, camX, camZ, radius)
     },
     heightAt(x, z) {
       if (inHome(x, z)) return homeGround.heightAt(x, z)

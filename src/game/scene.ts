@@ -24,6 +24,7 @@ import {
   placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, interiorObstacles, doorPosition,
   type ShelterFx,
 } from '../world/shelter'
+import { collectScatterCullers, sweepAll } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
 import { placeMine, mineObstacles, buildMineMesh } from '../world/mine'
@@ -169,6 +170,11 @@ export interface Forest {
    *  camera — three.js's LOD does not do this on its own. Call every frame;
    *  cheap (one pass over the placements, no rebuilding). */
   updateMushroomLod: (camera: THREE.Camera) => void
+  /** Real distance culling for the wood's static InstancedMesh scatter
+   *  (trees, boulders, deadwood, undergrowth, flora, grass) — see
+   *  world/instanceCulling.ts. Meant to be called periodically (every few
+   *  dozen frames), not every frame; main.ts owns that throttle. */
+  updateScatterCulling: (camX: number, camZ: number, radius: number) => void
 }
 
 /**
@@ -466,6 +472,15 @@ export function createForest(
     for (const lod of lods) lod.update(camera)
   }
 
+  // Snapshotted once, here, after every scatter group (trees/boulders/
+  // deadwood/leaning-trees/undergrowth/flora/grass) already carries its real,
+  // final per-instance transforms — see world/instanceCulling.ts's own doc
+  // comment for why fog alone doesn't already do this.
+  const scatterCullers = collectScatterCullers(scene)
+  const updateScatterCulling = (camX: number, camZ: number, radius: number): void => {
+    sweepAll(scatterCullers, camX, camZ, radius)
+  }
+
   return {
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
@@ -473,6 +488,6 @@ export function createForest(
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, updateShelter, updateCampfire, updateBirds,
     birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
-    updateMushroomLod,
+    updateMushroomLod, updateScatterCulling,
   }
 }
