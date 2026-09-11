@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.80.0
+Real recorded music (day/night/campfire) and a walk/run footstep loop, plus
+a new sprint (Shift).
+
 ## v0.79.0
 A narrow-gauge rail line and a short train shuttling back and forth along
 it, running in every wood.
