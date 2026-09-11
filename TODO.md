@@ -198,10 +198,11 @@ UX/фичи покрупнее.
       caveat, same voice as this file's other not-runtime-testable entries:
       whether it actually *sounds* better is a judgment call verified by
       ear/playing the game, not provable by a unit test.
-- [ ] **Звук воды** — генерируем синтезом (тем же приёмом, что и остальной
+- [x] **Звук воды** — генерируем синтезом (тем же приёмом, что и остальной
       звук игры, не CC0-запись) — журчание ручья/тишина у пруда, слышно
       раньше, чем видно, громче вблизи. Фон леса (ветер/скрип) — НЕ в этом
-      заходе, пользователь пришлёт свой референс отдельно.
+      заходе, пользователь пришлёт свой референс отдельно. Done — see the
+      matching "Вода" item in "🔊 Звук" below for the implementation.
 - [x] **Меню/ESC переработать.** Done. `Escape` in `main.ts` now opens
       `openPauseMenu()` — a plain `overlay()` (the same helper every other
       screen already uses) with five buttons: Continue (closes the menu),
@@ -687,8 +688,34 @@ UX/фичи покрупнее.
       note elsewhere in this file). Covered instead by unit tests of the
       pure trigger/substrate logic (9 tests) and a clean, error-free live
       walk with no exceptions thrown from the audio wiring.
-- [ ] **Вода** — речка и озеро слышны раньше, чем видны, и громче вблизи. Это
-      даёт настоящий ориентир в лесу, где ориентиров мало.
+- [x] **Вода** — речка и озеро слышны раньше, чем видны, и громче вблизи. Это
+      даёт настоящий ориентир в лесу, где ориентиров мало. Done (same task
+      as the "Звук воды" live-report item above): `audio/waterAmbience.ts`
+      holds the pure, tested distance→gain half (`nearestWater`, mirroring
+      `nearestBird`, and `waterAmbienceGain`, the same linear falloff shape
+      as `birdGain`) against `world/water.ts`'s own pond/stream rings, kinds
+      classified once at load (`classifyWater`) rather than every frame.
+      `AudioEngine.updateWaterAmbience()` is the one continuous, looping
+      node graph in `audio/audio.ts` (everything else there is fire-and-
+      forget) — a looping noise buffer through a lowpass filter swept by one
+      LFO (the moving-water texture) into an amplitude-wobble gain driven by
+      a second LFO (the bubbling pulse), built lazily once and only ever
+      ramped afterwards (`setTargetAtTime`, no click). Stream vs pond get
+      different characters (`WATER_AMBIENCE_PARAMS`): the stream's LFOs run
+      faster and deeper and it plays louder; the pond's are slow, shallow
+      and near-silent — same synthesis, no separate recording, per the
+      "everything here draws without pictures" rule (see the updated header
+      comment in `audio/audio.ts` — the original plan to source a real CC0
+      recording for continuous ambience specifically was reconsidered here).
+      Wired into `main.ts`'s per-frame loop next to the existing bird-call/
+      footstep audio calls, through `Prefs.soundVolume` the same way the
+      rest of the mixer already works. Verified: 9 new unit tests for the
+      pure module (`nearestWater`/`waterAmbienceGain`), `npm test` (735
+      green) and `npm run build` green, and a live headless-Chrome walk
+      (clicked into the demo wood, held movement toward its own pond for
+      real wall-clock time) with no console errors or thrown exceptions —
+      the DSP node wiring itself isn't unit-tested, same accepted gap as the
+      rest of `audio/audio.ts`.
 - [x] **Птицы** — привязать к стае из `birds.ts`, чтобы голос шёл из точки, где
       птица сидит, а не из ниоткуда. Done: re-triaged this session — this
       was grouped with the continuous-ambient items above (wind, water),
