@@ -23,7 +23,9 @@ function cornerButton(id: string, slot: number, title: string, glyph: string): s
 }
 
 /**
- * Crosshair, prompt, basket counter and the settings gear — plus, on touch,
+ * Crosshair, prompt, basket counter and the gear that opens the pause menu
+ * (`main.ts`'s `openPauseMenu()` — the same one `Esc` opens, so a touch
+ * player with no physical Escape key still reaches it) — plus, on touch,
  * the encyclopedia and tally buttons a mouse-and-keyboard player reaches with
  * `Tab`/`Q` instead (`ui/cornerButtons.ts` packs them against the gear so
  * adding one never needs its own hand-picked offset).
@@ -46,7 +48,7 @@ export function createHud(
      <div id="basket" style="position:fixed;right:16px;bottom:14px;font-size:14px;text-shadow:0 1px 3px #000;opacity:.85"></div>
      <div id="version" style="position:fixed;left:8px;bottom:2px;font-size:10px;text-shadow:0 1px 2px #000;opacity:.35;pointer-events:none">v${__APP_VERSION__}</div>
      <div id="help-hint" style="position:fixed;left:8px;top:14px;font-size:11px;text-shadow:0 1px 3px #000;opacity:.4;pointer-events:none">${t('helpHint')}</div>
-     <button id="settings-btn" title="${t('settingsTitle')} — M" aria-label="${t('settingsTitle')}"
+     <button id="settings-btn" title="${t('pauseTitle')} — Esc" aria-label="${t('pauseTitle')}"
        style="position:fixed;top:14px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(15,19,14,.55);color:#eee;font-size:15px;line-height:1;cursor:pointer;pointer-events:auto">⚙</button>
      ${cornerButton('encyclopedia-btn', 1, t('encyclopedia'), '📖')}
      ${cornerButton('tally-btn', 2, t('tally'), '🧺')}`,

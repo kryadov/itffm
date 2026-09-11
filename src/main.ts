@@ -184,7 +184,11 @@ async function main(): Promise<void> {
   const hud = createHud(
     ui,
     () => {
-      if (!modalOpen()) openSettings()
+      // The gear is the touch equivalent of a first `Escape`: touch has no
+      // physical key for it, so this is the only way a touch player ever
+      // reaches "change location" — reusing the same pause menu Esc opens,
+      // rather than jumping straight to settings, keeps the two routes equal.
+      if (!modalOpen()) openPauseMenu()
     },
     {
       active: touch.active,
@@ -552,6 +556,11 @@ async function main(): Promise<void> {
   }
 
   function openExitConfirm(): void {
+    // Guards against a duplicate on top of itself — openPauseMenu()'s own
+    // Escape handler below calls this on every second Escape press without
+    // tracking whether one is already open (it stays attached across a
+    // cancelled exit, see that function's own comment).
+    if (document.getElementById('exitConfirm')) return
     const el = overlay(
       'exitConfirm',
       `<div style="max-width:380px;padding:30px;text-align:center">
@@ -565,6 +574,68 @@ async function main(): Promise<void> {
     )
     el.querySelector('#exit-yes')!.addEventListener('click', () => location.reload())
     el.querySelector('#exit-no')!.addEventListener('click', () => el.remove())
+  }
+
+  const PAUSE_BTN_STYLE =
+    'padding:11px 18px;border:1px solid #444;border-radius:8px;background:#1f261c;color:#eee;' +
+    'font-size:15px;cursor:pointer;width:100%'
+
+  /**
+   * The first `Escape` (or the HUD gear, see createHud above): a start/pause
+   * menu, not straight into the exit confirmation the way `Escape` used to
+   * work — settings, changing location and the encyclopedia/basket views all
+   * happen through the very functions their own hotkeys already call, so
+   * this only wires up buttons for them, never a second implementation.
+   */
+  function openPauseMenu(): void {
+    if (document.getElementById('pauseMenu')) return
+    const el = overlay(
+      'pauseMenu',
+      `<div style="width:260px;padding:30px 34px;display:flex;flex-direction:column;gap:10px">
+         <h1 style="margin:0 0 10px;font-size:22px;text-align:center">${t('pauseTitle')}</h1>
+         <button id="pause-continue" style="${PAUSE_BTN_STYLE}">${t('pauseContinue')}</button>
+         <button id="pause-settings" style="${PAUSE_BTN_STYLE}">${t('settingsTitle')}</button>
+         <button id="pause-change-location" style="${PAUSE_BTN_STYLE}">${t('pauseChangeLocation')}</button>
+         <button id="pause-encyclopedia" style="${PAUSE_BTN_STYLE}">${t('encyclopedia')}</button>
+         <button id="pause-tally" style="${PAUSE_BTN_STYLE}">${t('tally')}</button>
+       </div>`,
+      [],
+    )
+
+    // A second Escape, with the menu still open, is "exit" — openExitConfirm()
+    // unchanged, just reached from here instead of directly. Left attached
+    // rather than one-shot, so cancelling the exit ("Stay") leaves a menu
+    // that still responds to a further Escape; openExitConfirm's own guard
+    // above is what keeps that from ever stacking two confirm dialogs.
+    const onEscape = (e: KeyboardEvent): void => {
+      if (e.code !== 'Escape') return
+      e.preventDefault()
+      openExitConfirm()
+    }
+    addEventListener('keydown', onEscape)
+
+    const closeMenu = (): void => {
+      el.remove()
+      removeEventListener('keydown', onEscape)
+    }
+    el.querySelector('#pause-continue')!.addEventListener('click', closeMenu)
+    el.querySelector('#pause-settings')!.addEventListener('click', () => {
+      closeMenu()
+      openSettings()
+    })
+    // "Change location" is exactly what the exit confirm's own "Leave" button
+    // already does — a full reload back to openPlacePicker() (`ui/placePicker.ts`)
+    // — just without asking first, since choosing it from the menu is already
+    // the deliberate action a second Escape's confirmation exists to catch.
+    el.querySelector('#pause-change-location')!.addEventListener('click', () => location.reload())
+    el.querySelector('#pause-encyclopedia')!.addEventListener('click', () => {
+      closeMenu()
+      openEncyclopedia(save, getLang())
+    })
+    el.querySelector('#pause-tally')!.addEventListener('click', () => {
+      closeMenu()
+      showTally()
+    })
   }
 
   addEventListener('resize', () => {
@@ -586,7 +657,7 @@ async function main(): Promise<void> {
     if (e.code === 'KeyQ') showTally()
     if (e.code === 'KeyM') openSettings()
     if (e.code === 'KeyH') showHelp()
-    if (e.code === 'Escape') openExitConfirm()
+    if (e.code === 'Escape') openPauseMenu()
     if (e.code === 'KeyF') {
       flashlightOn = !flashlightOn
       forest.setFlashlight(flashlightOn)
