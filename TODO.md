@@ -187,11 +187,32 @@ UX/фичи покрупнее.
       звук игры, не CC0-запись) — журчание ручья/тишина у пруда, слышно
       раньше, чем видно, громче вблизи. Фон леса (ветер/скрип) — НЕ в этом
       заходе, пользователь пришлёт свой референс отдельно.
-- [ ] **Меню/ESC переработать.** `Esc` открывает стартовое меню (не просто
-      снимает pointer lock), повторный `Esc` — «выйти» (как сейчас). В
-      стартовом меню: продолжить, настройки (то, что уже есть), сменить
-      локацию (вернуться к выбору места), энциклопедия и корзина — прямо из
-      меню, не только по хоткеям `Tab`/`Q`.
+- [x] **Меню/ESC переработать.** Done. `Escape` in `main.ts` now opens
+      `openPauseMenu()` — a plain `overlay()` (the same helper every other
+      screen already uses) with five buttons: Continue (closes the menu),
+      Settings, Change location, Encyclopedia and Basket. None of them
+      duplicate logic — Settings calls the existing `openSettings()`
+      (`ui/settingsMenu.ts`), Encyclopedia and Basket call the same
+      `openEncyclopedia()`/`showTally()` the `Tab`/`Q` hotkeys already call,
+      and Change location just does `location.reload()`, the same full
+      restart `openExitConfirm()`'s own "Leave" button already performs —
+      which lands back on `openPlacePicker()` (`ui/placePicker.ts`)
+      unchanged. A second `Escape` while the pause menu is open calls
+      `openExitConfirm()` itself, verbatim — it now guards against a
+      duplicate overlay so cancelling ("Stay") leaves a pause menu that still
+      responds to a further `Escape`. The HUD's settings gear
+      (`ui/hud.ts`) now opens this same pause menu instead of jumping
+      straight to settings — touch has no physical Escape key, so this was
+      the only way to give it "change location" at all; its tooltip changed
+      from "Settings — M" to "Menu — Esc" to match. Two new i18n keys
+      (`pauseTitle`, `pauseContinue`, `pauseChangeLocation`) in both
+      languages. Verified: `npm test` (726 tests) and `npm run build` green;
+      `npm run boot-check` OK; a scripted headless-Chrome sequence confirmed
+      first `Escape` opens `#pauseMenu` (not `#exitConfirm`), the five
+      buttons render as expected, clicking Continue removes the menu and
+      returns to gameplay, and a second `Escape` opens `#exitConfirm` on top
+      of the still-open pause menu — screenshots looked at directly, not
+      just the DOM assertions.
 - [x] **Дом и дверь ещё крупнее.** Done, same pass as the door-collision fix
       above. `world/shelter.ts`'s `WIDTH` 3.0→3.6m, `DEPTH` 2.6→3.1m,
       `WALL_HEIGHT` 2.3→2.6m, `DOOR_WIDTH` 0.95→1.1m, `DOOR_HEIGHT` 2.0→2.2m
