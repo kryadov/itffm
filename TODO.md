@@ -28,6 +28,25 @@ UX/фичи покрупнее.
       игрок стоит.** Не птичий крик (`audio/birdCalls.ts`, интервал 4-11с) —
       что-то ещё держит собственный таймер в `audio/` или `game/`, найти
       источник.
+      Checked (2026-09-11), no fix: traced every place in the codebase that
+      can make a sound. `AudioEngine` (`audio/audio.ts`) has exactly three
+      call sites, all in `main.ts` — `collect()` (action-gated, only on
+      pick/cut, not periodic), `footstep()` (gated on `crossedFootstep`
+      against `PlayerState.bobPhase`; `stepPlayer()` in `game/player.ts`
+      only advances `bobPhase` by ground distance actually covered while
+      grounded, so it provably cannot fire while the player stands still),
+      and `birdCall()` (`main.ts`'s own `birdCallTimer`, 4-11s — already
+      ruled out above). No `setInterval`/`setTimeout` anywhere in `src/`.
+      None of `world/insects.ts`, `world/critters.ts`, `world/weather.ts`,
+      `world/campfire.ts`, `world/shelter.ts` import `audio/` or reference
+      sound at all, despite each holding its own `+= dt` timer for visuals.
+      One thing worth checking live before ruling birdCall out for good:
+      `birdCallTimer` resets to a fresh random 4-11s wait even on a miss
+      (no bird within `BIRD_CALL_RADIUS` of the player) — with only 8 birds
+      over a 90-180m half-size wood, misses are common, so the real gap
+      between *audible* calls can silently run well past the advertised
+      4-11s. Next pass: log actual call timestamps in a live session rather
+      than reasoning from the static range in the comment.
 - [ ] **Поезд не появляется.** Рельсы видны, поезд — нет, при долгой ходьбе
       рядом. Плюс: рельсы не всегда лежат на рельефе (провисают в воздухе),
       деревья/объекты растут прямо на рельсах (`world/railway.ts` не
