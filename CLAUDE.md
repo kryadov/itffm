@@ -142,7 +142,8 @@ buildings, carriageways and lanes is dropped on the way.
 
 ## Responsibility
 
-This game is not a field guide. The disclaimer is mandatory on first run and
-permanently in the encyclopedia. The `edibility` field is checked against two
-independent sources during curation — it is the one place where an error in the
-data costs health rather than a bug report.
+This game is not a field guide. There is no in-game disclaimer screen — it
+blocked the game on mobile past fixing, and was removed by direct request
+(2026-09-11) rather than left broken. The `edibility` field is checked against
+two independent sources during curation — it is the one place where an error
+in the data costs health rather than a bug report.
