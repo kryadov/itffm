@@ -24,7 +24,7 @@ import { openPlacePicker, showLoading } from './ui/placePicker'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
-import { gameDaysElapsed } from './world/calendar'
+import { gameDaysElapsed, realMonthAt, DAYS_PER_MONTH } from './world/calendar'
 import { speciesById, loadSpecies } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
@@ -164,8 +164,11 @@ async function main(): Promise<void> {
   // The wood's own accelerated calendar (world/calendar.ts) — computed once
   // per load rather than re-read every frame, since spawn only ever runs
   // once per wood/chunk build anyway; the visible day/night cycle has its
-  // own separate, per-frame clock (see updateDayNight below).
-  const gameDays = gameDaysElapsed(save.calendarStart, Date.now())
+  // own separate, per-frame clock (see updateDayNight below). Anchored to
+  // the real month the save actually began in (realMonthAt) — see that
+  // function's own doc comment for the live report this fixed.
+  const gameDays =
+    gameDaysElapsed(save.calendarStart, Date.now()) + (realMonthAt(save.calendarStart) - 1) * DAYS_PER_MONTH
   const forest = createForest(source, seed, halfSize, groundSegments, gameDays)
   forest.setWeather(save.prefs.weather)
   // Infinite wilderness beyond the home plot — the demo wood only

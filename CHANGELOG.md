@@ -6,6 +6,13 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.87.2
+Fix: mushrooms had all but stopped appearing since the calendar update — the
+game month was stuck at "January" regardless of the real date, and most
+species only grow in spring/autumn. The calendar now starts in the real
+month a save began in, and out-of-season species are just rarer now,
+never absent outright.
+
 ## v0.87.1
 Fix: the rails now follow the ground under a slope instead of sitting flat
 at one height, detached from their own sleepers.

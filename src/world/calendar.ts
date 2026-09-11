@@ -27,8 +27,26 @@ export function gameDaysElapsed(startMs: number, nowMs: number): number {
   return Math.max(0, (nowMs - startMs) / MS_PER_GAME_DAY)
 }
 
-const DAYS_PER_MONTH = 30
+export const DAYS_PER_MONTH = 30
 const MONTHS_PER_YEAR = 12
+
+/**
+ * The real wall-clock month (1..12) at a timestamp — anchors the
+ * accelerated calendar to whatever real month a save actually began in.
+ * Live report: without this, `gameDaysElapsed` starting at 0 always put
+ * `gameMonth` at 1 (game-"January") right after a save's first load,
+ * regardless of the real date — most species' `season` data is real
+ * autumn/spring months (4-11; only a handful include the winter months),
+ * so a save created in September spent its first several real DAYS stuck
+ * in a game-month where almost nothing was allowed to spawn at all,
+ * reading as "mushrooms stopped appearing." `main.ts` adds this month's
+ * own offset (in game-days) to `gameDaysElapsed`'s result before it ever
+ * reaches `gameMonth`/`daysSinceRain`, so day zero starts in the real
+ * season the player actually loaded into.
+ */
+export function realMonthAt(ms: number): number {
+  return new Date(ms).getMonth() + 1
+}
 
 /**
  * Which month (1..12) the calendar is in. A 360-day year (30-day months) —

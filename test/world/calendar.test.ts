@@ -1,4 +1,6 @@
-import { gameDaysElapsed, gameMonth, isRainDay, daysSinceRain, REAL_HOURS_PER_GAME_DAY } from '../../src/world/calendar'
+import {
+  gameDaysElapsed, gameMonth, isRainDay, daysSinceRain, realMonthAt, REAL_HOURS_PER_GAME_DAY, DAYS_PER_MONTH,
+} from '../../src/world/calendar'
 
 describe('gameDaysElapsed', () => {
   it('is zero at the start', () => {
@@ -13,6 +15,26 @@ describe('gameDaysElapsed', () => {
 
   it('never goes negative, even if the clock skewed backward', () => {
     expect(gameDaysElapsed(10_000, 0)).toBe(0)
+  })
+})
+
+describe('realMonthAt', () => {
+  it('reads the real calendar month at a timestamp', () => {
+    expect(realMonthAt(new Date(2026, 0, 15).getTime())).toBe(1) // January
+    expect(realMonthAt(new Date(2026, 8, 15).getTime())).toBe(9) // September
+    expect(realMonthAt(new Date(2026, 11, 31).getTime())).toBe(12) // December
+  })
+
+  it('combined with gameDaysElapsed\'s offset, starts gameMonth at the real month a save began in', () => {
+    // Live report: a save's calendar always started at game-month 1
+    // regardless of the real date, and most species' season data is real
+    // spring/autumn months — a save created in September spent its first
+    // several real days stuck in a month almost nothing was allowed to grow
+    // in. main.ts adds (realMonthAt(start) - 1) * DAYS_PER_MONTH to
+    // gameDaysElapsed's result before gameMonth ever sees it.
+    const start = new Date(2026, 8, 15).getTime() // September
+    const offsetDays = (realMonthAt(start) - 1) * DAYS_PER_MONTH
+    expect(gameMonth(gameDaysElapsed(start, start) + offsetDays)).toBe(9)
   })
 })
 

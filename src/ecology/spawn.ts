@@ -53,22 +53,34 @@ const COLONY_SPREAD: Record<Gregarious, number> = {
 /** Share of sites that grow anything at all. A wood is not a carpet. */
 const OCCUPANCY = 0.12
 
+/** How much an out-of-season species' score is cut, rather than zeroed —
+ *  live request: with the accelerated calendar (world/calendar.ts) able to
+ *  sit in any one month for a real day and a half before it advances, a
+ *  hard season filter meant the wood could go visibly, uninterruptedly
+ *  empty for that whole stretch whenever the current month fell outside
+ *  most species' `season` (real spring/autumn months — very few include
+ *  the depths of winter). A steep but nonzero weight keeps mushrooms
+ *  showing up every month, just far more of them, and far more often, in
+ *  their real season. */
+const OFF_SEASON_WEIGHT = 0.08
+
 /**
  * How well this species suits this site. Zero means impossible.
  *
- * The hard conditions — season, biome, substrate, a partner tree — rule it out
- * outright. What is left becomes a weight: the closer the partner and the
- * better the moisture matches, the more often the species turns up here. The
- * player never sees this number, but it is what teaches them which tree to look
- * under and which hollow to check.
+ * The hard conditions — biome, substrate, a partner tree — rule it out
+ * outright; season is a steep weight rather than a hard gate (see
+ * `OFF_SEASON_WEIGHT`). What is left becomes a weight: the closer the
+ * partner and the better the moisture matches, the more often the species
+ * turns up here. The player never sees this number, but it is what teaches
+ * them which tree to look under and which hollow to check.
  */
 export function speciesScore(species: Species, site: Site, ctx: SpawnContext): number {
   const eco = species.ecology
-  if (!eco.season.includes(ctx.month)) return 0
   if (!eco.biomes.includes(site.biome)) return 0
   if (eco.substrate !== site.substrate) return 0
 
   let score = FREQUENCY_WEIGHT[eco.frequency]
+  if (!eco.season.includes(ctx.month)) score *= OFF_SEASON_WEIGHT
 
   // A mycorrhizal species must have its partner; a saprotroph does not care.
   if (eco.mycorrhizal.length > 0) {

@@ -19,8 +19,14 @@ const site = (over: Partial<Site> = {}): Site => ({
 const ctx: SpawnContext = { month: 9, seed: 1, daysSinceRain: 2 }
 
 describe('speciesScore', () => {
-  it('scores zero out of season', () => {
-    expect(speciesScore(boletus, site(), { ...ctx, month: 1 })).toBe(0)
+  it('scores much lower out of season, but never zero', () => {
+    // Not a hard gate any more (live request: mushrooms should still show
+    // up regardless of month) — a steep cut instead, so the accelerated
+    // calendar can't empty the wood outright for a whole game-month.
+    const inSeason = speciesScore(boletus, site(), ctx)
+    const outOfSeason = speciesScore(boletus, site(), { ...ctx, month: 1 })
+    expect(outOfSeason).toBeGreaterThan(0)
+    expect(outOfSeason).toBeLessThan(inSeason)
   })
 
   it('scores zero in the wrong biome', () => {
