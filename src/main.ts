@@ -55,6 +55,24 @@ const BASKET_CAPACITY = 24
 /** How close to a pond/stream ring a footstep reads as "water" underfoot —
  *  close enough to be at its edge, not merely somewhere in view of it. */
 const WATER_FOOTSTEP_RADIUS = 1.5
+/** Real distance culling for static scatter (trees, boulders, deadwood,
+ *  undergrowth, flora, grass) — see world/instanceCulling.ts and TODO.md's
+ *  "…но БЕЗ отсечения по дальности". Set past the fog's own far distance
+ *  (game/scene.ts's `Fog(...,30,140)`) plus a margin, not tied to
+ *  `save.prefs.drawDistance` (which only ever governed mushroom culling, at
+ *  a much shorter 20-80m): fog already hides everything past ~140m, so
+ *  culling right at that edge removes nothing the player could actually see
+ *  pop, only what the GPU was rasterizing for nothing. */
+const SCATTER_CULL_RADIUS = 155
+/** How many frames between scatter-culling sweeps — real, not per-frame,
+ *  cost: each sweep is one pass over every static-scatter instance (trees,
+ *  boulders, deadwood, undergrowth, flora, grass; a few thousand in a
+ *  typical wood), cheap on its own but wasted work to repeat 60 times a
+ *  second for something that only changes as fast as the player walks.
+ *  Every 20th frame is roughly three times a second at 60fps — an instance
+ *  crossing the cull radius shows up within a third of a second, not
+ *  perceptible as a pop, while cutting the sweep's own CPU cost by 20x. */
+const SCATTER_CULL_INTERVAL_FRAMES = 20
 /** How far a bird call still carries, metres — past this the flock is
  *  simply out of earshot (`audio/birdCalls.ts`'s `birdGain`/`nearestBird`). */
 const BIRD_CALL_RADIUS = 60
@@ -599,6 +617,9 @@ async function main(): Promise<void> {
 
   let last = performance.now()
   let bootFrames = 0
+  // Counts up every frame; scatter culling only sweeps every
+  // SCATTER_CULL_INTERVAL_FRAMES-th one — see that constant's own comment.
+  let scatterCullFrame = 0
   // Only read in 'cycle' mode — 'day' and 'night' hold their own fixed time
   // (see world/daynight.ts's timeFor), starting at noon so a first frame
   // rendered before this ever advances still matches the old fixed look.
@@ -688,6 +709,11 @@ async function main(): Promise<void> {
     cullDistantMushrooms()
     forest.updateMushroomLod(camera)
     worldStream?.updateLod(camera)
+    if (++scatterCullFrame >= SCATTER_CULL_INTERVAL_FRAMES) {
+      scatterCullFrame = 0
+      forest.updateScatterCulling(player.x, player.z, SCATTER_CULL_RADIUS)
+      worldStream?.updateScatterCulling(player.x, player.z, SCATTER_CULL_RADIUS)
+    }
     updateAim()
     updateDebugOverlay()
     renderer.render(forest.scene, camera)

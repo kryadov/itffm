@@ -174,7 +174,22 @@ UX/фичи покрупнее.
       уже сломанного перфоманса. См. также старые открытые пункты
       «Инстансинг грибов», «…но БЕЗ отсечения по дальности», «Бюджет
       производительности», «Chunk build cost» ниже — тот же класс работы,
-      берутся в этот же заход.
+      берутся в этот же заход. **Partially addressed this session** (see
+      those four sub-items below for what actually changed): real distance
+      culling for static scatter and a real slicing of chunk-build cost are
+      both done, with tests. Still open and NOT addressed by this pass:
+      the "постоянная нагрузка, когда игрок стоит на месте" (constant load
+      while standing still) and the shadow jitter specifically — without a
+      real GPU to profile against (only headless SwiftShader, which does not
+      port perf numbers across GPU classes for GPU-bound work — see the
+      tree-shadow entry above), there was nothing concrete in the render
+      loop to point at as a per-frame CPU cost while idle (no code runs an
+      unbounded loop or rebuilds a buffer every frame just from standing
+      still, checked directly). The shadow jitter is most likely inherent
+      PCF shadow-map sampling noise (`sun.shadow.mapSize` is a modest 1024,
+      `game/scene.ts`) rather than a bug — a real device is the only way to
+      tell noise from a bug here, the same class of gap as the tree-shadow
+      entry above.
 - [ ] **Тени только у деревьев (частично) — игрок, трава, кусты, камни,
       дом, животные, птицы тени не отбрасывают.** После перфоманса выше.
       Решено идти на компромисс, знакомый по деревьям
@@ -212,14 +227,22 @@ UX/фичи покрупнее.
       компромисс несколько готовых форм на вид, как у деревьев
       (`CONIFER_SHAPES`/`BROADLEAF_CROWNS`), а не честное «нет двух
       одинаковых» — реальный выигрыш в draw calls важнее. См. полное
-      обоснование компромисса в «🔧 Внутреннее» ниже.
-- [ ] **Culling дальней сцены по-настоящему**, не только туман — см. «…но БЕЗ
-      отсечения по дальности» в «🌲 Наполнение леса» ниже.
+      обоснование компромисса в «🔧 Внутреннее» ниже. **Still not
+      implemented** — this stays a design decision to make with the user
+      (finite shape set vs. true "no two mushrooms alike"), not something to
+      code solo; not touched this session, per that same note.
+- [x] **Culling дальней сцены по-настоящему**, не только туман — см. «…но БЕЗ
+      отсечения по дальности» в «🌲 Наполнение леса» ниже. Готово — see that
+      entry for the actual fix (`world/instanceCulling.ts`).
 - [ ] **Бюджет производительности на мобильных** — см. одноимённый пункт в
-      «📱 Мобильные устройства» ниже.
-- [ ] **Chunk build cost** — фриз при подгрузке чанка, см. «Chunk build cost
+      «📱 Мобильные устройства» ниже. Still genuinely blocked on a real
+      device — see that entry for what this session's culling/chunk-build
+      work does and does not give it for free.
+- [x] **Chunk build cost** — фриз при подгрузке чанка, см. «Chunk build cost
       is still a real…» в «🗺️ Infinite world» ниже; пересекается с «Просадки
-      FPS» выше.
+      FPS» выше. Partially done — see that entry: the dominant cost (a
+      chunk's own placement construction) is now sliced across several
+      frames; the terrain/trees/scatter half of a chunk build is not.
 
 ### Дизайн-решения, принятые в брейншторме 2026-09-11 (своя работа, в очередь)
 
@@ -925,17 +948,45 @@ UX/фичи покрупнее.
       `THREE.InstancedMesh` + `setMatrixAt`, как и деревья
       (`world/trees.ts`). Формулировка пункта была устаревшей, не код —
       TODO не обновили, когда это было сделано.
-- [ ] …но БЕЗ отсечения по дальности — вот это по-прежнему не сделано. Туман
-      (`game/scene.ts`'s `Fog(...,30,140)`) визуально прячет дальний план, но
-      это шейдерный эффект поверх уже отрисованного, не отказ от отрисовки —
-      GPU всё равно растеризует всё в пределах купола неба (радиус 1500,
-      `world/sky.ts`). Только грибы отсекаются по-настоящему
-      (`main.ts`'s `cullDistantMushrooms`, порог — настройка `drawDistance`).
-      Не тронуто в этой сессии: `InstancedMesh` не даёт дёшево скрыть
-      отдельные инстансы без пересборки буфера каждый кадр (или хотя бы
-      периодически) — риск мерцания/попапинга при неаккуратной реализации, и
-      измерить реальный выигрыш без настоящего железа (не headless
-      Chrome/Swiftshader) нечем, тот же довод, что уже у теней деревьев выше.
+- [x] …но БЕЗ отсечения по дальности — Done (2026-09-11 live-report batch).
+      Fog (`game/scene.ts`'s `Fog(...,30,140)`) visually hides the distance,
+      but that's a shader effect over geometry already drawn, not a reason to
+      skip drawing it — the GPU rasterized everything inside the sky dome
+      (radius 1500, `world/sky.ts`) regardless. Only mushrooms were ever
+      actually culled (`main.ts`'s `cullDistantMushrooms`).
+      **What changed:** new `world/instanceCulling.ts` — `THREE.InstancedMesh`
+      genuinely can't cheaply drop one instance from its own draw call (the
+      buffer would need rebuilding), so instead a far instance's own matrix
+      gets scaled to zero (degenerate, draws nothing, same buffer, same draw
+      call) and restored to its exact original transform once back in range.
+      `collectScatterCullers(root)` snapshots every static-scatter
+      `THREE.InstancedMesh` (trees/boulders/deadwood/leaning-trees/
+      undergrowth/flora/grass — named groups, deliberately excluding birds/
+      critters/insects, which re-pose their own instances every frame and
+      would fight this) the moment a wood (or a streamed chunk) finishes
+      building; `sweep(camX, camZ, radius)` recomputes fresh from the current
+      position every call, so it is safe to call it rarely — no accumulated
+      state to go stale. `game/scene.ts` exposes `Forest.updateScatterCulling`
+      for the home plot, `game/worldStream.ts` gives every loaded chunk its
+      own culler and a matching `WorldStream.updateScatterCulling`.
+      `main.ts` calls both from the render loop, but only every
+      `SCATTER_CULL_INTERVAL_FRAMES` (20) frames rather than every one — the
+      sweep itself is a full pass over every tracked instance (a few thousand
+      in a typical wood), cheap once but wasteful 60 times a second for
+      something that only changes as fast as the player walks. Radius is a
+      fixed `SCATTER_CULL_RADIUS = 155` (past the fog's own far distance,
+      140, plus a margin) rather than tied to `drawDistance` (which only ever
+      governed the much shorter 20-80m mushroom cull) — nothing culled here
+      was visible anyway, so there is no pop to tune around, only GPU work to
+      remove. Verified deterministically: `test/world/instanceCulling.test.ts`
+      (zeroing, exact restoration, needsUpdate/version only bumped when
+      something actually changed, order-independence, group-name filtering)
+      and `test/game/worldStream.test.ts`'s own `updateScatterCulling` test
+      against a real streamed chunk. **Honest limit, unchanged from the
+      original note:** the real frame-time win (fewer triangles the GPU
+      actually has to shade) is a GPU-bound number this session's headless
+      SwiftShader cannot measure meaningfully — only that the culling logic
+      itself is correct and cheap (a plain array scan) is verified here.
 
 ## 📱 Мобильные устройства
 
@@ -1025,7 +1076,21 @@ UX/фичи покрупнее.
 - [ ] **Бюджет производительности.** 243 гриба и полторы тысячи деревьев тянет
       десктоп; на телефоне нужны более агрессивное отсечение по дальности,
       меньше сегментов в телах вращения и, вероятно, инстансинг грибов одного
-      вида. Мерить на реальном устройстве, а не на эмуляции.
+      вида. Мерить на реальном устройстве, а не на эмуляции. **Still
+      genuinely blocked on a real device this session** — re-checked
+      2026-09-11 alongside the live-report FPS complaint. What this session's
+      other work does give a mobile pass to build on later, without being one
+      itself: real distance culling for static scatter now exists
+      (`world/instanceCulling.ts`, see «…но БЕЗ отсечения по дальности»
+      above) with its radius as one named constant
+      (`main.ts`'s `SCATTER_CULL_RADIUS`) — a mobile-specific quality tier
+      could plausibly just lower that number (and the sweep interval) rather
+      than invent its own culling mechanism from scratch. Not built here: a
+      lower-radius tier is a product/UX call (automatic by device detection?
+      a settings toggle? how much smaller a radius actually still looks
+      right?) the same way the instancing compromise is — not something to
+      decide unilaterally from a headless test run. "Меньше сегментов в телах
+      вращения" and instancing itself remain exactly as open as before.
 - [x] **PWA** — офлайн-запуск и иконка на домашний экран. Готово:
       `public/manifest.webmanifest` (иконка — тот же `favicon.svg`, `sizes:
       "any"` для svg вместо растеризации в PNG нескольких размеров) +
@@ -1243,14 +1308,50 @@ actually shipped this pass" section this list mirrors.
       quick-pick reasonably trading configurability for one click, not
       revisited here. Verified live: hidden on load and once the field is
       cleared, reappears the moment a character is typed.
-- [ ] **Chunk build cost is still a real, if now much smaller, per-frame
+- [x] **Chunk build cost is still a real, if now much smaller, per-frame
       stall.** `BUILD_BUDGET_PER_UPDATE` (1 chunk per `update()` call,
       `game/worldStream.ts`) turns "freeze for seconds" into "an
       occasional frame worth several hundred ms," not into "free." A
       proper fix — building off the main thread (a Worker), or slicing a
       single chunk's own generation across several frames instead of
       budgeting whole chunks — is real future work once this is actually
-      played on a real device, not just profiled in a test.
+      played on a real device, not just profiled in a test. **Partially
+      done (2026-09-11 live-report batch):** measured where a chunk's own
+      ~150-250ms build cost actually goes (`test/game/worldStream.test.ts`
+      didn't have a timing benchmark before this session; one was added).
+      Breakdown for one chunk (~130 placements) in this session's own
+      environment: terrain + trees + decorative scatter + ecology sites
+      together cost roughly 100-130ms, but building the placements
+      themselves — each mushroom/berry/herb/nut/find's real, merged mesh
+      (`collectible/placement.ts`'s `buildPlacementObject`, dominated by
+      `buildCollectible`'s own procedural geometry) — cost another
+      110-150ms **on top of that**, easily the single biggest piece, bigger
+      than every scatter system (grass included) combined. That piece is now
+      sliced: `buildChunk` still builds a chunk's terrain/trees/scatter/sites
+      synchronously (unchanged), but no longer builds any placement's real
+      object in the same call — `placements: Placement[]` is computed and
+      stored with a `placementCursor`, and a new `advancePlacements()` builds
+      `PLACEMENT_BUDGET_PER_UPDATE` (16) of them per `update()` call, spread
+      across however many chunks are still mid-build, same idea as
+      `BUILD_BUDGET_PER_UPDATE` one level deeper. `pendingChunkCount()` now
+      also counts chunks still mid-placement-build, so `WorldStream`'s own
+      contract ("0 once caught up") stays true for callers. Verified with
+      three new tests: placements provably arrive gradually across several
+      `update()` calls rather than all at once, no single call ever adds more
+      than the budget, and a wall-clock regression guard
+      (`test/game/worldStream.test.ts`) keeps a placement-only `update()`
+      call well under the old unsliced per-chunk placement cost (a
+      deliberately generous threshold — a regression guard against
+      "someone re-inlines the loop," not a tight perf number, since
+      wall-clock timings don't port across CI hardware). **Honest limit:**
+      the terrain/trees/scatter/sites half of a chunk build (~100-130ms) is
+      NOT sliced — still one synchronous stall per newly-needed chunk. That
+      would need untangling real interdependencies (trees need ground, sites
+      need trees, etc.) into resumable steps, or the Worker-based rewrite —
+      both too large a change to also land safely in this same session, and
+      the smaller, lower-risk win (removing the placement cost from being
+      bundled into that same stall) was worth taking on its own rather than
+      attempting both at once.
 
 ## 🍂 Игра
 
