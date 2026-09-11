@@ -6,6 +6,9 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.82.1
+Fix: a flaky CI perf-guard threshold was blocking the last few deploys.
+
 ## v0.82.0
 A real oil lamp on the table instead of an unexplained light in mid-air,
 and a foundation skirt so light no longer leaks out from under the hut on
