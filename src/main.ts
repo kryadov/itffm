@@ -8,6 +8,8 @@ import { createTouchControls } from './game/touchControls'
 import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
 import { birdPan, birdGain, nearestBird } from './audio/birdCalls'
+import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAmbience'
+import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import { mulberry32 } from './util/rng'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
@@ -58,6 +60,11 @@ const WATER_FOOTSTEP_RADIUS = 1.5
 /** How far a bird call still carries, metres — past this the flock is
  *  simply out of earshot (`audio/birdCalls.ts`'s `birdGain`/`nearestBird`). */
 const BIRD_CALL_RADIUS = 60
+/** How far water ambience carries, metres — past the fog's own near
+ *  distance (30m, `game/scene.ts`) so it is audible before it is clearly
+ *  visible, short of the fog's far distance (140m) so it stays a landmark
+ *  rather than a constant hum everywhere in the wood. */
+const WATER_AMBIENCE_RADIUS = 45
 /** How long, in real seconds, between one bird call and the next roll for
  *  another — wide enough that the wood isn't a chorus every second, narrow
  *  enough that a flock nearby is heard now and then, not never. */
@@ -201,6 +208,14 @@ async function main(): Promise<void> {
   const minimap = createMinimap(ui)
   minimap.setWorld(source.paths ?? [], source.water ?? [], forest.shelter, halfSize)
   minimap.setVisible(save.prefs.minimap)
+
+  // Classified once at load — `classifyWater` is pure per-ring geometry, not
+  // something that changes while the player walks, so there is no reason to
+  // re-run it every frame the way `nearestWater` (audio/waterAmbience.ts)
+  // itself must.
+  const waterBodies: WaterBody[] = (source.water ?? [])
+    .filter((ring) => ring.length >= 2)
+    .map((ring) => ({ ring, kind: classifyWater(ring) }))
 
   const obstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
@@ -646,6 +661,15 @@ async function main(): Promise<void> {
           )
         }
       }
+
+      // Water ambience: unlike the bird call above, this runs every frame,
+      // not on a timer — it is a continuous loop whose only job is to track
+      // the player's own distance to the nearest pond/stream edge.
+      const nearestW = nearestWater(player.x, player.z, waterBodies)
+      audio.updateWaterAmbience(
+        nearestW ? waterAmbienceGain(nearestW.distance, WATER_AMBIENCE_RADIUS) : 0,
+        nearestW?.kind ?? null,
+      )
 
       // A tap stands for "aim at it and press E" in one motion — see
       // game/touchControls.ts's own doc comment for why a crosshair is not

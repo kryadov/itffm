@@ -1,4 +1,5 @@
 import type { FootstepSubstrate } from './footsteps'
+import type { WaterAmbienceKind } from './waterAmbience'
 
 /**
  * Sound in the wood. Only the mixer plumbing is ported from race-the-city's
@@ -13,16 +14,36 @@ import type { FootstepSubstrate } from './footsteps'
  * than shipped as assets — and a synthesized "dry cut", footstep thud, or
  * bird chirp (a short filtered noise burst or a couple of oscillator
  * notes, not a sampled recording) is the same idea applied to sound. That
- * only holds for a short, discrete EVENT, though:
- * the broader ambient-sound plan (continuous wind, a babbling stream — see
- * TODO.md's 🔊 section) is a different problem, where synthesis does not
- * read as a real recorded place convincingly the way one sharp noise burst
- * does, and that is where sourcing real CC0 recordings actually belongs.
+ * held, for a while, only for a short discrete EVENT — the original plan for
+ * a continuous ambience (wind, a babbling stream) was to source a real CC0
+ * recording instead, on the theory that synthesis reads as a real place less
+ * convincingly stretched over a whole loop than in one sharp burst. Water
+ * ambience (`updateWaterAmbience`, below) went the other way on reflection:
+ * the same filtered-noise-plus-LFO recipe that already reads as a footstep
+ * splash or a bird chirp keeps "nothing in this game is a picture, everything
+ * is a formula" consistent instead of carving out one exception, and it does
+ * not need to fool anyone into thinking they hear an actual recorded stream —
+ * just enough texture and movement to read as "water, over there" from a
+ * distance. TODO.md's 🔊 section's forest ambience (wind, creaks) is still
+ * open and still undecided between the two.
  */
 export class AudioEngine {
   private ctx: AudioContext | null = null
   private sfxGain: GainNode | null = null
   private volume = 0.7
+
+  // Water ambience is the one sound in this file that is not fire-and-forget
+  // like collect()/footstep()/birdCall(): it has to keep running while the
+  // player walks, so its nodes are built once (ensureWaterAmbience, lazily
+  // on first non-zero gain) and kept around rather than created per call.
+  private waterNoise: AudioBufferSourceNode | null = null
+  private waterFilter: BiquadFilterNode | null = null
+  private waterFreqLfo: OscillatorNode | null = null
+  private waterFreqLfoDepth: GainNode | null = null
+  private waterAmpGain: GainNode | null = null
+  private waterAmpLfo: OscillatorNode | null = null
+  private waterAmpLfoDepth: GainNode | null = null
+  private waterDistanceGain: GainNode | null = null
 
   /** Create/resume the AudioContext. Call from a click/keydown handler —
    *  browsers refuse to start audio before one. */
@@ -43,6 +64,19 @@ export class AudioEngine {
   setVolume(v: number): void {
     this.volume = Math.max(0, Math.min(1, v))
     if (this.sfxGain) this.sfxGain.gain.value = this.volume
+  }
+
+  /** One filtered-noise-plus-LFO recipe per water kind — a stream reads as
+   *  more active than a pond by moving more: a wider, faster sweep on the
+   *  lowpass cutoff (the "bubbling" motion) and a faster, deeper amplitude
+   *  wobble on top of it, both centred higher and louder than the pond's
+   *  own near-silent, near-static hush. */
+  private static readonly WATER_AMBIENCE_PARAMS: Record<
+    WaterAmbienceKind,
+    { baseFreq: number; freqLfoRate: number; freqLfoDepth: number; ampLfoRate: number; ampLfoDepth: number; peakGain: number }
+  > = {
+    stream: { baseFreq: 900, freqLfoRate: 1.7, freqLfoDepth: 350, ampLfoRate: 3.3, ampLfoDepth: 0.3, peakGain: 0.5 },
+    pond: { baseFreq: 260, freqLfoRate: 0.15, freqLfoDepth: 40, ampLfoRate: 0.4, ampLfoDepth: 0.06, peakGain: 0.22 },
   }
 
   private noiseBurst(seconds: number): AudioBuffer {
@@ -149,8 +183,8 @@ export class AudioEngine {
    * A short two-note chirp from a bird in the flock (`audio/birdCalls.ts`
    * decides which bird, and this call's own `pan`/`gain`) — another short
    * discrete event, same synthesis-is-honest-here reasoning as `collect()`
-   * and `footstep()` above, not the continuous-texture case TODO.md's 🔊
-   * section still wants a real recording for. Two quick upward chirps read
+   * and `footstep()` above — unlike `updateWaterAmbience()` below, a
+   * continuous loop rather than a one-shot. Two quick upward chirps read
    * as a bird call; one long tone reads as a siren.
    */
   birdCall(pan: number, gain: number): void {
@@ -175,5 +209,103 @@ export class AudioEngine {
       osc.start(t + start)
       osc.stop(t + start + 0.07)
     }
+  }
+
+  /** Builds the water-ambience node graph once, on the first frame that
+   *  actually needs it — a looping noise buffer through a lowpass filter
+   *  (an LFO sweeps its cutoff for the "moving water" texture) into an
+   *  amplitude-wobble gain (a second LFO for the bubbling pulse) into the
+   *  distance gain `updateWaterAmbience` drives every frame. No-op once
+   *  built; a no-op if the context isn't ready yet (mirrors `resume()`'s own
+   *  guard elsewhere in this file). */
+  private ensureWaterAmbience(): void {
+    if (!this.ctx || !this.sfxGain || this.waterNoise) return
+    const ctx = this.ctx
+
+    const noise = ctx.createBufferSource()
+    noise.buffer = this.noiseBurst(2)
+    noise.loop = true
+
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.Q.value = 0.6
+
+    const freqLfo = ctx.createOscillator()
+    freqLfo.type = 'sine'
+    const freqLfoDepth = ctx.createGain()
+    freqLfo.connect(freqLfoDepth)
+    freqLfoDepth.connect(filter.frequency)
+
+    const ampGain = ctx.createGain()
+    const ampLfo = ctx.createOscillator()
+    ampLfo.type = 'sine'
+    const ampLfoDepth = ctx.createGain()
+    ampLfo.connect(ampLfoDepth)
+    ampLfoDepth.connect(ampGain.gain)
+
+    const distanceGain = ctx.createGain()
+    distanceGain.gain.value = 0
+
+    noise.connect(filter)
+    filter.connect(ampGain)
+    ampGain.connect(distanceGain)
+    distanceGain.connect(this.sfxGain)
+
+    noise.start()
+    freqLfo.start()
+    ampLfo.start()
+
+    this.waterNoise = noise
+    this.waterFilter = filter
+    this.waterFreqLfo = freqLfo
+    this.waterFreqLfoDepth = freqLfoDepth
+    this.waterAmpGain = ampGain
+    this.waterAmpLfo = ampLfo
+    this.waterAmpLfoDepth = ampLfoDepth
+    this.waterDistanceGain = distanceGain
+  }
+
+  /**
+   * The one continuous, looping sound in this file — called every frame
+   * (`main.ts`'s per-frame loop, alongside footstep/bird-call wiring) with
+   * `kind` and `gain` from `audio/waterAmbience.ts`'s pure `nearestWater`/
+   * `waterAmbienceGain`, computed from the player's own distance to the
+   * nearest pond or stream. `kind` picks which of `WATER_AMBIENCE_PARAMS`'
+   * two characters plays (see that table's own comment); `gain` (already
+   * the [0, 1] distance falloff) sets how loud, ramped rather than snapped
+   * to avoid a click at the target (`setTargetAtTime`, same reason a
+   * `footstep()`'s own envelope ramps rather than jumps). Nodes are built
+   * lazily on the first call that actually needs them; with no water in
+   * earshot (`kind` null or `gain` 0) this only ever ramps existing nodes
+   * toward silence, never tears them down — cheaper than rebuilding the
+   * graph every time the player wanders in and out of range.
+   */
+  updateWaterAmbience(gain: number, kind: WaterAmbienceKind | null): void {
+    if (!this.ctx || !this.sfxGain) return
+    if (!kind || gain <= 0) {
+      if (this.waterDistanceGain) this.waterDistanceGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15)
+      return
+    }
+    this.ensureWaterAmbience()
+    if (
+      !this.waterFilter ||
+      !this.waterFreqLfo ||
+      !this.waterFreqLfoDepth ||
+      !this.waterAmpGain ||
+      !this.waterAmpLfo ||
+      !this.waterAmpLfoDepth ||
+      !this.waterDistanceGain
+    ) {
+      return
+    }
+    const p = AudioEngine.WATER_AMBIENCE_PARAMS[kind]
+    const t = this.ctx.currentTime
+    this.waterFilter.frequency.setTargetAtTime(p.baseFreq, t, 0.5)
+    this.waterFreqLfo.frequency.setTargetAtTime(p.freqLfoRate, t, 0.5)
+    this.waterFreqLfoDepth.gain.setTargetAtTime(p.freqLfoDepth, t, 0.5)
+    this.waterAmpGain.gain.setTargetAtTime(1, t, 0.5)
+    this.waterAmpLfo.frequency.setTargetAtTime(p.ampLfoRate, t, 0.5)
+    this.waterAmpLfoDepth.gain.setTargetAtTime(p.ampLfoDepth, t, 0.5)
+    this.waterDistanceGain.gain.setTargetAtTime(gain * p.peakGain, t, 0.15)
   }
 }
