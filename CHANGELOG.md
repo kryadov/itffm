@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.87.0
+Removed the wind ambience added last release — live feedback called it
+naggingly repetitive. Reverted rather than tuned.
+
 ## v0.86.0
 A synthesized wind bed in the canopy, changing with weather and time of
 day instead of dead silence between footsteps and bird calls.
