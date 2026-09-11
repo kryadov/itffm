@@ -6,6 +6,10 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.87.1
+Fix: the rails now follow the ground under a slope instead of sitting flat
+at one height, detached from their own sleepers.
+
 ## v0.87.0
 Removed the wind ambience added last release — live feedback called it
 naggingly repetitive. Reverted rather than tuned.

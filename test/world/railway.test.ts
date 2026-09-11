@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { placeRailLine, railHeightAt, stepTrainT, createTrain } from '../../src/world/railway'
+import { placeRailLine, railHeightAt, stepTrainT, createTrain, buildRailMesh } from '../../src/world/railway'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
@@ -96,6 +96,32 @@ describe('stepTrainT', () => {
     const { t, dir } = stepTrainT(0.01, -1, 1, 2, 10)
     expect(t).toBeGreaterThanOrEqual(0)
     expect(dir).toBe(1)
+  })
+})
+
+describe('buildRailMesh', () => {
+  it('follows a real slope at both ends, not just at its own midpoint', () => {
+    // Live report: the rails read as detached from their sleepers and the
+    // ground. Root cause was a single rigid box per rail, spanning the
+    // whole line at ONE height sampled at the midpoint — dead flat on any
+    // real slope. Each rail is now a chain of segments; check both ends
+    // actually sit near the real ground there, not near the midpoint's own
+    // height.
+    const slope: ElevationProvider = { heightAt: (x) => x * 0.3 }
+    const line = placeRailLine(slope, 90, 3)
+    const group = buildRailMesh(line)
+    const rail = group.children.find((c) => c instanceof THREE.Mesh && (c as THREE.Mesh).geometry.type !== 'BoxGeometry') as THREE.Mesh
+    expect(rail).toBeTruthy()
+    const box = new THREE.Box3().setFromObject(rail)
+    const x0 = line.points[0].x
+    const x1 = line.points[line.points.length - 1].x
+    const groundAtStart = slope.heightAt(x0, line.points[0].z)
+    const groundAtEnd = slope.heightAt(x1, line.points[0].z)
+    // The whole-line box bug would have put EVERY vertex near the midpoint's
+    // height, off by roughly half the slope's total rise across the line —
+    // several metres here. A ground-following rail keeps its overall
+    // vertical span close to the real rise, not flattened to nothing.
+    expect(box.max.y - box.min.y).toBeGreaterThan(Math.abs(groundAtEnd - groundAtStart) * 0.8)
   })
 })
 

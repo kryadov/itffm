@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 
@@ -111,21 +112,44 @@ const SLEEPER_WIDTH = 0.22
 const SLEEPER_HEIGHT = 0.1
 
 /** The track bed itself — two rails and their sleepers, ground-following
- *  along the line's own span. Static geometry, never updated once built. */
+ *  along the line's own span. Static geometry, never updated once built.
+ *
+ *  A live report caught the rails detached from both their own sleepers and
+ *  the ground under a slope: each rail used to be ONE rigid box spanning the
+ *  whole line, positioned at a single height sampled at the line's own
+ *  midpoint — dead flat regardless of how much the terrain actually climbs
+ *  or drops along the way, while the sleepers (already built per sampled
+ *  point) correctly followed it. Now each rail is a chain of short segments,
+ *  one per pair of consecutive `line.points` (the same `RAIL_STEP`-spaced
+ *  samples the sleepers and the train already read off `railHeightAt`),
+ *  each tilted to match its own local slope and merged into one mesh per
+ *  side — still two draw calls, not one per segment. */
 export function buildRailMesh(line: RailLine): THREE.Group {
   const group = new THREE.Group()
   group.name = 'railway'
-  const x0 = line.points[0].x
-  const x1 = line.points[line.points.length - 1].x
-  const z = line.points[0].z
+  const pts = line.points
+  const z = pts[0].z
+  const x0 = pts[0].x
+  const x1 = pts[pts.length - 1].x
   const length = x1 - x0
 
   const railMat = new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.6, metalness: 0.3 })
   const half = RAIL_GAUGE / 2
   for (const side of [-1, 1]) {
-    const rail = new THREE.Mesh(new THREE.BoxGeometry(length, RAIL_HEIGHT, 0.07), railMat)
-    rail.position.set((x0 + x1) / 2, railHeightAt(line, (x0 + x1) / 2) + RAIL_HEIGHT / 2, z + side * half)
-    group.add(rail)
+    const segments: THREE.BufferGeometry[] = []
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i]
+      const b = pts[i + 1]
+      const dx = b.x - a.x
+      const dy = b.y - a.y
+      const seg = new THREE.BoxGeometry(Math.hypot(dx, dy), RAIL_HEIGHT, 0.07)
+      seg.rotateZ(Math.atan2(dy, dx))
+      seg.translate((a.x + b.x) / 2, (a.y + b.y) / 2 + RAIL_HEIGHT / 2, z + side * half)
+      segments.push(seg)
+    }
+    const merged = mergeGeometries(segments, false)
+    merged.computeVertexNormals()
+    group.add(new THREE.Mesh(merged, railMat))
   }
 
   const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })
