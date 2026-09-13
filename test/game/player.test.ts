@@ -3,6 +3,7 @@ import {
   eyeHeight,
   cameraBob,
   biomeSpeedFactor,
+  bikeSpeedFactor,
   type PlayerState,
   type PlayerInput,
 } from '../../src/game/player'
@@ -25,6 +26,24 @@ describe('biomeSpeedFactor', () => {
     expect(biomeSpeedFactor('forest-mixed')).toBe(1)
     expect(biomeSpeedFactor('dunes-coast')).toBe(1)
     expect(biomeSpeedFactor('meadow-scrub')).toBe(1)
+  })
+})
+
+describe('bikeSpeedFactor', () => {
+  it('is neutral without the bike owned, even right on a path', () => {
+    expect(bikeSpeedFactor(false, 0, 0.6)).toBe(1)
+  })
+
+  it('is neutral owned but off any path', () => {
+    expect(bikeSpeedFactor(true, 5, 0.6)).toBe(1)
+  })
+
+  it('speeds up only when owned AND on a path', () => {
+    expect(bikeSpeedFactor(true, 0.3, 0.6)).toBeGreaterThan(1)
+  })
+
+  it('treats exactly the path\'s own half-width as still on it', () => {
+    expect(bikeSpeedFactor(true, 0.6, 0.6)).toBeGreaterThan(1)
   })
 })
 

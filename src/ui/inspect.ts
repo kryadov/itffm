@@ -84,6 +84,9 @@ export function openInspect(
   } else if (species.kind === 'nut') {
     const m = species.morphology
     traitsHtml = `<li>${t('nutSize')}: ${m.size[0]}–${m.size[1]} ${t('mm')}</li>`
+  } else if (species.kind === 'fish') {
+    const m = species.morphology
+    traitsHtml = `<li>${t('fishLength')}: ${m.length[0]}–${m.length[1]} ${t('mm')}</li>`
   } else {
     const m = species.morphology
     traitsHtml = `

@@ -1,4 +1,5 @@
-import { mulberry32, randRange } from '../util/rng'
+import { mulberry32, randRange, hashString } from '../util/rng'
+import { QUEST_ITEM_IDS, type QuestItemId } from './types'
 import type { Vec2 } from '../geo/types'
 
 /** Structurally identical to game/player.ts's Obstacle (a plain circle) —
@@ -9,6 +10,11 @@ export interface QuestObstacle {
   x: number
   z: number
   radius: number
+  /** Stable identity for one scrub circle, scoped by which quest item's own
+   *  detour it belongs to (`${ownerId}-scrub-${i}`) — the hatchet (see
+   *  main.ts) needs to remove exactly one bush, not the whole band, and two
+   *  different items' bands must never collide on the same id. */
+  id: string
 }
 
 /** How far from the shelter the lost basket is placed, metres. */
@@ -76,6 +82,10 @@ export function thicketObstacles(
   seed: number,
   shelterPos: { x: number; z: number },
   item: { x: number; z: number },
+  /** Which quest item this band belongs to — folded into every obstacle's
+   *  own `id` so two items' bands never collide (see QuestObstacle's own
+   *  doc comment). Empty for a standalone/test call with only one band. */
+  ownerId = '',
 ): QuestObstacle[] {
   const rng = mulberry32(seed)
   const dx = item.x - shelterPos.x
@@ -102,6 +112,7 @@ export function thicketObstacles(
       x: baseX + perpX * offset,
       z: baseZ + perpZ * offset,
       radius: randRange(rng, [THICKET_MIN_RADIUS, THICKET_MAX_RADIUS]),
+      id: `${ownerId}-scrub-${i}`,
     })
   }
   return obstacles
@@ -120,6 +131,8 @@ export function placeQuestItem(
   shelterPos: { x: number; z: number },
   water: Vec2[][],
   heightAt: (x: number, z: number) => number,
+  /** Threaded through to `thicketObstacles` — see its own doc comment. */
+  ownerId = '',
 ): { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] } {
   const rng = mulberry32(seed)
   const angle = randRange(rng, [0, Math.PI * 2])
@@ -135,7 +148,29 @@ export function placeQuestItem(
     return false
   })
 
-  const obstacles = waterBlocks ? [] : thicketObstacles(seed, shelterPos, item)
+  const obstacles = waterBlocks ? [] : thicketObstacles(seed, shelterPos, item, ownerId)
 
   return { position: { x, y: heightAt(x, z), z }, obstacles }
+}
+
+/**
+ * Places all four quest items from one world seed, each getting its own
+ * derived seed (`seed + hashString(id)`, folded into 32 bits the same way
+ * `mulberry32` itself already truncates its own input) so the four never
+ * draw from the same random stream and never collide — same shape as
+ * `world/railway.ts`'s own small fixed seed offsets, just derived from the
+ * item id instead of a hand-picked integer, since there are four of them.
+ */
+export function placeQuestItems(
+  seed: number,
+  shelterPos: { x: number; z: number },
+  water: Vec2[][],
+  heightAt: (x: number, z: number) => number,
+): Record<QuestItemId, { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] }> {
+  const result = {} as Record<QuestItemId, ReturnType<typeof placeQuestItem>>
+  for (const id of QUEST_ITEM_IDS) {
+    const itemSeed = (seed + hashString(id)) >>> 0
+    result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt, id)
+  }
+  return result
 }

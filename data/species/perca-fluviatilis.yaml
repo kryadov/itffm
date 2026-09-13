@@ -1,0 +1,38 @@
+id: perca-fluviatilis
+gbifKey: 8140485
+name:
+  la: Perca fluviatilis
+  ru: Окунь речной
+  en: European perch
+kind: fish
+edibility: edible
+lookalikes: []
+morphology:
+  bodyColor: "#5a7a3a"
+  bellyColor: "#e8dfa0"
+  finColor: "#c9542f"
+  length: [100, 350]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub, wetland]
+  season: [4, 5, 6, 7, 8, 9, 10]
+  moisture: [0.85, 1]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Зеленовато-жёлтый бок с пятью-девятью тёмными поперечными полосами,
+    красновато-оранжевые брюшной и анальный плавники — окраску не спутать ни
+    с одной другой рыбой пруда. Держится небольшими стайками у коряг, свай и
+    зарослей у берега, дальше от чистой воды на середине. Мясо белое, плотное,
+    без мелких костей в филе — одна из самых обычных рыб на любительской
+    удочке.
+  en: >-
+    A greenish-yellow flank crossed by five to nine dark vertical bars, with
+    reddish-orange pelvic and anal fins — a colouring no other pond fish
+    shares. Keeps to small loose shoals around snags, posts and bankside
+    growth rather than open water. White, firm-fleshed and easy to fillet
+    without small bones — one of the most ordinary catches on a hook and
+    line.

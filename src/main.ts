@@ -11,9 +11,12 @@ import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAm
 import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
-import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
+import {
+  stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, bikeSpeedFactor, type PlayerState, type Obstacle,
+} from './game/player'
+import { distanceToNearestPath, HALF_WIDTH as PATH_HALF_WIDTH } from './world/paths'
 import { chooseStartPose } from './game/startPose'
-import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
+import { createBasket, nearestInView, nearestScrubInView, canPick, debugRaycastHits } from './game/pick'
 import type { Placement } from './ecology/spawn'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
@@ -30,8 +33,12 @@ import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
-import { placeQuestItem } from './quest/placement'
-import { tryPickUp, tryDeliver, type Quest } from './quest/state'
+import { placeQuestItems, type QuestObstacle } from './quest/placement'
+import { tryPickUp, tryDeliver } from './quest/state'
+import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
+import { chopScrub } from './quest/scrub'
+import { lampIsOn } from './quest/lamp'
+import { buildScrubMesh } from './world/scrub'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -89,11 +96,30 @@ const WATER_AMBIENCE_RADIUS = 45
 const CAMPFIRE_MUSIC_RADIUS = 8
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
-/** Seed offset for the wood's one fetch quest (world/railway.ts's own
+/** Seed offset for the wood's four quest items (world/railway.ts's own
  *  RAIL_SEED_OFFSET is 29, game/scene.ts's train sits at seed + 30 — this is
- *  the next free slot, so the quest's own placement never draws from the
- *  same stream as anything else the wood already seeds). */
+ *  the next free slot, so quest placement never draws from the same stream
+ *  as anything else the wood already seeds). Each item then derives its own
+ *  seed from this one (see quest/placement.ts's placeQuestItems). */
 const QUEST_SEED_OFFSET = 31
+/** One colour per quest item, so the four standalone pickup meshes read as
+ *  different things at a glance even though v1 gives none of them a real
+ *  carried-item model (see the fetch-quest design doc's "no carried-item
+ *  mesh in hand for v1" — still true here, just four colours instead of one). */
+const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
+  axe: 0x8a8a92,
+  lamp: 0xd8a04a,
+  rod: 0x5a4a30,
+  bike: 0x3f6db0,
+}
+/** Which i18n key names each item's own completion message — see
+ *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike. */
+const QUEST_COMPLETE_KEY: Record<QuestItemId, 'questCompleteAxe' | 'questCompleteLamp' | 'questCompleteRod' | 'questCompleteBike'> = {
+  axe: 'questCompleteAxe',
+  lamp: 'questCompleteLamp',
+  rod: 'questCompleteRod',
+  bike: 'questCompleteBike',
+}
 /** Below this distance the quest's HUD readout reads "near" rather than
  *  "far" — see i18n's questDistanceNear/questDistanceFar. */
 const QUEST_NEAR_RADIUS = 15
@@ -257,31 +283,59 @@ async function main(): Promise<void> {
     .filter((ring) => ring.length >= 2)
     .map((ring) => ({ ring, kind: classifyWater(ring) }))
 
-  // The wood's one fetch quest (see docs/superpowers/specs/2026-09-13-fetch-
-  // quest-design.md): sited deterministically from the world seed, same as
-  // everything else about this wood, so a fresh game always finds the lost
-  // basket in the same place a returning save already remembers. Recomputed
-  // on every load regardless — cheap, pure, and deterministic — so its own
-  // thicket/water detour obstacles are always available for the physics step
-  // below even when `save.quest` already carries the item's position and
-  // state from an earlier session.
-  const questPlacement = placeQuestItem(
+  // The wood's four quest items (see docs/superpowers/specs/2026-09-13-quest-
+  // items-design.md, extending the single fetch quest of v0.88.0): each
+  // sited deterministically from the world seed, same as everything else
+  // about this wood, so a fresh game always finds them in the same places a
+  // returning save already remembers. Recomputed on every load regardless —
+  // cheap, pure, and deterministic — so every item's own thicket/water
+  // detour obstacles are always available for the physics step below even
+  // when `save.quests` already carries their positions and states from an
+  // earlier session.
+  const questPlacements = placeQuestItems(
     seed + QUEST_SEED_OFFSET, forest.shelter, source.water ?? [], (x, z) => forest.ground.heightAt(x, z),
   )
-  const isFreshQuest = !save.quest
-  let quest: Quest = save.quest ?? { position: questPlacement.position, state: 'pending' }
-  if (isFreshQuest) {
-    save = { ...save, quest }
+  const isFreshQuests = !save.quests
+  const quests: Quests = {} as Quests
+  for (const id of QUEST_ITEM_IDS) {
+    quests[id] = save.quests?.[id] ?? { position: questPlacements[id].position, state: 'pending' }
+  }
+  if (isFreshQuests) {
+    save = { ...save, quests }
     void persistSave(save)
     toast(t('questPrompt'))
   }
 
-  const obstacles: Obstacle[] = [
+  // Every quest item's own thicket-detour scrub — a `let`, not a `const`,
+  // because the hatchet (`tryChopScrub` below) replaces this with a shorter
+  // array (via `chopScrub`, a pure function) the moment the axe quest is
+  // done and the player chops one down. `baseObstacles` (trees + everything
+  // else `createForest` already built) never changes, so only this list
+  // needs to be recombined with it on every physics step.
+  let scrubObstacles: QuestObstacle[] = QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles)
+  const baseObstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
-    ...questPlacement.obstacles,
   ]
-  const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
+  // Recomputed fresh wherever it's read (never a frozen snapshot): `chopScrub`
+  // replaces `scrubObstacles` with a new, shorter array rather than mutating
+  // the old one in place, so anything reading a stale `[...baseObstacles,
+  // ...scrubObstacles]` array from before a chop would still collide with a
+  // bush that is no longer there.
+  const currentObstacles = (): Obstacle[] => [...baseObstacles, ...scrubObstacles]
+
+  // One real, identifiable mesh per scrub circle (see world/scrub.ts) — a
+  // player has to be able to see and aim at the thing a hatchet would
+  // remove, not just bump into an invisible obstacle. Kept in a map by the
+  // same id the obstacle circle carries, so chopping one down (below) can
+  // find and drop both together.
+  const scrubMeshes = new Map<string, THREE.Mesh>()
+  for (const o of scrubObstacles) {
+    const mesh = buildScrubMesh(o, forest.ground)
+    forest.scene.add(mesh)
+    scrubMeshes.set(o.id, mesh)
+  }
+  const startPose = chooseStartPose(currentObstacles(), halfSize, forest.shelter)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
     bobPhase: 0,
@@ -293,53 +347,94 @@ async function main(): Promise<void> {
   // aim at; a doorway is a fixed, room-sized target you just walk up to).
   let nearDoor = false
 
-  // The lost basket itself: a simple standalone mesh (no carried-item mesh
-  // in hand for v1, per the design doc) that sits at `quest.position` while
+  // Each quest item itself: a simple standalone mesh (no carried-item mesh
+  // in hand for v1, per the design doc) that sits at its own position while
   // `pending` and disappears the instant it's picked up — cosmetic, not the
-  // objective's own state, which lives in `quest` above.
+  // objective's own state, which lives in `quests` above.
   const questItemGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.32, 10)
-  const questItemMat = new THREE.MeshStandardMaterial({ color: 0xa9772f, roughness: 1 })
-  let questItemMesh: THREE.Mesh | null = null
-  function showQuestItem(): void {
-    questItemMesh = new THREE.Mesh(questItemGeo, questItemMat)
-    questItemMesh.position.set(quest.position.x, quest.position.y + 0.16, quest.position.z)
-    forest.scene.add(questItemMesh)
+  const questItemMeshes = {} as Record<QuestItemId, THREE.Mesh | null>
+  function showQuestItem(id: QuestItemId): void {
+    const mesh = new THREE.Mesh(
+      questItemGeo, new THREE.MeshStandardMaterial({ color: QUEST_ITEM_COLOR[id], roughness: 1 }),
+    )
+    const pos = quests[id].position
+    mesh.position.set(pos.x, pos.y + 0.16, pos.z)
+    forest.scene.add(mesh)
+    questItemMeshes[id] = mesh
   }
-  function hideQuestItem(): void {
-    questItemMesh?.removeFromParent()
-    questItemMesh = null
+  function hideQuestItem(id: QuestItemId): void {
+    questItemMeshes[id]?.removeFromParent()
+    questItemMeshes[id] = null
   }
-  if (quest.state === 'pending') showQuestItem()
+  for (const id of QUEST_ITEM_IDS) {
+    if (quests[id].state === 'pending') showQuestItem(id)
+  }
 
   /**
-   * Tries both quest transitions at the player's current position — a no-op
-   * unless `quest` is actually in the matching state and range (see
-   * quest/state.ts's own doc comments), so calling both unconditionally is
-   * safe and mirrors the shelter door's own "just walk up and press E" feel.
-   * Returns whether anything actually happened, so the caller (the `E`
-   * keydown handler and the touch tap handler) knows whether to fall through
-   * to the door check / mushroom examination instead.
+   * Tries both quest transitions, for every item at once, at the player's
+   * current position — a no-op for an item unless it is actually in the
+   * matching state and range (see quest/state.ts's own doc comments), so
+   * calling both unconditionally for all four is safe and mirrors the
+   * shelter door's own "just walk up and press E" feel. Returns whether
+   * anything actually happened, so the caller (the `E` keydown handler and
+   * the touch tap handler) knows whether to fall through to the door check /
+   * mushroom examination instead.
    */
   function tryQuestInteract(): boolean {
-    const before = quest.state
-    quest = tryPickUp(quest, player, DOOR_INTERACT_RADIUS)
-    quest = tryDeliver(quest, player, forest.shelterDoor, DOOR_INTERACT_RADIUS)
-    if (quest.state === before) return false
-    if (before === 'pending') hideQuestItem()
-    if (quest.state === 'done') toast(t('questComplete'))
-    save = { ...save, quest }
+    let changed = false
+    for (const id of QUEST_ITEM_IDS) {
+      const before = quests[id].state
+      quests[id] = tryPickUp(quests[id], player, DOOR_INTERACT_RADIUS)
+      quests[id] = tryDeliver(quests[id], player, forest.shelterDoor, DOOR_INTERACT_RADIUS)
+      if (quests[id].state === before) continue
+      changed = true
+      if (before === 'pending') hideQuestItem(id)
+      if (quests[id].state === 'done') toast(t(QUEST_COMPLETE_KEY[id]))
+    }
+    if (!changed) return false
+    save = { ...save, quests }
     void persistSave(save)
     return true
   }
 
-  /** The quest's own small always-on HUD line — no footprint at all once
+  /**
+   * The hatchet's own interaction: only once the axe quest is delivered, `E`
+   * facing a scrub object removes it — both the mesh (here) and the
+   * obstacle circle (`chopScrub`, quest/scrub.ts). Only ever touches objects
+   * built by `thicketObstacles`, tracked in `scrubMeshes`/`scrubObstacles`
+   * above — `world/trees.ts`'s batched trees are never in that list, so a
+   * mature tree can never be chopped this way.
+   *
+   * @param point where on screen to aim (see nearestScrubInView) — a touch
+   *   tap's own point on mobile, the crosshair centre by default on desktop.
+   */
+  function tryChopScrub(point?: THREE.Vector2): boolean {
+    if (quests.axe.state !== 'done') return false
+    const target = nearestScrubInView(camera, [...scrubMeshes.values()], REACH, point)
+    if (!target) return false
+    const id = target.userData.scrubId as string
+    const next = chopScrub(scrubObstacles, id, true)
+    if (next === scrubObstacles) return false
+    scrubObstacles = next
+    target.removeFromParent()
+    scrubMeshes.delete(id)
+    return true
+  }
+
+  /** The quests' own small always-on HUD line — the nearest not-yet-done
+   *  item's own distance readout (carrying beats pending, since heading home
+   *  is the more pressing goal), and no footprint at all once every item is
    *  `done`, per the design doc. */
   function updateQuestHud(): void {
-    if (quest.state === 'done') {
+    const activeId =
+      QUEST_ITEM_IDS.find((id) => quests[id].state === 'carrying') ??
+      QUEST_ITEM_IDS.find((id) => quests[id].state === 'pending')
+    if (!activeId) {
       hud.setQuestDistance(null)
       return
     }
-    const target = quest.state === 'pending' ? quest.position : forest.shelterDoor
+    const q = quests[activeId]
+    const target = q.state === 'pending' ? q.position : forest.shelterDoor
     const dist = Math.hypot(player.x - target.x, player.z - target.z)
     const label = dist < QUEST_NEAR_RADIUS ? t('questDistanceNear') : t('questDistanceFar')
     hud.setQuestDistance(`${label} — ${Math.round(dist)}m`)
@@ -515,6 +610,9 @@ async function main(): Promise<void> {
     const placement = target.userData.placement
     const species = speciesById(placement.speciesId)
     if (!species) return
+    // The rod's own gate: a fish is visible and aimable before the rod quest
+    // is delivered, but pressing E on one does nothing until then.
+    if (!canPick(species, quests.rod.state === 'done')) return
 
     openInspect(
       species,
@@ -765,7 +863,9 @@ async function main(): Promise<void> {
     if (modalOpen()) return
     if (e.code === 'KeyE') {
       if (tryQuestInteract()) {
-        // handled: picked up or delivered the quest item
+        // handled: picked up or delivered a quest item
+      } else if (tryChopScrub()) {
+        // handled: chopped down a scrub object
       } else if (nearDoor) forest.toggleShelterDoor()
       else examineAimed()
     }
@@ -809,9 +909,12 @@ async function main(): Promise<void> {
     if (!modalOpen()) {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
-      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome)
+      const bike = bikeSpeedFactor(
+        quests.bike.state === 'done', distanceToNearestPath(player, source.paths ?? []), PATH_HALF_WIDTH,
+      )
+      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * bike
       const input = touch.active ? touch.read(dt) : controls.read(dt)
-      const stepObstacles = worldStream ? [...obstacles, ...worldStream.obstacles()] : obstacles
+      const stepObstacles = worldStream ? [...currentObstacles(), ...worldStream.obstacles()] : currentObstacles()
       const prevBobPhase = player.bobPhase
       player = stepPlayer(player, input, combinedGround, stepObstacles, speed)
       if (!worldStream) {
@@ -846,11 +949,12 @@ async function main(): Promise<void> {
       // the right aim model for a thumb.
       const tap = touch.consumeTap()
       if (tap) {
-        const target = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
-        // A tap that missed every mushroom still tries the quest item/door —
-        // touch has no separate `E` to reach either otherwise.
+        const tapPoint = new THREE.Vector2(tap.x, tap.y)
+        const target = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders, tapPoint)
+        // A tap that missed every mushroom still tries the quest item/scrub/
+        // door — touch has no separate `E` to reach any of those otherwise.
         if (target) examineTarget(target)
-        else if (!tryQuestInteract() && nearDoor) forest.toggleShelterDoor()
+        else if (!tryQuestInteract() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
       }
     }
 
@@ -869,6 +973,10 @@ async function main(): Promise<void> {
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
     const clockT = timeFor(save.prefs.timeMode, cycleT)
     forest.updateDayNight(clockT, camera.position)
+    forest.updatePlayerLamp(
+      lampIsOn(quests.lamp.state === 'done', nightFactor(clockT), forest.playerInsideMine(player.x, player.z)),
+      camera.position,
+    )
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
     audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
     forest.updateClouds(camera.position, dt)

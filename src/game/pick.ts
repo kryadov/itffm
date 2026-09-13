@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Placement } from '../ecology/spawn'
+import type { Species } from '../species/schema'
 
 export interface Basket {
   readonly items: Placement[]
@@ -24,6 +25,17 @@ export function createBasket(capacity = 24): Basket {
       return items.length >= capacity
     },
   }
+}
+
+/**
+ * The rod's own gate: a fish can be aimed at and seen before the fishing rod
+ * quest is delivered, but pressing `E` on one is a no-op until then — the
+ * same class of gate as any other quest ability (docs/superpowers/specs/
+ * 2026-09-13-quest-items-design.md). Every other kind is always pickable;
+ * this only ever refuses `kind: 'fish'`.
+ */
+export function canPick(species: Species, rodOwned: boolean): boolean {
+  return species.kind !== 'fish' || rodOwned
 }
 
 const raycaster = new THREE.Raycaster()
@@ -73,6 +85,27 @@ export function nearestInView(
   let o: THREE.Object3D | null = hits[0].object
   while (o && !o.userData.placement) o = o.parent
   return o
+}
+
+/**
+ * The same crosshair-aim idea as `nearestInView`, for the hatchet's own
+ * targets instead of a collectible's: a flat list of scrub meshes, no
+ * occluders, no walk-up-to-`userData.placement` — a scrub mesh IS the object
+ * to remove, tagged with `userData.scrubId` directly (see world/scrub.ts).
+ * Kept separate from `nearestInView` rather than folded into it: a scrub
+ * object is never a `Placement` and never belongs in the basket/inspect flow
+ * that function's callers assume.
+ */
+export function nearestScrubInView(
+  camera: THREE.Camera,
+  scrubs: THREE.Object3D[],
+  maxDistance: number,
+  point: THREE.Vector2 = centre,
+): THREE.Object3D | null {
+  raycaster.setFromCamera(point, camera)
+  raycaster.far = maxDistance
+  const hits = raycaster.intersectObjects(scrubs, false)
+  return hits.length > 0 ? hits[0].object : null
 }
 
 /**

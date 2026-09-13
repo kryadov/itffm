@@ -1,9 +1,37 @@
 import * as THREE from 'three'
-import { buildPathMeshes } from '../../src/world/paths'
+import { buildPathMeshes, distanceToNearestPath, HALF_WIDTH } from '../../src/world/paths'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
 const HALF_SIZE = 90
+
+describe('distanceToNearestPath', () => {
+  const path = [{ x: -10, z: 0 }, { x: 10, z: 0 }]
+
+  it('is (near) zero right on the centreline', () => {
+    expect(distanceToNearestPath({ x: 0, z: 0 }, [path])).toBeLessThan(1e-6)
+  })
+
+  it('grows with perpendicular distance from the centreline', () => {
+    expect(distanceToNearestPath({ x: 0, z: 5 }, [path])).toBeCloseTo(5, 5)
+  })
+
+  it('picks the nearest of several paths', () => {
+    const other = [{ x: -10, z: 50 }, { x: 10, z: 50 }]
+    expect(distanceToNearestPath({ x: 0, z: 49 }, [path, other])).toBeCloseTo(1, 5)
+  })
+
+  it('is Infinity when there are no paths at all', () => {
+    expect(distanceToNearestPath({ x: 0, z: 0 }, [])).toBe(Infinity)
+  })
+})
+
+describe('HALF_WIDTH', () => {
+  it('is a small, positive footpath width', () => {
+    expect(HALF_WIDTH).toBeGreaterThan(0)
+    expect(HALF_WIDTH).toBeLessThan(2)
+  })
+})
 
 describe('buildPathMeshes', () => {
   it('draws nothing for an empty list', () => {

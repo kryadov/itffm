@@ -18,7 +18,9 @@ interface CircleObstacle {
   radius: number
 }
 
-const TUNNEL_LENGTH = 6
+/** Exported so `isInsideMine` (below) reuses the exact same tunnel size
+ *  rather than a second, hand-picked "interior radius" constant. */
+export const TUNNEL_LENGTH = 6
 const TUNNEL_WIDTH = 2.2
 const TUNNEL_HEIGHT = 2.3
 const WALL_THICKNESS = 0.15
@@ -65,6 +67,17 @@ export function placeMine(entrance: Vec2, ground: ElevationProvider): Mine {
     }
   }
   return { x: entrance.x, z: entrance.z, y: here, heading: bestHeading }
+}
+
+/**
+ * Whether a point is close enough to this mine's entrance to count as
+ * "inside" for the lamp's own on/off rule (`quest/lamp.ts`'s `lampIsOn`) — a
+ * plain distance check against the tunnel's own length, not a precise
+ * inside-the-box test: standing right at the mouth already counts, which is
+ * the honest reading of "you're at the mine, it's dark in there."
+ */
+export function isInsideMine(m: Mine, x: number, z: number): boolean {
+  return Math.hypot(x - m.x, z - m.z) <= TUNNEL_LENGTH
 }
 
 /** A point `lx` deep and `lz` across from the entrance, in world metres —
@@ -141,10 +154,14 @@ export function buildMineMesh(m: Mine): THREE.Group {
   back.position.set(TUNNEL_LENGTH, TUNNEL_HEIGHT / 2, 0)
   group.add(back)
 
-  // A lantern near the back, not the mouth — the whole point is that it's
-  // dark until you're actually inside, the same "nothing lights the wood
-  // except its own fixed features" rule the hearth light already follows.
-  const lantern = new THREE.PointLight(0xffb15c, 6, 7)
+  // A lantern near the back, not the mouth, but deliberately dim — a mine
+  // without the lamp quest owned has to read as genuinely dark regardless of
+  // time of day (see docs/superpowers/specs/2026-09-13-quest-items-design.md),
+  // so this is barely more than a glint on the rock rather than the earlier,
+  // brighter fixture that lit the whole tunnel by itself. What actually lights
+  // the interior once the player has reason to see is the lamp quest's own
+  // PointLight on the player (game/scene.ts's `updatePlayerLamp`), not this.
+  const lantern = new THREE.PointLight(0xffb15c, 0.5, 4)
   lantern.position.set(TUNNEL_LENGTH * 0.75, TUNNEL_HEIGHT * 0.6, 0)
   lantern.castShadow = true
   lantern.shadow.mapSize.set(256, 256)

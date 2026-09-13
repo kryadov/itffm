@@ -4,6 +4,7 @@ import { buildBerry } from '../berry/build'
 import { buildHerb } from '../herb/build'
 import { buildNut } from '../nut/build'
 import { buildFind } from '../find/build'
+import { buildFish } from '../fish/build'
 import type { Species } from '../species/schema'
 
 export { toWorldMesh, withPickHitbox, HITBOX_RADIUS, buildCollectibleLod, LOD_DISTANCE } from './worldMesh'
@@ -27,5 +28,7 @@ export function buildCollectible(species: Species, seed: number, age: number): T
       return buildNut(species.morphology, seed, age)
     case 'find':
       return buildFind(species.morphology, seed, age)
+    case 'fish':
+      return buildFish(species.morphology, seed, age)
   }
 }

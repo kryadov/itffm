@@ -6,6 +6,16 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.89.0
+Four more quest items alongside the lost basket: a hatchet, a lamp, a
+fishing rod and a bicycle, each placed and delivered the same way, each
+unlocking something real once home. The hatchet clears quest-detour scrub,
+now real and visible objects instead of bare invisible obstacles. The lamp
+lights the player at night and inside mines — mine interiors are genuinely
+dark now without it. The rod unlocks catching fish, a new collectible kind
+(three real species: perch, roach, pike) that spawn near water. The bicycle
+speeds up movement on paths.
+
 ## v0.88.1
 Fix: the settings menu could push its own language switcher past the
 viewport with no way to scroll to it — centering a taller-than-viewport

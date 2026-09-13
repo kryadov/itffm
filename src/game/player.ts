@@ -106,6 +106,23 @@ export function biomeSpeedFactor(biome: Biome): number {
   return biome === 'wetland' ? WETLAND_SPEED : 1
 }
 
+/** How much faster the bicycle quest's own ability makes you on a path — the
+ *  opposite direction of WETLAND_SPEED above, tuned during implementation
+ *  (a gameplay-feel number, not an architectural one). */
+const BIKE_SPEED = 1.6
+
+/**
+ * Speed multiplier for the bicycle quest's own ability: faster only once the
+ * bike is owned AND the player is within a path's own half-width of its
+ * centreline (`world/paths.ts`'s `distanceToNearestPath`/`HALF_WIDTH`) — a
+ * bicycle only helps on an actual trail, not cross-country. 1 (no effect)
+ * whenever either condition is missing, same "neutral by default" shape as
+ * `biomeSpeedFactor`.
+ */
+export function bikeSpeedFactor(owned: boolean, distanceToPath: number, pathHalfWidth: number): number {
+  return owned && distanceToPath <= pathHalfWidth ? BIKE_SPEED : 1
+}
+
 /** Eye height above the ground, accounting for the crouch. */
 export function eyeHeight(s: PlayerState): number {
   return STAND_EYE + (CROUCH_EYE - STAND_EYE) * s.crouch

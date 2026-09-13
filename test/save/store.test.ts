@@ -39,16 +39,28 @@ describe('applyFind', () => {
   })
 })
 
-describe('quest', () => {
-  it('round-trips through save/load (mergeSave, the same path loadSave itself uses)', () => {
-    const withQuest = { ...emptySave(), quest: { position: { x: 12, y: 3, z: -4 }, state: 'carrying' as const } }
-    const loaded = mergeSave(withQuest)
-    expect(loaded.quest).toEqual(withQuest.quest)
+describe('quests', () => {
+  it('round-trips a partially-populated set (only axe placed so far)', () => {
+    const withQuests = { ...emptySave(), quests: { axe: { position: { x: 12, y: 3, z: -4 }, state: 'carrying' as const } } }
+    const loaded = mergeSave(withQuests)
+    expect(loaded.quests).toEqual(withQuests.quests)
+  })
+
+  it('round-trips a fully-populated set', () => {
+    const full = {
+      axe: { position: { x: 1, y: 0, z: 1 }, state: 'pending' as const },
+      lamp: { position: { x: 2, y: 0, z: 2 }, state: 'pending' as const },
+      rod: { position: { x: 3, y: 0, z: 3 }, state: 'done' as const },
+      bike: { position: { x: 4, y: 0, z: 4 }, state: 'carrying' as const },
+    }
+    const withQuests = { ...emptySave(), quests: full }
+    const loaded = mergeSave(withQuests)
+    expect(loaded.quests).toEqual(full)
   })
 
   it('is absent from a fresh save, same as a save from before this feature existed', () => {
-    expect(emptySave().quest).toBeUndefined()
-    expect(mergeSave(undefined).quest).toBeUndefined()
+    expect(emptySave().quests).toBeUndefined()
+    expect(mergeSave(undefined).quests).toBeUndefined()
   })
 })
 

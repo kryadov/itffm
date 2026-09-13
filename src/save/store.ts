@@ -2,6 +2,7 @@ import type { Lang } from '../i18n/i18n'
 import type { TimeMode } from '../world/daynight'
 import type { Weather } from '../world/weather'
 import type { Quest } from '../quest/state'
+import type { QuestItemId } from '../quest/types'
 
 export interface Find {
   speciesId: string
@@ -60,10 +61,15 @@ export interface SaveData {
    *  advancing across sessions instead of resetting to day zero on every
    *  reload. */
   calendarStart: number
-  /** The wood's one fetch quest — undefined for a save from before this
-   *  feature existed, or for one where a fresh quest hasn't been sited yet
-   *  (main.ts sites one on first load and stores it here right away). */
-  quest?: Quest
+  /** The wood's four quest items (hatchet, lamp, rod, bike) — each entry
+   *  undefined until main.ts sites it (it sites all four together on first
+   *  load, so in practice a save either has none of them or all four, but
+   *  the type stays Partial so a save built one item at a time — or one
+   *  from before a later item existed — still loads cleanly). Replaces the
+   *  single-item `quest` field the first fetch quest (v0.88.0) used — that
+   *  field is simply superseded, not migrated, since the feature is one
+   *  release old and dropping it costs nobody a real quest in progress. */
+  quests?: Partial<Record<QuestItemId, Quest>>
 }
 
 export function defaultPrefs(): Prefs {
