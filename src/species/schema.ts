@@ -29,7 +29,7 @@ export const FREQUENCY = ['common', 'occasional', 'rare'] as const
  * `Species` union, the collectible dispatcher and the encyclopedia's kind
  * filter all key off.
  */
-export const KINDS = ['mushroom', 'berry', 'herb', 'nut', 'find'] as const
+export const KINDS = ['mushroom', 'berry', 'herb', 'nut', 'find', 'fish'] as const
 
 export type Edibility = (typeof EDIBILITY)[number]
 export type HymeniumType = (typeof HYMENIUM)[number]
@@ -102,6 +102,19 @@ export interface NutMorphology {
  * mesh, coloured and sized by species data, stands in for a nest, an antler,
  * a feather or a stone alike.
  */
+/** Everything the mesh generator needs to build one fish — the rod quest's
+ *  own kind (docs/superpowers/specs/2026-09-13-quest-items-design.md), a
+ *  fourth Species kind following the forest-finds pattern. Genuinely simple
+ *  by design: a body, a belly stripe and two fins, not a render-accurate
+ *  species model (see fish/build.ts's own doc comment). */
+export interface FishMorphology {
+  bodyColor: string
+  bellyColor: string
+  finColor: string
+  /** Overall body length, mm. */
+  length: Range
+}
+
 export interface FindMorphology {
   color: string
   /** Rough overall size, mm. */
@@ -156,6 +169,7 @@ export type Species =
   | (SpeciesCommon & { kind: 'berry'; morphology: BerryMorphology; edibility: Edibility })
   | (SpeciesCommon & { kind: 'herb'; morphology: HerbMorphology; edibility: Edibility })
   | (SpeciesCommon & { kind: 'nut'; morphology: NutMorphology; edibility: Edibility })
+  | (SpeciesCommon & { kind: 'fish'; morphology: FishMorphology; edibility: Edibility })
   | (SpeciesCommon & { kind: 'find'; morphology: FindMorphology })
 
 class SpeciesError extends Error {
@@ -300,6 +314,16 @@ function parseHerbMorphology(raw: unknown, file: string): HerbMorphology {
   }
 }
 
+function parseFishMorphology(raw: unknown, file: string): FishMorphology {
+  const mo = get(raw, 'morphology', file, '')
+  return {
+    bodyColor: color(mo, 'bodyColor', file, 'morphology'),
+    bellyColor: color(mo, 'bellyColor', file, 'morphology'),
+    finColor: color(mo, 'finColor', file, 'morphology'),
+    length: range(mo, 'length', file, 'morphology'),
+  }
+}
+
 function parseFindMorphology(raw: unknown, file: string): FindMorphology {
   const mo = get(raw, 'morphology', file, '')
   return {
@@ -395,5 +419,6 @@ export function validateSpecies(raw: unknown, file: string): Species {
   if (kind === 'berry') return { ...common, kind, edibility: edibility!, morphology: parseBerryMorphology(raw, file) }
   if (kind === 'herb') return { ...common, kind, edibility: edibility!, morphology: parseHerbMorphology(raw, file) }
   if (kind === 'nut') return { ...common, kind, edibility: edibility!, morphology: parseNutMorphology(raw, file) }
+  if (kind === 'fish') return { ...common, kind, edibility: edibility!, morphology: parseFishMorphology(raw, file) }
   return { ...common, kind: 'mushroom', edibility: edibility!, morphology: parseMushroomMorphology(raw, file) }
 }

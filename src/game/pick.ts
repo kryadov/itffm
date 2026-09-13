@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { Placement } from '../ecology/spawn'
+import type { Species } from '../species/schema'
 
 export interface Basket {
   readonly items: Placement[]
@@ -24,6 +25,17 @@ export function createBasket(capacity = 24): Basket {
       return items.length >= capacity
     },
   }
+}
+
+/**
+ * The rod's own gate: a fish can be aimed at and seen before the fishing rod
+ * quest is delivered, but pressing `E` on one is a no-op until then — the
+ * same class of gate as any other quest ability (docs/superpowers/specs/
+ * 2026-09-13-quest-items-design.md). Every other kind is always pickable;
+ * this only ever refuses `kind: 'fish'`.
+ */
+export function canPick(species: Species, rodOwned: boolean): boolean {
+  return species.kind !== 'fish' || rodOwned
 }
 
 const raycaster = new THREE.Raycaster()

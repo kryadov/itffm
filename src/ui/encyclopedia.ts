@@ -9,12 +9,13 @@ import { EDIBILITY, HYMENIUM, BIOMES, KINDS } from '../species/schema'
 import type { SaveData } from '../save/store'
 import type { Biome, Edibility, HymeniumType, Kind, Species } from '../species/schema'
 
-const KIND_LABEL: Record<Kind, 'kindMushroom' | 'kindBerry' | 'kindHerb' | 'kindNut' | 'kindFind'> = {
+const KIND_LABEL: Record<Kind, 'kindMushroom' | 'kindBerry' | 'kindHerb' | 'kindNut' | 'kindFind' | 'kindFish'> = {
   mushroom: 'kindMushroom',
   berry: 'kindBerry',
   herb: 'kindHerb',
   nut: 'kindNut',
   find: 'kindFind',
+  fish: 'kindFish',
 }
 
 const BIOME_LABEL: Record<Biome, { ru: string; en: string }> = {

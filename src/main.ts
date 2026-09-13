@@ -13,7 +13,7 @@ import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
-import { createBasket, nearestInView, nearestScrubInView, debugRaycastHits } from './game/pick'
+import { createBasket, nearestInView, nearestScrubInView, canPick, debugRaycastHits } from './game/pick'
 import type { Placement } from './ecology/spawn'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
@@ -599,6 +599,9 @@ async function main(): Promise<void> {
     const placement = target.userData.placement
     const species = speciesById(placement.speciesId)
     if (!species) return
+    // The rod's own gate: a fish is visible and aimable before the rod quest
+    // is delivered, but pressing E on one does nothing until then.
+    if (!canPick(species, quests.rod.state === 'done')) return
 
     openInspect(
       species,

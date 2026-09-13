@@ -1,7 +1,8 @@
 import * as THREE from 'three'
-import { createBasket, nearestInView } from '../../src/game/pick'
+import { createBasket, nearestInView, canPick } from '../../src/game/pick'
 import { withPickHitbox } from '../../src/collectible/worldMesh'
 import type { Placement } from '../../src/ecology/spawn'
+import type { Species } from '../../src/species/schema'
 
 const item = (id: string): Placement => ({
   speciesId: id,
@@ -149,5 +150,23 @@ describe('nearestInView', () => {
       const ndc = new THREE.Vector3(2, 0, -3).project(camera)
       expect(nearestInView(camera, [m], 10, [], new THREE.Vector2(ndc.x, ndc.y))).toBe(m)
     })
+  })
+})
+
+describe('canPick', () => {
+  const fishSpecies = { kind: 'fish' } as unknown as Species
+  const mushroomSpecies = { kind: 'mushroom' } as unknown as Species
+
+  it('refuses a fish before the rod is owned', () => {
+    expect(canPick(fishSpecies, false)).toBe(false)
+  })
+
+  it('allows a fish once the rod is owned', () => {
+    expect(canPick(fishSpecies, true)).toBe(true)
+  })
+
+  it('always allows every other kind, rod or no rod', () => {
+    expect(canPick(mushroomSpecies, false)).toBe(true)
+    expect(canPick(mushroomSpecies, true)).toBe(true)
   })
 })

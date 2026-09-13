@@ -1,0 +1,36 @@
+id: rutilus-rutilus
+gbifKey: 2359706
+name:
+  la: Rutilus rutilus
+  ru: Плотва
+  en: Common roach
+kind: fish
+edibility: edible
+lookalikes: []
+morphology:
+  bodyColor: "#8a9a6a"
+  bellyColor: "#eef0e0"
+  finColor: "#c9502f"
+  length: [100, 300]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub, wetland]
+  season: [4, 5, 6, 7, 8, 9, 10]
+  moisture: [0.85, 1]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Серебристый бок, зеленовато-бурая спина, красноватая радужка глаза и
+    такого же цвета брюшной и хвостовой плавники — самая обычная рыба
+    небольших прудов и тихих заводей. Держится плотными стаями у поверхности
+    в тёплые дни, мясо костистое, но традиционно едят — в засоленном или
+    копчёном виде мелкие кости почти не мешают.
+  en: >-
+    A silvery flank, an olive-brown back, and a reddish iris matched by
+    reddish pelvic and tail fins — the most ordinary fish of small ponds and
+    still backwaters. Shoals tightly near the surface on warm days; the flesh
+    is bony but traditionally eaten all the same — salted or smoked, the fine
+    bones barely register.

@@ -1,0 +1,40 @@
+id: esox-lucius
+gbifKey: 2346633
+name:
+  la: Esox lucius
+  ru: Щука обыкновенная
+  en: Northern pike
+kind: fish
+edibility: conditional
+lookalikes: []
+morphology:
+  bodyColor: "#4a5a2e"
+  bellyColor: "#e8e6d0"
+  finColor: "#8a5a3a"
+  length: [300, 700]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub, wetland]
+  season: [4, 5, 6, 7, 8, 9, 10]
+  moisture: [0.88, 1]
+  gregarious: solitary
+  frequency: rare
+media: []
+text:
+  ru: >-
+    Длинное, почти цилиндрическое тело оливково-бурого цвета с бледными
+    пятнами, приплюснутая «утиная» голова с зубастой пастью — узнаётся
+    издалека среди камышей, откуда она подстерегает добычу в одиночку. Крупная
+    хищница, редко попадается там, где есть рыба помельче. Мясо белое и
+    вкусное, но сырую или недоваренную щуку есть нельзя — она нередко
+    заражена широким лентецом, поэтому её всегда готовят полностью
+    прожаренной или проваренной.
+  en: >-
+    A long, almost cylindrical olive-brown body with pale blotches and a
+    flattened, duck-billed head full of teeth — unmistakable lurking among
+    reeds, where it ambushes prey alone rather than in a shoal. A large
+    predator, seen only where smaller fish are already plentiful. The white
+    flesh is good eating, but raw or undercooked pike is not safe — it is a
+    known carrier of the broad fish tapeworm, so it is always cooked all the
+    way through.
