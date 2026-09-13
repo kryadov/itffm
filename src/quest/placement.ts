@@ -1,4 +1,5 @@
-import { mulberry32, randRange } from '../util/rng'
+import { mulberry32, randRange, hashString } from '../util/rng'
+import { QUEST_ITEM_IDS, type QuestItemId } from './types'
 import type { Vec2 } from '../geo/types'
 
 /** Structurally identical to game/player.ts's Obstacle (a plain circle) —
@@ -138,4 +139,26 @@ export function placeQuestItem(
   const obstacles = waterBlocks ? [] : thicketObstacles(seed, shelterPos, item)
 
   return { position: { x, y: heightAt(x, z), z }, obstacles }
+}
+
+/**
+ * Places all four quest items from one world seed, each getting its own
+ * derived seed (`seed + hashString(id)`, folded into 32 bits the same way
+ * `mulberry32` itself already truncates its own input) so the four never
+ * draw from the same random stream and never collide — same shape as
+ * `world/railway.ts`'s own small fixed seed offsets, just derived from the
+ * item id instead of a hand-picked integer, since there are four of them.
+ */
+export function placeQuestItems(
+  seed: number,
+  shelterPos: { x: number; z: number },
+  water: Vec2[][],
+  heightAt: (x: number, z: number) => number,
+): Record<QuestItemId, { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] }> {
+  const result = {} as Record<QuestItemId, ReturnType<typeof placeQuestItem>>
+  for (const id of QUEST_ITEM_IDS) {
+    const itemSeed = (seed + hashString(id)) >>> 0
+    result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt)
+  }
+  return result
 }

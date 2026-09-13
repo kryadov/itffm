@@ -1,4 +1,5 @@
-import { placeQuestItem, thicketObstacles } from '../../src/quest/placement'
+import { placeQuestItem, placeQuestItems, thicketObstacles } from '../../src/quest/placement'
+import { QUEST_ITEM_IDS } from '../../src/quest/types'
 import type { Vec2 } from '../../src/geo/types'
 
 const shelter = { x: 0, z: 0 }
@@ -52,6 +53,34 @@ describe('placeQuestItem', () => {
     ]
     const { obstacles } = placeQuestItem(3, shelter, [pond], flatHeight)
     expect(obstacles).toHaveLength(0)
+  })
+})
+
+describe('placeQuestItems', () => {
+  it('is deterministic for the same seed', () => {
+    expect(placeQuestItems(7, shelter, [], flatHeight)).toEqual(placeQuestItems(7, shelter, [], flatHeight))
+  })
+
+  it('places all four items, each at a meaningfully different position', () => {
+    const placed = placeQuestItems(11, shelter, [], flatHeight)
+    expect(Object.keys(placed).sort()).toEqual([...QUEST_ITEM_IDS].sort())
+    const positions = QUEST_ITEM_IDS.map((id) => placed[id].position)
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const dist = Math.hypot(positions[i].x - positions[j].x, positions[i].z - positions[j].z)
+        expect(dist).toBeGreaterThan(1)
+      }
+    }
+  })
+
+  it('every item still lands 30-45m from the shelter', () => {
+    const placed = placeQuestItems(23, shelter, [], flatHeight)
+    for (const id of QUEST_ITEM_IDS) {
+      const { position } = placed[id]
+      const dist = Math.hypot(position.x - shelter.x, position.z - shelter.z)
+      expect(dist).toBeGreaterThanOrEqual(30)
+      expect(dist).toBeLessThanOrEqual(45)
+    }
   })
 })
 
