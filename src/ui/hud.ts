@@ -40,12 +40,17 @@ export function createHud(
 ): {
   setTarget(name: string | null): void
   setBasket(n: number, cap: number): void
+  /** The fetch quest's own small always-on readout — null hides it entirely
+   *  (a completed or not-yet-started quest has no HUD footprint at all, per
+   *  the design doc). */
+  setQuestDistance(text: string | null): void
 } {
   root.insertAdjacentHTML(
     'beforeend',
     `<div id="crosshair" style="position:fixed;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;opacity:.55"></div>
      <div id="hint" style="position:fixed;left:50%;top:calc(50% + 26px);transform:translateX(-50%);font-size:15px;white-space:nowrap;text-shadow:0 1px 3px #000;opacity:0;transition:opacity .12s"></div>
      <div id="basket" style="position:fixed;right:16px;bottom:14px;font-size:14px;text-shadow:0 1px 3px #000;opacity:.85"></div>
+     <div id="quest-distance" style="position:fixed;left:16px;bottom:14px;font-size:14px;text-shadow:0 1px 3px #000;opacity:.85"></div>
      <div id="version" style="position:fixed;left:8px;bottom:2px;font-size:10px;text-shadow:0 1px 2px #000;opacity:.35;pointer-events:none">v${__APP_VERSION__}</div>
      <div id="help-hint" style="position:fixed;left:8px;top:14px;font-size:11px;text-shadow:0 1px 3px #000;opacity:.4;pointer-events:none">${t('helpHint')}</div>
      <button id="settings-btn" title="${t('pauseTitle')} — Esc" aria-label="${t('pauseTitle')}"
@@ -55,6 +60,7 @@ export function createHud(
   )
   const hint = root.querySelector<HTMLElement>('#hint')!
   const basket = root.querySelector<HTMLElement>('#basket')!
+  const questDistance = root.querySelector<HTMLElement>('#quest-distance')!
   root.querySelector<HTMLButtonElement>('#settings-btn')!.addEventListener('click', onSettings)
 
   const encyclopediaBtn = root.querySelector<HTMLButtonElement>('#encyclopedia-btn')!
@@ -73,6 +79,10 @@ export function createHud(
     },
     setBasket(n, cap) {
       basket.textContent = `🧺 ${n} / ${cap}`
+    },
+    setQuestDistance(text) {
+      questDistance.textContent = text ?? ''
+      questDistance.style.opacity = text ? '.85' : '0'
     },
   }
 }

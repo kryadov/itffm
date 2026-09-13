@@ -1703,6 +1703,22 @@ actually shipped this pass" section this list mirrors.
       скачивание — не тестируются, тот же выбор, что уже стоит для
       остального DOM-кода в `ui/`.
 
+- [x] **Fetch quest: a lost basket, with a natural detour.** Design:
+      `docs/superpowers/specs/2026-09-13-fetch-quest-design.md`, plan:
+      `docs/superpowers/plans/2026-09-13-fetch-quest-plan.md`. Done (v0.88.0):
+      one quest, one item, per save — a lost basket sits 30-45m from the
+      shelter, sited deterministically from the world seed, with either a
+      real mapped pond/wetland or (where the wood has none) a generated
+      thicket band standing between it and home — no maze, just one detour
+      around either end. Same `E` key as the shelter door for pickup and
+      delivery; a small always-on HUD line tracks the distance while it's
+      active. New pure modules `src/quest/state.ts` (the pending/carrying/
+      done state machine) and `src/quest/placement.ts` (deterministic
+      placement + the thicket generator), both `mulberry32`-seeded and unit-
+      tested. Along the way: real water (`world.water`) now blocks movement
+      everywhere, like a tree trunk — it had no collision at all before,
+      quest or not (`world/water.ts`'s new `waterObstacles`).
+
 ## 🔧 Внутреннее
 
 - [ ] **Подземные грибы (трюфель и родственные) не влезают в схему.** У

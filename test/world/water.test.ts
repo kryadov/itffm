@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import {
-  waterLevel, buildWaterMeshes, classifyWater, findWaterfall, placeSprings, buildSpringMeshes,
+  waterLevel, buildWaterMeshes, classifyWater, findWaterfall, placeSprings, buildSpringMeshes, waterObstacles,
 } from '../../src/world/water'
 import { mulberry32 } from '../../src/util/rng'
 import type { ElevationProvider } from '../../src/terrain/provider'
@@ -106,6 +106,31 @@ describe('placeSprings', () => {
       expect(Math.abs(s.x)).toBeLessThanOrEqual(90)
       expect(Math.abs(s.z)).toBeLessThanOrEqual(90)
     }
+  })
+})
+
+describe('waterObstacles', () => {
+  it('gives nothing for an empty list', () => {
+    expect(waterObstacles([])).toHaveLength(0)
+  })
+
+  it('covers a square polygon\'s perimeter, including the middle of long edges', () => {
+    const square = [{ x: -5, z: -5 }, { x: 5, z: -5 }, { x: 5, z: 5 }, { x: -5, z: 5 }]
+    const obstacles = waterObstacles([square], 0.6)
+    // Every vertex is a circle...
+    for (const v of square) {
+      expect(obstacles.some((o) => Math.hypot(o.x - v.x, o.z - v.z) < 1e-6)).toBe(true)
+    }
+    // ...and a 10m edge (more than 2x the 0.6m radius) is not left porous at
+    // its own midpoint either.
+    const edgeMidpoint = { x: 0, z: -5 }
+    const nearest = Math.min(...obstacles.map((o) => Math.hypot(o.x - edgeMidpoint.x, o.z - edgeMidpoint.z) - o.radius))
+    expect(nearest).toBeLessThan(0.6)
+  })
+
+  it('gives every obstacle a positive radius', () => {
+    const ring = [{ x: 0, z: 0 }, { x: 3, z: 0 }, { x: 3, z: 3 }]
+    for (const o of waterObstacles([ring])) expect(o.radius).toBeGreaterThan(0)
   })
 })
 

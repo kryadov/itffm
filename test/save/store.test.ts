@@ -39,6 +39,19 @@ describe('applyFind', () => {
   })
 })
 
+describe('quest', () => {
+  it('round-trips through save/load (mergeSave, the same path loadSave itself uses)', () => {
+    const withQuest = { ...emptySave(), quest: { position: { x: 12, y: 3, z: -4 }, state: 'carrying' as const } }
+    const loaded = mergeSave(withQuest)
+    expect(loaded.quest).toEqual(withQuest.quest)
+  })
+
+  it('is absent from a fresh save, same as a save from before this feature existed', () => {
+    expect(emptySave().quest).toBeUndefined()
+    expect(mergeSave(undefined).quest).toBeUndefined()
+  })
+})
+
 describe('mergeSave', () => {
   it('starts from the defaults with nothing stored at all', () => {
     // calendarStart is Date.now() at call time — compared separately

@@ -1,6 +1,7 @@
 import type { Lang } from '../i18n/i18n'
 import type { TimeMode } from '../world/daynight'
 import type { Weather } from '../world/weather'
+import type { Quest } from '../quest/state'
 
 export interface Find {
   speciesId: string
@@ -59,6 +60,10 @@ export interface SaveData {
    *  advancing across sessions instead of resetting to day zero on every
    *  reload. */
   calendarStart: number
+  /** The wood's one fetch quest — undefined for a save from before this
+   *  feature existed, or for one where a fresh quest hasn't been sited yet
+   *  (main.ts sites one on first load and stores it here right away). */
+  quest?: Quest
 }
 
 export function defaultPrefs(): Prefs {

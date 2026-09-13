@@ -36,7 +36,9 @@ import { moonPhase } from '../world/moonPhase'
 import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
 import { buildPathMeshes } from '../world/paths'
-import { buildWaterMeshes, placeSprings, buildSpringMeshes, classifyWater, waterLevel } from '../world/water'
+import {
+  buildWaterMeshes, placeSprings, buildSpringMeshes, classifyWater, waterLevel, waterObstacles,
+} from '../world/water'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
@@ -332,6 +334,10 @@ export function createForest(
   const extraObstacles = [
     ...logs.flatMap((l) => logObstacles(l)),
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius, topHeight: s.height })),
+    // Real water becomes a real obstacle everywhere, not just near the quest
+    // item — it was already parsed and drawn (buildWaterMeshes above) but had
+    // no collision at all (see world/water.ts's own doc comment).
+    ...waterObstacles(source.water ?? []),
   ]
 
   const leaningTrees = placeLeaningTrees(source.ground, halfSize, seed + 14)
