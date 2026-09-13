@@ -38,13 +38,19 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   const overlay = document.createElement('div')
   overlay.id = 'settings'
   overlay.dataset.modal = 'true'
+  // `align-items:center` would clip a panel taller than the viewport with no
+  // way to scroll to the clipped part (a flexbox centering/overflow gotcha —
+  // `overflow-y:auto` on a centered cross-axis alone doesn't let you reach
+  // content pushed above the fold). `margin:auto` on the panel itself centers
+  // it when it fits and degrades to top-anchored + scrollable when it doesn't.
   overlay.style.cssText =
     'position:fixed;inset:0;background:#0f130ecc;pointer-events:auto;display:flex;' +
-    'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee'
+    'justify-content:center;overflow-y:auto;font-family:system-ui,sans-serif;color:#eee'
 
   const panel = document.createElement('div')
   panel.style.cssText =
-    'background:#171d15;border-radius:12px;padding:26px 30px;min-width:320px;max-width:90vw;display:flex;flex-direction:column;gap:18px'
+    'background:#171d15;border-radius:12px;padding:26px 30px;min-width:320px;max-width:90vw;' +
+    'display:flex;flex-direction:column;gap:18px;margin:auto;flex-shrink:0'
   overlay.appendChild(panel)
 
   // Every label the menu shows in the current language — repainted whenever
