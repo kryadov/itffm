@@ -6,6 +6,12 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.88.1
+Fix: the settings menu could push its own language switcher past the
+viewport with no way to scroll to it — centering a taller-than-viewport
+panel with no overflow handling clips both ends equally. The menu now
+scrolls when it doesn't fit.
+
 ## v0.88.0
 A first quest: a lost basket sits 30-45m from the shelter, with a real pond
 or wetland — or, where the wood has none, a generated thicket — standing
