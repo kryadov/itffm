@@ -30,6 +30,8 @@ import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
+import { placeQuestItem } from './quest/placement'
+import { tryPickUp, tryDeliver, type Quest } from './quest/state'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -87,6 +89,14 @@ const WATER_AMBIENCE_RADIUS = 45
 const CAMPFIRE_MUSIC_RADIUS = 8
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
+/** Seed offset for the wood's one fetch quest (world/railway.ts's own
+ *  RAIL_SEED_OFFSET is 29, game/scene.ts's train sits at seed + 30 — this is
+ *  the next free slot, so the quest's own placement never draws from the
+ *  same stream as anything else the wood already seeds). */
+const QUEST_SEED_OFFSET = 31
+/** Below this distance the quest's HUD readout reads "near" rather than
+ *  "far" — see i18n's questDistanceNear/questDistanceFar. */
+const QUEST_NEAR_RADIUS = 15
 
 const STAGE_KEY: Record<LoadStage, 'stageGeocode' | 'stageOsm' | 'stageTerrain' | 'stageBuild'> = {
   geocode: 'stageGeocode',
@@ -247,9 +257,29 @@ async function main(): Promise<void> {
     .filter((ring) => ring.length >= 2)
     .map((ring) => ({ ring, kind: classifyWater(ring) }))
 
+  // The wood's one fetch quest (see docs/superpowers/specs/2026-09-13-fetch-
+  // quest-design.md): sited deterministically from the world seed, same as
+  // everything else about this wood, so a fresh game always finds the lost
+  // basket in the same place a returning save already remembers. Recomputed
+  // on every load regardless — cheap, pure, and deterministic — so its own
+  // thicket/water detour obstacles are always available for the physics step
+  // below even when `save.quest` already carries the item's position and
+  // state from an earlier session.
+  const questPlacement = placeQuestItem(
+    seed + QUEST_SEED_OFFSET, forest.shelter, source.water ?? [], (x, z) => forest.ground.heightAt(x, z),
+  )
+  const isFreshQuest = !save.quest
+  let quest: Quest = save.quest ?? { position: questPlacement.position, state: 'pending' }
+  if (isFreshQuest) {
+    save = { ...save, quest }
+    void persistSave(save)
+    toast(t('questPrompt'))
+  }
+
   const obstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
+    ...questPlacement.obstacles,
   ]
   const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
   let player: PlayerState = {
@@ -262,6 +292,58 @@ async function main(): Promise<void> {
   // distance check (game/pick.ts's crosshair raycast is for a mushroom you
   // aim at; a doorway is a fixed, room-sized target you just walk up to).
   let nearDoor = false
+
+  // The lost basket itself: a simple standalone mesh (no carried-item mesh
+  // in hand for v1, per the design doc) that sits at `quest.position` while
+  // `pending` and disappears the instant it's picked up — cosmetic, not the
+  // objective's own state, which lives in `quest` above.
+  const questItemGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.32, 10)
+  const questItemMat = new THREE.MeshStandardMaterial({ color: 0xa9772f, roughness: 1 })
+  let questItemMesh: THREE.Mesh | null = null
+  function showQuestItem(): void {
+    questItemMesh = new THREE.Mesh(questItemGeo, questItemMat)
+    questItemMesh.position.set(quest.position.x, quest.position.y + 0.16, quest.position.z)
+    forest.scene.add(questItemMesh)
+  }
+  function hideQuestItem(): void {
+    questItemMesh?.removeFromParent()
+    questItemMesh = null
+  }
+  if (quest.state === 'pending') showQuestItem()
+
+  /**
+   * Tries both quest transitions at the player's current position — a no-op
+   * unless `quest` is actually in the matching state and range (see
+   * quest/state.ts's own doc comments), so calling both unconditionally is
+   * safe and mirrors the shelter door's own "just walk up and press E" feel.
+   * Returns whether anything actually happened, so the caller (the `E`
+   * keydown handler and the touch tap handler) knows whether to fall through
+   * to the door check / mushroom examination instead.
+   */
+  function tryQuestInteract(): boolean {
+    const before = quest.state
+    quest = tryPickUp(quest, player, DOOR_INTERACT_RADIUS)
+    quest = tryDeliver(quest, player, forest.shelterDoor, DOOR_INTERACT_RADIUS)
+    if (quest.state === before) return false
+    if (before === 'pending') hideQuestItem()
+    if (quest.state === 'done') toast(t('questComplete'))
+    save = { ...save, quest }
+    void persistSave(save)
+    return true
+  }
+
+  /** The quest's own small always-on HUD line — no footprint at all once
+   *  `done`, per the design doc. */
+  function updateQuestHud(): void {
+    if (quest.state === 'done') {
+      hud.setQuestDistance(null)
+      return
+    }
+    const target = quest.state === 'pending' ? quest.position : forest.shelterDoor
+    const dist = Math.hypot(player.x - target.x, player.z - target.z)
+    const label = dist < QUEST_NEAR_RADIUS ? t('questDistanceNear') : t('questDistanceFar')
+    hud.setQuestDistance(`${label} — ${Math.round(dist)}m`)
+  }
 
   // A live readout of what the crosshair actually sees, for exactly the kind
   // of "the label just doesn't show up" report that is otherwise
@@ -682,7 +764,9 @@ async function main(): Promise<void> {
   addEventListener('keydown', (e) => {
     if (modalOpen()) return
     if (e.code === 'KeyE') {
-      if (nearDoor) forest.toggleShelterDoor()
+      if (tryQuestInteract()) {
+        // handled: picked up or delivered the quest item
+      } else if (nearDoor) forest.toggleShelterDoor()
       else examineAimed()
     }
     if (e.code === 'Tab') {
@@ -763,10 +847,10 @@ async function main(): Promise<void> {
       const tap = touch.consumeTap()
       if (tap) {
         const target = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
-        // A tap that missed every mushroom still opens/closes the door when
-        // the player is standing right at it — touch has no separate `E`.
+        // A tap that missed every mushroom still tries the quest item/door —
+        // touch has no separate `E` to reach either otherwise.
         if (target) examineTarget(target)
-        else if (nearDoor) forest.toggleShelterDoor()
+        else if (!tryQuestInteract() && nearDoor) forest.toggleShelterDoor()
       }
     }
 
@@ -778,6 +862,7 @@ async function main(): Promise<void> {
     )
     camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
     compass.update(player.yaw)
+    updateQuestHud()
     if (save.prefs.minimap) {
       minimap.update({ x: player.x, z: player.z, heading: headingFromYaw(player.yaw) })
     }
