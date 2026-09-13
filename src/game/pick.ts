@@ -76,6 +76,27 @@ export function nearestInView(
 }
 
 /**
+ * The same crosshair-aim idea as `nearestInView`, for the hatchet's own
+ * targets instead of a collectible's: a flat list of scrub meshes, no
+ * occluders, no walk-up-to-`userData.placement` — a scrub mesh IS the object
+ * to remove, tagged with `userData.scrubId` directly (see world/scrub.ts).
+ * Kept separate from `nearestInView` rather than folded into it: a scrub
+ * object is never a `Placement` and never belongs in the basket/inspect flow
+ * that function's callers assume.
+ */
+export function nearestScrubInView(
+  camera: THREE.Camera,
+  scrubs: THREE.Object3D[],
+  maxDistance: number,
+  point: THREE.Vector2 = centre,
+): THREE.Object3D | null {
+  raycaster.setFromCamera(point, camera)
+  raycaster.far = maxDistance
+  const hits = raycaster.intersectObjects(scrubs, false)
+  return hits.length > 0 ? hits[0].object : null
+}
+
+/**
  * The exact same raycast `nearestInView` runs, but reporting every hit along
  * the ray instead of only resolving the first one — for `?debug=1`
  * (main.ts) to show, since "the label doesn't show up" has no other way to

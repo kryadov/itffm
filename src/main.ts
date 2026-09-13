@@ -13,7 +13,7 @@ import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
 import { chooseStartPose } from './game/startPose'
-import { createBasket, nearestInView, debugRaycastHits } from './game/pick'
+import { createBasket, nearestInView, nearestScrubInView, debugRaycastHits } from './game/pick'
 import type { Placement } from './ecology/spawn'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
@@ -33,6 +33,7 @@ import { setLang, getLang, t, speciesName } from './i18n/i18n'
 import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { tryPickUp, tryDeliver } from './quest/state'
 import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
+import { chopScrub } from './quest/scrub'
 import { buildScrubMesh } from './world/scrub'
 
 declare global {
@@ -293,22 +294,36 @@ async function main(): Promise<void> {
     toast(t('questPrompt'))
   }
 
-  // Every quest item's own thicket-detour scrub, in one flat mutable list —
-  // `obstacles` below is spread fresh into `stepObstacles` every frame, so
-  // splicing an entry out here (the hatchet, main.ts's `tryChopScrub`) takes
-  // effect on the very next frame with no extra plumbing.
-  const scrubObstacles: QuestObstacle[] = QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles)
-  const obstacles: Obstacle[] = [
+  // Every quest item's own thicket-detour scrub — a `let`, not a `const`,
+  // because the hatchet (`tryChopScrub` below) replaces this with a shorter
+  // array (via `chopScrub`, a pure function) the moment the axe quest is
+  // done and the player chops one down. `baseObstacles` (trees + everything
+  // else `createForest` already built) never changes, so only this list
+  // needs to be recombined with it on every physics step.
+  let scrubObstacles: QuestObstacle[] = QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles)
+  const baseObstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
-    ...scrubObstacles,
   ]
+  // Recomputed fresh wherever it's read (never a frozen snapshot): `chopScrub`
+  // replaces `scrubObstacles` with a new, shorter array rather than mutating
+  // the old one in place, so anything reading a stale `[...baseObstacles,
+  // ...scrubObstacles]` array from before a chop would still collide with a
+  // bush that is no longer there.
+  const currentObstacles = (): Obstacle[] => [...baseObstacles, ...scrubObstacles]
 
   // One real, identifiable mesh per scrub circle (see world/scrub.ts) — a
   // player has to be able to see and aim at the thing a hatchet would
-  // remove, not just bump into an invisible obstacle.
-  for (const o of scrubObstacles) forest.scene.add(buildScrubMesh(o, forest.ground))
-  const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
+  // remove, not just bump into an invisible obstacle. Kept in a map by the
+  // same id the obstacle circle carries, so chopping one down (below) can
+  // find and drop both together.
+  const scrubMeshes = new Map<string, THREE.Mesh>()
+  for (const o of scrubObstacles) {
+    const mesh = buildScrubMesh(o, forest.ground)
+    forest.scene.add(mesh)
+    scrubMeshes.set(o.id, mesh)
+  }
+  const startPose = chooseStartPose(currentObstacles(), halfSize, forest.shelter)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
     bobPhase: 0,
@@ -367,6 +382,30 @@ async function main(): Promise<void> {
     if (!changed) return false
     save = { ...save, quests }
     void persistSave(save)
+    return true
+  }
+
+  /**
+   * The hatchet's own interaction: only once the axe quest is delivered, `E`
+   * facing a scrub object removes it — both the mesh (here) and the
+   * obstacle circle (`chopScrub`, quest/scrub.ts). Only ever touches objects
+   * built by `thicketObstacles`, tracked in `scrubMeshes`/`scrubObstacles`
+   * above — `world/trees.ts`'s batched trees are never in that list, so a
+   * mature tree can never be chopped this way.
+   *
+   * @param point where on screen to aim (see nearestScrubInView) — a touch
+   *   tap's own point on mobile, the crosshair centre by default on desktop.
+   */
+  function tryChopScrub(point?: THREE.Vector2): boolean {
+    if (quests.axe.state !== 'done') return false
+    const target = nearestScrubInView(camera, [...scrubMeshes.values()], REACH, point)
+    if (!target) return false
+    const id = target.userData.scrubId as string
+    const next = chopScrub(scrubObstacles, id, true)
+    if (next === scrubObstacles) return false
+    scrubObstacles = next
+    target.removeFromParent()
+    scrubMeshes.delete(id)
     return true
   }
 
@@ -809,7 +848,9 @@ async function main(): Promise<void> {
     if (modalOpen()) return
     if (e.code === 'KeyE') {
       if (tryQuestInteract()) {
-        // handled: picked up or delivered the quest item
+        // handled: picked up or delivered a quest item
+      } else if (tryChopScrub()) {
+        // handled: chopped down a scrub object
       } else if (nearDoor) forest.toggleShelterDoor()
       else examineAimed()
     }
@@ -855,7 +896,7 @@ async function main(): Promise<void> {
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
       const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome)
       const input = touch.active ? touch.read(dt) : controls.read(dt)
-      const stepObstacles = worldStream ? [...obstacles, ...worldStream.obstacles()] : obstacles
+      const stepObstacles = worldStream ? [...currentObstacles(), ...worldStream.obstacles()] : currentObstacles()
       const prevBobPhase = player.bobPhase
       player = stepPlayer(player, input, combinedGround, stepObstacles, speed)
       if (!worldStream) {
@@ -890,11 +931,12 @@ async function main(): Promise<void> {
       // the right aim model for a thumb.
       const tap = touch.consumeTap()
       if (tap) {
-        const target = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders, new THREE.Vector2(tap.x, tap.y))
-        // A tap that missed every mushroom still tries the quest item/door —
-        // touch has no separate `E` to reach either otherwise.
+        const tapPoint = new THREE.Vector2(tap.x, tap.y)
+        const target = nearestInView(camera, mushroomCandidates(), REACH, forest.occluders, tapPoint)
+        // A tap that missed every mushroom still tries the quest item/scrub/
+        // door — touch has no separate `E` to reach any of those otherwise.
         if (target) examineTarget(target)
-        else if (!tryQuestInteract() && nearDoor) forest.toggleShelterDoor()
+        else if (!tryQuestInteract() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
       }
     }
 
