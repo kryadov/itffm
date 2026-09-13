@@ -10,6 +10,11 @@ export interface QuestObstacle {
   x: number
   z: number
   radius: number
+  /** Stable identity for one scrub circle, scoped by which quest item's own
+   *  detour it belongs to (`${ownerId}-scrub-${i}`) — the hatchet (see
+   *  main.ts) needs to remove exactly one bush, not the whole band, and two
+   *  different items' bands must never collide on the same id. */
+  id: string
 }
 
 /** How far from the shelter the lost basket is placed, metres. */
@@ -77,6 +82,10 @@ export function thicketObstacles(
   seed: number,
   shelterPos: { x: number; z: number },
   item: { x: number; z: number },
+  /** Which quest item this band belongs to — folded into every obstacle's
+   *  own `id` so two items' bands never collide (see QuestObstacle's own
+   *  doc comment). Empty for a standalone/test call with only one band. */
+  ownerId = '',
 ): QuestObstacle[] {
   const rng = mulberry32(seed)
   const dx = item.x - shelterPos.x
@@ -103,6 +112,7 @@ export function thicketObstacles(
       x: baseX + perpX * offset,
       z: baseZ + perpZ * offset,
       radius: randRange(rng, [THICKET_MIN_RADIUS, THICKET_MAX_RADIUS]),
+      id: `${ownerId}-scrub-${i}`,
     })
   }
   return obstacles
@@ -121,6 +131,8 @@ export function placeQuestItem(
   shelterPos: { x: number; z: number },
   water: Vec2[][],
   heightAt: (x: number, z: number) => number,
+  /** Threaded through to `thicketObstacles` — see its own doc comment. */
+  ownerId = '',
 ): { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] } {
   const rng = mulberry32(seed)
   const angle = randRange(rng, [0, Math.PI * 2])
@@ -136,7 +148,7 @@ export function placeQuestItem(
     return false
   })
 
-  const obstacles = waterBlocks ? [] : thicketObstacles(seed, shelterPos, item)
+  const obstacles = waterBlocks ? [] : thicketObstacles(seed, shelterPos, item, ownerId)
 
   return { position: { x, y: heightAt(x, z), z }, obstacles }
 }
@@ -158,7 +170,7 @@ export function placeQuestItems(
   const result = {} as Record<QuestItemId, ReturnType<typeof placeQuestItem>>
   for (const id of QUEST_ITEM_IDS) {
     const itemSeed = (seed + hashString(id)) >>> 0
-    result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt)
+    result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt, id)
   }
   return result
 }

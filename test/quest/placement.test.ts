@@ -116,4 +116,18 @@ describe('thicketObstacles', () => {
       expect(o.radius).toBeLessThanOrEqual(0.8)
     }
   })
+
+  it('gives every obstacle a stable, unique id scoped by its owner', () => {
+    const obstacles = thicketObstacles(9, shelter, item, 'axe')
+    const ids = obstacles.map((o) => o.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    for (const id of ids) expect(id.startsWith('axe-scrub-')).toBe(true)
+  })
+
+  it('never collides ids between two different owners', () => {
+    const a = thicketObstacles(9, shelter, item, 'axe')
+    const b = thicketObstacles(9, shelter, item, 'lamp')
+    const aIds = new Set(a.map((o) => o.id))
+    for (const o of b) expect(aIds.has(o.id)).toBe(false)
+  })
 })

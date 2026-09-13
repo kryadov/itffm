@@ -30,9 +30,10 @@ import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
-import { placeQuestItems } from './quest/placement'
+import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { tryPickUp, tryDeliver } from './quest/state'
 import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
+import { buildScrubMesh } from './world/scrub'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -292,11 +293,21 @@ async function main(): Promise<void> {
     toast(t('questPrompt'))
   }
 
+  // Every quest item's own thicket-detour scrub, in one flat mutable list —
+  // `obstacles` below is spread fresh into `stepObstacles` every frame, so
+  // splicing an entry out here (the hatchet, main.ts's `tryChopScrub`) takes
+  // effect on the very next frame with no extra plumbing.
+  const scrubObstacles: QuestObstacle[] = QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles)
   const obstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
-    ...QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles),
+    ...scrubObstacles,
   ]
+
+  // One real, identifiable mesh per scrub circle (see world/scrub.ts) — a
+  // player has to be able to see and aim at the thing a hatchet would
+  // remove, not just bump into an invisible obstacle.
+  for (const o of scrubObstacles) forest.scene.add(buildScrubMesh(o, forest.ground))
   const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
