@@ -1719,6 +1719,27 @@ actually shipped this pass" section this list mirrors.
       everywhere, like a tree trunk — it had no collision at all before,
       quest or not (`world/water.ts`'s new `waterObstacles`).
 
+- [x] **Four quest items with real abilities.** Design:
+      `docs/superpowers/specs/2026-09-13-quest-items-design.md`, plan:
+      `docs/superpowers/plans/2026-09-13-quest-items-plan.md`. Done (v0.89.0):
+      generalized the single fetch quest above to four independent items —
+      a hatchet, a lamp, a fishing rod, a bicycle — each placed and delivered
+      the same way, each unlocking a real ability the moment it's home. The
+      hatchet chops down quest-detour scrub, now real, visible, individually
+      removable objects (`world/scrub.ts`) instead of bare invisible
+      obstacles — never `world/trees.ts`'s batched mature trees. The lamp is
+      an always-on `PointLight` on the player at night or inside a mine
+      (`quest/lamp.ts`'s `lampIsOn`); a mine's own lantern was dimmed
+      (`world/mine.ts`) so its interior is genuinely dark without it. The rod
+      unlocks catching fish, a fourth `Species` kind (`src/fish/build.ts`,
+      following the forest-finds pattern) with three real species — perch,
+      roach, pike — spawning near water via a stretched `moisture` range,
+      the same "reuse an existing field" compromise `find` already accepted.
+      The bicycle multiplies walking speed on OSM paths
+      (`world/paths.ts`'s new `distanceToNearestPath`, `game/player.ts`'s
+      new `bikeSpeedFactor`). `save/store.ts`'s single `quest?` field became
+      `quests?: Partial<Record<QuestItemId, Quest>>`.
+
 ## 🔧 Внутреннее
 
 - [ ] **Подземные грибы (трюфель и родственные) не влезают в схему.** У

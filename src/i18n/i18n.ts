@@ -119,10 +119,14 @@ export const RU = {
   fellBackNotice: 'Не удалось построить участок по этому месту — показываю запасной лес.',
   notePlaceholder: 'Своя заметка…',
   exportEncyclopedia: 'Экспорт картинкой',
-  questPrompt: 'Кто-то обронил в лесу корзину — найдите её и отнесите домой.',
+  questPrompt:
+    'В лесу потеряны четыре вещи — топор, лампа, удочка и велосипед. Найдите их и отнесите домой: каждая даст что-то полезное.',
   questDistanceFar: 'далеко',
   questDistanceNear: 'близко',
-  questComplete: 'Корзина дома.',
+  questCompleteAxe: 'Топор дома — теперь можно расчищать заросли.',
+  questCompleteLamp: 'Лампа дома — она загорится в темноте и в шахте.',
+  questCompleteRod: 'Удочка дома — теперь можно ловить рыбу.',
+  questCompleteBike: 'Велосипед дома — на тропах теперь можно ехать быстрее.',
   lang: 'EN',
 } as const
 
@@ -239,10 +243,14 @@ export const EN: Record<keyof typeof RU, string> = {
   fellBackNotice: 'Could not build a plot from that place — showing the demo wood instead.',
   notePlaceholder: 'Your own note…',
   exportEncyclopedia: 'Export as an image',
-  questPrompt: 'Someone lost a basket in the wood — find it and bring it home.',
+  questPrompt:
+    'Four things are lost in the wood — a hatchet, a lamp, a fishing rod and a bicycle. Find them and bring them home: each one unlocks something useful.',
   questDistanceFar: 'far',
   questDistanceNear: 'near',
-  questComplete: 'The basket is home.',
+  questCompleteAxe: 'The hatchet is home — you can clear scrub now.',
+  questCompleteLamp: 'The lamp is home — it will light up in the dark and inside mines.',
+  questCompleteRod: 'The fishing rod is home — you can catch fish now.',
+  questCompleteBike: 'The bicycle is home — you move faster on paths now.',
   lang: 'RU',
 }
 

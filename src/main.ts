@@ -112,6 +112,14 @@ const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
   rod: 0x5a4a30,
   bike: 0x3f6db0,
 }
+/** Which i18n key names each item's own completion message — see
+ *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike. */
+const QUEST_COMPLETE_KEY: Record<QuestItemId, 'questCompleteAxe' | 'questCompleteLamp' | 'questCompleteRod' | 'questCompleteBike'> = {
+  axe: 'questCompleteAxe',
+  lamp: 'questCompleteLamp',
+  rod: 'questCompleteRod',
+  bike: 'questCompleteBike',
+}
 /** Below this distance the quest's HUD readout reads "near" rather than
  *  "far" — see i18n's questDistanceNear/questDistanceFar. */
 const QUEST_NEAR_RADIUS = 15
@@ -381,7 +389,7 @@ async function main(): Promise<void> {
       if (quests[id].state === before) continue
       changed = true
       if (before === 'pending') hideQuestItem(id)
-      if (quests[id].state === 'done') toast(t('questComplete'))
+      if (quests[id].state === 'done') toast(t(QUEST_COMPLETE_KEY[id]))
     }
     if (!changed) return false
     save = { ...save, quests }
