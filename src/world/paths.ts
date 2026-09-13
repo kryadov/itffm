@@ -1,10 +1,13 @@
 import * as THREE from 'three'
-import { densify } from '../util/geometry'
+import { densify, distanceToPolyline } from '../util/geometry'
 import type { Vec2 } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
 
-/** Half the ribbon's width, metres — a footpath, not a road. */
-const HALF_WIDTH = 0.6
+/** Half the ribbon's width, metres — a footpath, not a road. Exported so the
+ *  bike's own "on a path" check (`distanceToNearestPath`, used against this
+ *  same value by `game/player.ts`) reuses the exact width the mesh itself
+ *  draws, rather than a second hand-picked number. */
+export const HALF_WIDTH = 0.6
 /** How far apart ribbon vertices sit at most, metres — dense enough that the
  *  ribbon follows the ground rather than cutting a chord over it (see
  *  `densify`). */
@@ -58,6 +61,18 @@ function offsetsForPolyline(points: Vec2[], halfWidth: number): { left: Vec2; ri
     })
   }
   return out
+}
+
+/**
+ * How far `pos` sits from the nearest trail's own centreline — the bike's
+ * own "am I on a path" check (`game/player.ts`'s `biomeSpeedFactor`),
+ * reusing the exact same ribbon geometry `buildPathMeshes` walks rather than
+ * recomputing it a second way. `Infinity` for a wood with no paths at all.
+ */
+export function distanceToNearestPath(pos: Vec2, paths: Vec2[][]): number {
+  let min = Infinity
+  for (const path of paths) min = Math.min(min, distanceToPolyline(pos.x, pos.z, path))
+  return min
 }
 
 /**

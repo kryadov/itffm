@@ -11,7 +11,10 @@ import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAm
 import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
-import { stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, type PlayerState, type Obstacle } from './game/player'
+import {
+  stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, bikeSpeedFactor, type PlayerState, type Obstacle,
+} from './game/player'
+import { distanceToNearestPath, HALF_WIDTH as PATH_HALF_WIDTH } from './world/paths'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, nearestScrubInView, canPick, debugRaycastHits } from './game/pick'
 import type { Placement } from './ecology/spawn'
@@ -898,7 +901,10 @@ async function main(): Promise<void> {
     if (!modalOpen()) {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
-      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome)
+      const bike = bikeSpeedFactor(
+        quests.bike.state === 'done', distanceToNearestPath(player, source.paths ?? []), PATH_HALF_WIDTH,
+      )
+      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * bike
       const input = touch.active ? touch.read(dt) : controls.read(dt)
       const stepObstacles = worldStream ? [...currentObstacles(), ...worldStream.obstacles()] : currentObstacles()
       const prevBobPhase = player.bobPhase
