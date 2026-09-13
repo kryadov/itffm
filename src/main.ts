@@ -30,8 +30,9 @@ import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
-import { placeQuestItem } from './quest/placement'
-import { tryPickUp, tryDeliver, type Quest } from './quest/state'
+import { placeQuestItems } from './quest/placement'
+import { tryPickUp, tryDeliver } from './quest/state'
+import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -89,11 +90,22 @@ const WATER_AMBIENCE_RADIUS = 45
 const CAMPFIRE_MUSIC_RADIUS = 8
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
-/** Seed offset for the wood's one fetch quest (world/railway.ts's own
+/** Seed offset for the wood's four quest items (world/railway.ts's own
  *  RAIL_SEED_OFFSET is 29, game/scene.ts's train sits at seed + 30 — this is
- *  the next free slot, so the quest's own placement never draws from the
- *  same stream as anything else the wood already seeds). */
+ *  the next free slot, so quest placement never draws from the same stream
+ *  as anything else the wood already seeds). Each item then derives its own
+ *  seed from this one (see quest/placement.ts's placeQuestItems). */
 const QUEST_SEED_OFFSET = 31
+/** One colour per quest item, so the four standalone pickup meshes read as
+ *  different things at a glance even though v1 gives none of them a real
+ *  carried-item model (see the fetch-quest design doc's "no carried-item
+ *  mesh in hand for v1" — still true here, just four colours instead of one). */
+const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
+  axe: 0x8a8a92,
+  lamp: 0xd8a04a,
+  rod: 0x5a4a30,
+  bike: 0x3f6db0,
+}
 /** Below this distance the quest's HUD readout reads "near" rather than
  *  "far" — see i18n's questDistanceNear/questDistanceFar. */
 const QUEST_NEAR_RADIUS = 15
@@ -257,21 +269,25 @@ async function main(): Promise<void> {
     .filter((ring) => ring.length >= 2)
     .map((ring) => ({ ring, kind: classifyWater(ring) }))
 
-  // The wood's one fetch quest (see docs/superpowers/specs/2026-09-13-fetch-
-  // quest-design.md): sited deterministically from the world seed, same as
-  // everything else about this wood, so a fresh game always finds the lost
-  // basket in the same place a returning save already remembers. Recomputed
-  // on every load regardless — cheap, pure, and deterministic — so its own
-  // thicket/water detour obstacles are always available for the physics step
-  // below even when `save.quest` already carries the item's position and
-  // state from an earlier session.
-  const questPlacement = placeQuestItem(
+  // The wood's four quest items (see docs/superpowers/specs/2026-09-13-quest-
+  // items-design.md, extending the single fetch quest of v0.88.0): each
+  // sited deterministically from the world seed, same as everything else
+  // about this wood, so a fresh game always finds them in the same places a
+  // returning save already remembers. Recomputed on every load regardless —
+  // cheap, pure, and deterministic — so every item's own thicket/water
+  // detour obstacles are always available for the physics step below even
+  // when `save.quests` already carries their positions and states from an
+  // earlier session.
+  const questPlacements = placeQuestItems(
     seed + QUEST_SEED_OFFSET, forest.shelter, source.water ?? [], (x, z) => forest.ground.heightAt(x, z),
   )
-  const isFreshQuest = !save.quest
-  let quest: Quest = save.quest ?? { position: questPlacement.position, state: 'pending' }
-  if (isFreshQuest) {
-    save = { ...save, quest }
+  const isFreshQuests = !save.quests
+  const quests: Quests = {} as Quests
+  for (const id of QUEST_ITEM_IDS) {
+    quests[id] = save.quests?.[id] ?? { position: questPlacements[id].position, state: 'pending' }
+  }
+  if (isFreshQuests) {
+    save = { ...save, quests }
     void persistSave(save)
     toast(t('questPrompt'))
   }
@@ -279,7 +295,7 @@ async function main(): Promise<void> {
   const obstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
-    ...questPlacement.obstacles,
+    ...QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles),
   ]
   const startPose = chooseStartPose(obstacles, halfSize, forest.shelter)
   let player: PlayerState = {
@@ -293,53 +309,70 @@ async function main(): Promise<void> {
   // aim at; a doorway is a fixed, room-sized target you just walk up to).
   let nearDoor = false
 
-  // The lost basket itself: a simple standalone mesh (no carried-item mesh
-  // in hand for v1, per the design doc) that sits at `quest.position` while
+  // Each quest item itself: a simple standalone mesh (no carried-item mesh
+  // in hand for v1, per the design doc) that sits at its own position while
   // `pending` and disappears the instant it's picked up — cosmetic, not the
-  // objective's own state, which lives in `quest` above.
+  // objective's own state, which lives in `quests` above.
   const questItemGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.32, 10)
-  const questItemMat = new THREE.MeshStandardMaterial({ color: 0xa9772f, roughness: 1 })
-  let questItemMesh: THREE.Mesh | null = null
-  function showQuestItem(): void {
-    questItemMesh = new THREE.Mesh(questItemGeo, questItemMat)
-    questItemMesh.position.set(quest.position.x, quest.position.y + 0.16, quest.position.z)
-    forest.scene.add(questItemMesh)
+  const questItemMeshes = {} as Record<QuestItemId, THREE.Mesh | null>
+  function showQuestItem(id: QuestItemId): void {
+    const mesh = new THREE.Mesh(
+      questItemGeo, new THREE.MeshStandardMaterial({ color: QUEST_ITEM_COLOR[id], roughness: 1 }),
+    )
+    const pos = quests[id].position
+    mesh.position.set(pos.x, pos.y + 0.16, pos.z)
+    forest.scene.add(mesh)
+    questItemMeshes[id] = mesh
   }
-  function hideQuestItem(): void {
-    questItemMesh?.removeFromParent()
-    questItemMesh = null
+  function hideQuestItem(id: QuestItemId): void {
+    questItemMeshes[id]?.removeFromParent()
+    questItemMeshes[id] = null
   }
-  if (quest.state === 'pending') showQuestItem()
+  for (const id of QUEST_ITEM_IDS) {
+    if (quests[id].state === 'pending') showQuestItem(id)
+  }
 
   /**
-   * Tries both quest transitions at the player's current position — a no-op
-   * unless `quest` is actually in the matching state and range (see
-   * quest/state.ts's own doc comments), so calling both unconditionally is
-   * safe and mirrors the shelter door's own "just walk up and press E" feel.
-   * Returns whether anything actually happened, so the caller (the `E`
-   * keydown handler and the touch tap handler) knows whether to fall through
-   * to the door check / mushroom examination instead.
+   * Tries both quest transitions, for every item at once, at the player's
+   * current position — a no-op for an item unless it is actually in the
+   * matching state and range (see quest/state.ts's own doc comments), so
+   * calling both unconditionally for all four is safe and mirrors the
+   * shelter door's own "just walk up and press E" feel. Returns whether
+   * anything actually happened, so the caller (the `E` keydown handler and
+   * the touch tap handler) knows whether to fall through to the door check /
+   * mushroom examination instead.
    */
   function tryQuestInteract(): boolean {
-    const before = quest.state
-    quest = tryPickUp(quest, player, DOOR_INTERACT_RADIUS)
-    quest = tryDeliver(quest, player, forest.shelterDoor, DOOR_INTERACT_RADIUS)
-    if (quest.state === before) return false
-    if (before === 'pending') hideQuestItem()
-    if (quest.state === 'done') toast(t('questComplete'))
-    save = { ...save, quest }
+    let changed = false
+    for (const id of QUEST_ITEM_IDS) {
+      const before = quests[id].state
+      quests[id] = tryPickUp(quests[id], player, DOOR_INTERACT_RADIUS)
+      quests[id] = tryDeliver(quests[id], player, forest.shelterDoor, DOOR_INTERACT_RADIUS)
+      if (quests[id].state === before) continue
+      changed = true
+      if (before === 'pending') hideQuestItem(id)
+      if (quests[id].state === 'done') toast(t('questComplete'))
+    }
+    if (!changed) return false
+    save = { ...save, quests }
     void persistSave(save)
     return true
   }
 
-  /** The quest's own small always-on HUD line — no footprint at all once
+  /** The quests' own small always-on HUD line — the nearest not-yet-done
+   *  item's own distance readout (carrying beats pending, since heading home
+   *  is the more pressing goal), and no footprint at all once every item is
    *  `done`, per the design doc. */
   function updateQuestHud(): void {
-    if (quest.state === 'done') {
+    const activeId =
+      QUEST_ITEM_IDS.find((id) => quests[id].state === 'carrying') ??
+      QUEST_ITEM_IDS.find((id) => quests[id].state === 'pending')
+    if (!activeId) {
       hud.setQuestDistance(null)
       return
     }
-    const target = quest.state === 'pending' ? quest.position : forest.shelterDoor
+    const q = quests[activeId]
+    const target = q.state === 'pending' ? q.position : forest.shelterDoor
     const dist = Math.hypot(player.x - target.x, player.z - target.z)
     const label = dist < QUEST_NEAR_RADIUS ? t('questDistanceNear') : t('questDistanceFar')
     hud.setQuestDistance(`${label} — ${Math.round(dist)}m`)
