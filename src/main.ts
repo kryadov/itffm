@@ -34,6 +34,7 @@ import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { tryPickUp, tryDeliver } from './quest/state'
 import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
 import { chopScrub } from './quest/scrub'
+import { lampIsOn } from './quest/lamp'
 import { buildScrubMesh } from './world/scrub'
 
 declare global {
@@ -955,6 +956,10 @@ async function main(): Promise<void> {
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
     const clockT = timeFor(save.prefs.timeMode, cycleT)
     forest.updateDayNight(clockT, camera.position)
+    forest.updatePlayerLamp(
+      lampIsOn(quests.lamp.state === 'done', nightFactor(clockT), forest.playerInsideMine(player.x, player.z)),
+      camera.position,
+    )
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
     audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
     forest.updateClouds(camera.position, dt)

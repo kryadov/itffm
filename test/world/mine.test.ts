@@ -1,4 +1,5 @@
-import { placeMine, mineObstacles } from '../../src/world/mine'
+import * as THREE from 'three'
+import { placeMine, mineObstacles, isInsideMine, buildMineMesh, TUNNEL_LENGTH } from '../../src/world/mine'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 describe('placeMine', () => {
@@ -53,5 +54,36 @@ describe('mineObstacles', () => {
     const flat: ElevationProvider = { heightAt: () => 0 }
     const m = placeMine({ x: 2, z: -3 }, flat)
     expect(mineObstacles(m)).toEqual(mineObstacles(m))
+  })
+})
+
+describe('isInsideMine', () => {
+  const flat: ElevationProvider = { heightAt: () => 0 }
+  const m = placeMine({ x: 0, z: 0 }, flat)
+
+  it('is true right at the entrance', () => {
+    expect(isInsideMine(m, 0, 0)).toBe(true)
+  })
+
+  it('is true within the tunnel length', () => {
+    expect(isInsideMine(m, TUNNEL_LENGTH * 0.5, 0)).toBe(true)
+  })
+
+  it('is false well outside the tunnel length', () => {
+    expect(isInsideMine(m, TUNNEL_LENGTH * 5, TUNNEL_LENGTH * 5)).toBe(false)
+  })
+})
+
+describe('buildMineMesh', () => {
+  it('keeps the lantern deliberately dim — the interior must read as dark without the lamp', () => {
+    const flat: ElevationProvider = { heightAt: () => 0 }
+    const m = placeMine({ x: 0, z: 0 }, flat)
+    const group = buildMineMesh(m)
+    let lantern: THREE.PointLight | null = null
+    group.traverse((o) => {
+      if (o instanceof THREE.PointLight) lantern = o
+    })
+    expect(lantern).not.toBeNull()
+    expect(lantern!.intensity).toBeLessThan(1)
   })
 })
