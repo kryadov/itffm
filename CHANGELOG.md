@@ -6,6 +6,13 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.88.0
+A first quest: a lost basket sits 30-45m from the shelter, with a real pond
+or wetland — or, where the wood has none, a generated thicket — standing
+between it and home. `E` picks it up and delivers it, same as the shelter
+door; a small HUD line tracks the distance while it's active. Mapped water
+also blocks movement everywhere now, not just near the quest.
+
 ## v0.87.3
 Fix: the walking stick vanished a few hundred ms into every touch on real
 phones — the canvas never told the browser to keep touch gestures for
