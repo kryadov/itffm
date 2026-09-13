@@ -25,6 +25,52 @@ const SPRING_OFFSET_MAX = 6
 
 export type WaterKind = 'pond' | 'stream'
 
+/** Structurally identical to game/player.ts's Obstacle (a plain circle) —
+ *  see the same note in world/deadwood.ts and world/boulders.ts. Kept local
+ *  rather than imported so this stays a pure core module (CLAUDE.md's
+ *  layering table: no import from game/ here). */
+export interface WaterObstacle {
+  x: number
+  z: number
+  radius: number
+}
+
+/** Default collision radius for a water-edge circle — a little narrower than
+ *  a tree trunk's usual footprint, since a bank is a line, not a stout post. */
+const DEFAULT_WATER_OBSTACLE_RADIUS = 0.6
+
+/**
+ * Real water becomes a real physics obstacle, not just a rendered surface:
+ * `world.water` was already parsed and drawn (`buildWaterMeshes` above) but
+ * had no collision at all, so a player could walk straight through a mapped
+ * pond exactly as if it were dry ground. Sampling every vertex — and, for any
+ * edge longer than 2x `radius`, its midpoints too — into a chain of
+ * collision circles blocks a long straight bank the same way `game/
+ * player.ts`'s `stepPlayer` already blocks a tree trunk or a boulder,
+ * reusing that exact substrate instead of inventing a second one.
+ */
+export function waterObstacles(water: Vec2[][], radius = DEFAULT_WATER_OBSTACLE_RADIUS): WaterObstacle[] {
+  const obstacles: WaterObstacle[] = []
+  for (const ring of water) {
+    if (ring.length < 2) continue
+    const closed = classifyWater(ring) === 'pond'
+    const segmentCount = closed ? ring.length : ring.length - 1
+    for (let i = 0; i < segmentCount; i++) {
+      const a = ring[i]
+      const b = ring[(i + 1) % ring.length]
+      obstacles.push({ x: a.x, z: a.z, radius })
+      const len = Math.hypot(b.x - a.x, b.z - a.z)
+      const steps = Math.floor(len / (radius * 2))
+      for (let k = 1; k <= steps; k++) {
+        const t = k / (steps + 1)
+        obstacles.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, radius })
+      }
+    }
+    if (!closed) obstacles.push({ x: ring[ring.length - 1].x, z: ring[ring.length - 1].z, radius })
+  }
+  return obstacles
+}
+
 /**
  * A pond polygon, whether OSM's or the demo wood's, is roughly as wide as it
  * is long and (when it comes from OSM) closes on itself: its last node
