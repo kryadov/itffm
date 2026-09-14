@@ -4,6 +4,7 @@ import type { Vec2 } from '../../src/geo/types'
 
 const shelter = { x: 0, z: 0 }
 const flatHeight = (): number => 5
+const diamondSpot = { x: 12, y: 5, z: 8 }
 
 describe('placeQuestItem', () => {
   it('is deterministic for the same seed and inputs', () => {
@@ -58,11 +59,13 @@ describe('placeQuestItem', () => {
 
 describe('placeQuestItems', () => {
   it('is deterministic for the same seed', () => {
-    expect(placeQuestItems(7, shelter, [], flatHeight)).toEqual(placeQuestItems(7, shelter, [], flatHeight))
+    expect(placeQuestItems(7, shelter, [], flatHeight, diamondSpot)).toEqual(
+      placeQuestItems(7, shelter, [], flatHeight, diamondSpot),
+    )
   })
 
-  it('places all four items, each at a meaningfully different position', () => {
-    const placed = placeQuestItems(11, shelter, [], flatHeight)
+  it('places all five items, each at a meaningfully different position', () => {
+    const placed = placeQuestItems(11, shelter, [], flatHeight, diamondSpot)
     expect(Object.keys(placed).sort()).toEqual([...QUEST_ITEM_IDS].sort())
     const positions = QUEST_ITEM_IDS.map((id) => placed[id].position)
     for (let i = 0; i < positions.length; i++) {
@@ -73,14 +76,20 @@ describe('placeQuestItems', () => {
     }
   })
 
-  it('every item still lands 30-45m from the shelter', () => {
-    const placed = placeQuestItems(23, shelter, [], flatHeight)
+  it('every randomly-placed item still lands 30-45m from the shelter', () => {
+    const placed = placeQuestItems(23, shelter, [], flatHeight, diamondSpot)
     for (const id of QUEST_ITEM_IDS) {
+      if (id === 'diamond') continue
       const { position } = placed[id]
       const dist = Math.hypot(position.x - shelter.x, position.z - shelter.z)
       expect(dist).toBeGreaterThanOrEqual(30)
       expect(dist).toBeLessThanOrEqual(45)
     }
+  })
+
+  it('puts the diamond exactly at the given spot, with no detour obstacles', () => {
+    const placed = placeQuestItems(23, shelter, [], flatHeight, diamondSpot)
+    expect(placed.diamond).toEqual({ position: diamondSpot, obstacles: [] })
   })
 })
 

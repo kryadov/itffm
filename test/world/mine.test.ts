@@ -1,20 +1,53 @@
 import * as THREE from 'three'
-import { placeMine, mineObstacles, isInsideMine, buildMineMesh, TUNNEL_LENGTH } from '../../src/world/mine'
+import { placeMine, mineObstacles, isInsideMine, buildMineMesh, diamondSpotInMine, TUNNEL_LENGTH } from '../../src/world/mine'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
+const shelter = { x: 0, z: 0 }
+
 describe('placeMine', () => {
-  it('sits at the entrance, on the ground beneath it', () => {
+  it('sits at the mapped entrance, on the ground beneath it, when this plot has one', () => {
     const ground: ElevationProvider = { heightAt: () => 3 }
-    const m = placeMine({ x: 5, z: -2 }, ground)
+    const m = placeMine(ground, 90, 3, [], shelter, [{ x: 5, z: -2 }])
     expect(m.x).toBe(5)
     expect(m.z).toBe(-2)
     expect(m.y).toBe(3)
   })
 
+  it('ignores a mapped entrance that falls outside this plot', () => {
+    const ground: ElevationProvider = { heightAt: () => 0 }
+    const withoutMapped = placeMine(ground, 90, 3, [], shelter, [])
+    const withOffPlot = placeMine(ground, 90, 3, [], shelter, [{ x: 500, z: 500 }])
+    expect(withOffPlot.x).toBe(withoutMapped.x)
+    expect(withOffPlot.z).toBe(withoutMapped.z)
+  })
+
+  it('sites one procedurally when this plot has no mapped entrance at all', () => {
+    const ground: ElevationProvider = { heightAt: () => 0 }
+    const m = placeMine(ground, 90, 3, [], shelter, [])
+    expect(Math.abs(m.x)).toBeLessThanOrEqual(90)
+    expect(Math.abs(m.z)).toBeLessThanOrEqual(90)
+    // Not sitting on top of the shelter itself.
+    expect(Math.hypot(m.x - shelter.x, m.z - shelter.z)).toBeGreaterThan(1)
+  })
+
+  it('is deterministic for the same seed when sited procedurally', () => {
+    const ground: ElevationProvider = { heightAt: () => 0 }
+    const a = placeMine(ground, 90, 7, [], shelter, [])
+    const b = placeMine(ground, 90, 7, [], shelter, [])
+    expect(a).toEqual(b)
+  })
+
+  it('gives a different procedural spot for a different seed', () => {
+    const ground: ElevationProvider = { heightAt: () => 0 }
+    const a = placeMine(ground, 90, 1, [], shelter, [])
+    const b = placeMine(ground, 90, 2, [], shelter, [])
+    expect(a.x).not.toBe(b.x)
+  })
+
   it('bores into whichever direction actually climbs — a real slope', () => {
     // Ground rises only toward +x: a real hillside behind the entrance.
     const slope: ElevationProvider = { heightAt: (x) => x * 0.5 }
-    const m = placeMine({ x: 0, z: 0 }, slope)
+    const m = placeMine(slope, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     // heading 0 is +x — the only direction that climbs here.
     expect(Math.cos(m.heading)).toBeGreaterThan(0.9)
   })
@@ -22,14 +55,14 @@ describe('placeMine', () => {
   it('bores toward the steepest of two rising sides, not the shallow one', () => {
     // Steeper climb toward +z than +x.
     const slope: ElevationProvider = { heightAt: (x, z) => x * 0.1 + z * 0.8 }
-    const m = placeMine({ x: 0, z: 0 }, slope)
+    const m = placeMine(slope, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     expect(Math.sin(m.heading)).toBeGreaterThan(0.9)
   })
 
   it('is deterministic on perfectly flat ground', () => {
     const flat: ElevationProvider = { heightAt: () => 0 }
-    const a = placeMine({ x: 1, z: 1 }, flat)
-    const b = placeMine({ x: 1, z: 1 }, flat)
+    const a = placeMine(flat, 90, 3, [], shelter, [{ x: 1, z: 1 }])
+    const b = placeMine(flat, 90, 3, [], shelter, [{ x: 1, z: 1 }])
     expect(a.heading).toBe(b.heading)
   })
 })
@@ -37,7 +70,7 @@ describe('placeMine', () => {
 describe('mineObstacles', () => {
   it('gives obstacles on both sides of the tunnel, plus a back wall at its far end', () => {
     const flat: ElevationProvider = { heightAt: () => 0 }
-    const m = placeMine({ x: 0, z: 0 }, flat)
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     const obstacles = mineObstacles(m)
     // At heading 0 the tunnel bores along +x: every obstacle's own local x
     // (its distance along the tunnel) stays within [0, length], and z spans
@@ -52,14 +85,14 @@ describe('mineObstacles', () => {
 
   it('is deterministic', () => {
     const flat: ElevationProvider = { heightAt: () => 0 }
-    const m = placeMine({ x: 2, z: -3 }, flat)
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 2, z: -3 }])
     expect(mineObstacles(m)).toEqual(mineObstacles(m))
   })
 })
 
 describe('isInsideMine', () => {
   const flat: ElevationProvider = { heightAt: () => 0 }
-  const m = placeMine({ x: 0, z: 0 }, flat)
+  const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
 
   it('is true right at the entrance', () => {
     expect(isInsideMine(m, 0, 0)).toBe(true)
@@ -77,7 +110,7 @@ describe('isInsideMine', () => {
 describe('buildMineMesh', () => {
   it('keeps the lantern deliberately dim — the interior must read as dark without the lamp', () => {
     const flat: ElevationProvider = { heightAt: () => 0 }
-    const m = placeMine({ x: 0, z: 0 }, flat)
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     const group = buildMineMesh(m)
     let lantern: THREE.PointLight | null = null
     group.traverse((o) => {
@@ -85,5 +118,21 @@ describe('buildMineMesh', () => {
     })
     expect(lantern).not.toBeNull()
     expect(lantern!.intensity).toBeLessThan(1)
+  })
+})
+
+describe('diamondSpotInMine', () => {
+  it('sits inside the tunnel, not at or beyond the entrance', () => {
+    const flat: ElevationProvider = { heightAt: () => 0 }
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const spot = diamondSpotInMine(m)
+    expect(isInsideMine(m, spot.x, spot.z)).toBe(true)
+    expect(Math.hypot(spot.x - m.x, spot.z - m.z)).toBeGreaterThan(1)
+  })
+
+  it('is deterministic', () => {
+    const flat: ElevationProvider = { heightAt: () => 0 }
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    expect(diamondSpotInMine(m)).toEqual(diamondSpotInMine(m))
   })
 })

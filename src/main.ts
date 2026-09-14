@@ -111,15 +111,25 @@ const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
   lamp: 0xd8a04a,
   rod: 0x5a4a30,
   bike: 0x3f6db0,
+  diamond: 0xbfe8ff,
 }
 /** Which i18n key names each item's own completion message — see
- *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike. */
-const QUEST_COMPLETE_KEY: Record<QuestItemId, 'questCompleteAxe' | 'questCompleteLamp' | 'questCompleteRod' | 'questCompleteBike'> = {
+ *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike/Diamond. */
+const QUEST_COMPLETE_KEY: Record<
+  QuestItemId,
+  'questCompleteAxe' | 'questCompleteLamp' | 'questCompleteRod' | 'questCompleteBike' | 'questCompleteDiamond'
+> = {
   axe: 'questCompleteAxe',
   lamp: 'questCompleteLamp',
   rod: 'questCompleteRod',
   bike: 'questCompleteBike',
+  diamond: 'questCompleteDiamond',
 }
+/** The diamond's own pickup mesh reads as a gem, not another coloured
+ *  cylinder like the other four — the rest still share `questItemGeo`
+ *  (below), since only the diamond needs its own shape to be legible as a
+ *  trophy rather than one more errand marker. */
+const DIAMOND_GEO = new THREE.OctahedronGeometry(0.18)
 /** Below this distance the quest's HUD readout reads "near" rather than
  *  "far" — see i18n's questDistanceNear/questDistanceFar. */
 const QUEST_NEAR_RADIUS = 15
@@ -289,19 +299,23 @@ async function main(): Promise<void> {
     .filter((ring) => ring.length >= 2)
     .map((ring) => ({ ring, kind: classifyWater(ring) }))
 
-  // The wood's four quest items (see docs/superpowers/specs/2026-09-13-quest-
-  // items-design.md, extending the single fetch quest of v0.88.0): each
-  // sited deterministically from the world seed, same as everything else
-  // about this wood, so a fresh game always finds them in the same places a
-  // returning save already remembers. Recomputed on every load regardless —
-  // cheap, pure, and deterministic — so every item's own thicket/water
-  // detour obstacles are always available for the physics step below even
-  // when `save.quests` already carries their positions and states from an
-  // earlier session.
+  // The wood's five quest items (see docs/superpowers/specs/2026-09-13-quest-
+  // items-design.md, extending the single fetch quest of v0.88.0, plus the
+  // diamond added in v0.91.0): each sited deterministically from the world
+  // seed, same as everything else about this wood, so a fresh game always
+  // finds them in the same places a returning save already remembers.
+  // Recomputed on every load regardless — cheap, pure, and deterministic —
+  // so every item's own thicket/water detour obstacles are always available
+  // for the physics step below even when `save.quests` already carries
+  // their positions and states from an earlier session. The diamond's own
+  // position comes from the wood's mine (forest.diamondSpot), not this
+  // module's own RNG — see placeQuestItems's own doc comment.
   const questPlacements = placeQuestItems(
     seed + QUEST_SEED_OFFSET, forest.shelter, source.water ?? [], (x, z) => forest.ground.heightAt(x, z),
+    forest.diamondSpot,
   )
   const isFreshQuests = !save.quests
+  const isNewDiamond = !isFreshQuests && !save.quests?.diamond
   const quests: Quests = {} as Quests
   for (const id of QUEST_ITEM_IDS) {
     quests[id] = save.quests?.[id] ?? { position: questPlacements[id].position, state: 'pending' }
@@ -310,6 +324,15 @@ async function main(): Promise<void> {
     save = { ...save, quests }
     void persistSave(save)
     toast(t('questPrompt'))
+  } else if (isNewDiamond) {
+    // A save from before the diamond quest existed: it gets the same
+    // per-key fallback as any other missing quest (the loop above), but
+    // silently — `isFreshQuests`'s own toast only fires for a brand-new
+    // game, so a returning player would otherwise never learn the mine now
+    // holds something.
+    save = { ...save, quests }
+    void persistSave(save)
+    toast(t('questPromptDiamond'))
   }
 
   // Every quest item's own thicket-detour scrub — a `let`, not a `const`,
@@ -360,11 +383,17 @@ async function main(): Promise<void> {
   const questItemGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.32, 10)
   const questItemMeshes = {} as Record<QuestItemId, THREE.Mesh | null>
   function showQuestItem(id: QuestItemId): void {
+    const isDiamond = id === 'diamond'
     const mesh = new THREE.Mesh(
-      questItemGeo, new THREE.MeshStandardMaterial({ color: QUEST_ITEM_COLOR[id], roughness: 1 }),
+      isDiamond ? DIAMOND_GEO : questItemGeo,
+      new THREE.MeshStandardMaterial({
+        color: QUEST_ITEM_COLOR[id],
+        roughness: isDiamond ? 0.05 : 1,
+        metalness: isDiamond ? 0.1 : 0,
+      }),
     )
     const pos = quests[id].position
-    mesh.position.set(pos.x, pos.y + 0.16, pos.z)
+    mesh.position.set(pos.x, pos.y + (isDiamond ? 0.2 : 0.16), pos.z)
     forest.scene.add(mesh)
     questItemMeshes[id] = mesh
   }
@@ -372,8 +401,18 @@ async function main(): Promise<void> {
     questItemMeshes[id]?.removeFromParent()
     questItemMeshes[id] = null
   }
+  // Three of the five items leave a trophy visible at the shelter once
+  // delivered (world/shelter.ts's own setters) — the hatchet and lamp don't,
+  // since their own abilities (choppable scrub, the carried light) are
+  // already the visible proof they're owned.
+  const TROPHY_SETTER: Partial<Record<QuestItemId, (on: boolean) => void>> = {
+    diamond: forest.setDiamondPlaced,
+    rod: forest.setRodPlaced,
+    bike: forest.setBikePlaced,
+  }
   for (const id of QUEST_ITEM_IDS) {
     if (quests[id].state === 'pending') showQuestItem(id)
+    if (quests[id].state === 'done') TROPHY_SETTER[id]?.(true)
   }
 
   /**
@@ -395,7 +434,10 @@ async function main(): Promise<void> {
       if (quests[id].state === before) continue
       changed = true
       if (before === 'pending') hideQuestItem(id)
-      if (quests[id].state === 'done') toast(t(QUEST_COMPLETE_KEY[id]))
+      if (quests[id].state === 'done') {
+        toast(t(QUEST_COMPLETE_KEY[id]))
+        TROPHY_SETTER[id]?.(true)
+      }
     }
     if (!changed) return false
     save = { ...save, quests }
@@ -887,6 +929,7 @@ async function main(): Promise<void> {
       flashlightOn = !flashlightOn
       forest.setFlashlight(flashlightOn)
     }
+    if (e.code === 'KeyL' && quests.lamp.state === 'done') lampOn = !lampOn
     if (e.code === 'F3') {
       debugEnabled = !debugEnabled
       ensureDebugEl().hidden = !debugEnabled
@@ -905,6 +948,11 @@ async function main(): Promise<void> {
   // Off at the start of every walk — a session preference, not a saved one:
   // there is no reason a flashlight left on should surprise the next visit.
   let flashlightOn = false
+  // On by default once owned, matching the lamp's old always-automatic
+  // behaviour — `L` is a manual override on top of `lampIsOn`'s own
+  // day/night/mine rule, not a replacement for it, and resets to on at the
+  // start of every walk the same way the flashlight resets to off.
+  let lampOn = true
   const camDir = new THREE.Vector3()
   renderer.setAnimationLoop(() => {
     const now = performance.now()
@@ -980,7 +1028,7 @@ async function main(): Promise<void> {
     const clockT = timeFor(save.prefs.timeMode, cycleT)
     forest.updateDayNight(clockT, camera.position)
     forest.updatePlayerLamp(
-      lampIsOn(quests.lamp.state === 'done', nightFactor(clockT), forest.playerInsideMine(player.x, player.z)),
+      lampIsOn(quests.lamp.state === 'done', nightFactor(clockT), forest.playerInsideMine(player.x, player.z), lampOn),
       camera.position,
     )
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)

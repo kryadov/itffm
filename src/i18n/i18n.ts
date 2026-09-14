@@ -120,13 +120,15 @@ export const RU = {
   notePlaceholder: 'Своя заметка…',
   exportEncyclopedia: 'Экспорт картинкой',
   questPrompt:
-    'В лесу потеряны четыре вещи — топор, лампа, удочка и велосипед. Найдите их и отнесите домой: каждая даст что-то полезное.',
+    'В лесу потеряны пять вещей — топор, лампа, удочка, велосипед и бриллиант в старой штольне. Найдите их и отнесите домой: четыре дадут что-то полезное, бриллиант просто стоит того, чтобы его найти.',
+  questPromptDiamond: 'В старой штольне блеснуло что-то новое — бриллиант, брошенный кем-то давным-давно.',
   questDistanceFar: 'далеко',
   questDistanceNear: 'близко',
   questCompleteAxe: 'Топор дома — теперь можно расчищать заросли.',
   questCompleteLamp: 'Лампа дома — она загорится в темноте и в шахте.',
   questCompleteRod: 'Удочка дома — теперь можно ловить рыбу.',
   questCompleteBike: 'Велосипед дома — на тропах теперь можно ехать быстрее.',
+  questCompleteDiamond: 'Бриллиант дома — теперь он лежит на столе.',
   lang: 'EN',
 } as const
 
@@ -244,13 +246,15 @@ export const EN: Record<keyof typeof RU, string> = {
   notePlaceholder: 'Your own note…',
   exportEncyclopedia: 'Export as an image',
   questPrompt:
-    'Four things are lost in the wood — a hatchet, a lamp, a fishing rod and a bicycle. Find them and bring them home: each one unlocks something useful.',
+    'Five things are lost in the wood — a hatchet, a lamp, a fishing rod, a bicycle, and a diamond in the old mine. Find them and bring them home: four unlock something useful, and the diamond is just worth having.',
+  questPromptDiamond: 'Something new glints in the old mine — a diamond, left there long ago.',
   questDistanceFar: 'far',
   questDistanceNear: 'near',
   questCompleteAxe: 'The hatchet is home — you can clear scrub now.',
   questCompleteLamp: 'The lamp is home — it will light up in the dark and inside mines.',
   questCompleteRod: 'The fishing rod is home — you can catch fish now.',
   questCompleteBike: 'The bicycle is home — you move faster on paths now.',
+  questCompleteDiamond: 'The diamond is home — it sits on the table now.',
   lang: 'RU',
 }
 

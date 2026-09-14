@@ -6,6 +6,17 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.91.0
+A fifth quest item: a diamond, sitting in the wood's own mine — every wood
+now has one (the mine's entrance is sited procedurally when no real cave/
+adit/mineshaft was surveyed there, the same way the shelter already is),
+not only the ones OSM happened to map. Unlike the other four, the diamond
+unlocks nothing — it's a trophy that ends up on the shelter's own table once
+delivered. The fishing rod and bicycle now leave a trophy of their own too,
+the rod leaned by the table and the bike parked outside by the door. The
+carried lamp can be switched off and back on with `L`, on top of its usual
+automatic day/night/mine rule.
+
 ## v0.90.0
 Default language is English now, matching how most players will first meet
 the game — a fresh save no longer starts in Russian. The title screen also

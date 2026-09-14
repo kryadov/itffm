@@ -1,4 +1,6 @@
 import * as THREE from 'three'
+import { findOpenSpot, type Circle } from '../util/openSpot'
+import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Vec2 } from '../geo/types'
 
@@ -31,6 +33,14 @@ const WALL_THICKNESS = 0.15
 const HEADING_SAMPLE_DIST = 8
 const HEADING_CANDIDATES = 12
 
+/** How far the procedurally-sited entrance needs from anything already
+ *  standing, metres — the tunnel's own length, a rough stand-in for its
+ *  whole 6x2.2m footprint along whichever heading it ends up boring (the
+ *  heading itself is only known after the entrance point is picked, so this
+ *  can only protect the mouth, not the full bore — the same simplification
+ *  `world/shelter.ts`'s own SHELTER_CLEARANCE already accepts). */
+const MINE_CLEARANCE = TUNNEL_LENGTH
+
 /** Spacing of the small circles standing in for the tunnel's real (thin,
  *  straight) walls in the player's own circle-based collision — the same
  *  technique `world/shelter.ts`'s `wallObstacles` uses, close enough
@@ -39,34 +49,62 @@ const WALL_CIRCLE_SPACING = 0.3
 const WALL_CIRCLE_RADIUS = 0.16
 
 /**
- * Where the wood's one mine/cave interior sits — one per real OSM
- * cave/adit/mineshaft mouth (`geo/parse.ts`'s `CaveEntrance`). Unlike the
- * shelter, there is no procedural fallback siting one in open woods: a
- * tunnel dug at an arbitrary point would not mean anything the way a hut in
- * a clearing does. A real entrance is what makes this honest, so it only
- * ever exists where one was actually surveyed.
+ * Where the wood's one mine/cave interior sits. A real OSM cave/adit/
+ * mineshaft mouth (`geo/parse.ts`'s `CaveEntrance`, `mapped` here) always
+ * wins when this plot has one — the same rule `world/shelter.ts`'s
+ * `placeShelter` already follows for a mapped hut. Every wood gets a mine
+ * either way now (a live request, 2026-09-15: the diamond quest item needs
+ * somewhere to be in every wood, not only the ones a surveyor happened to
+ * map a real entrance in) — where nothing was surveyed, the entrance is
+ * sited the same way the shelter and campfire already are: a random
+ * direction from the shelter, `findOpenSpot` keeping it clear of everything
+ * else already standing.
  *
- * OSM never records which way a mapped entrance faces, so the heading is
- * read off the terrain itself rather than guessed or seeded: whichever of a
- * ring of candidate directions climbs the most over `HEADING_SAMPLE_DIST`
- * is treated as "into the hillside" — the same thing a real visitor would
- * look for.
+ * OSM never records which way a mapped entrance faces, and a procedural one
+ * has no such record either, so the heading is always read off the terrain
+ * itself rather than guessed or seeded: whichever of a ring of candidate
+ * directions climbs the most over `HEADING_SAMPLE_DIST` is treated as "into
+ * the hillside" — the same thing a real visitor would look for, and no
+ * worse an approximation on a procedurally-sited mouth than a mapped one,
+ * since neither ever carried a real heading to begin with.
  */
-export function placeMine(entrance: Vec2, ground: ElevationProvider): Mine {
-  const here = ground.heightAt(entrance.x, entrance.z)
+export function placeMine(
+  ground: ElevationProvider,
+  halfSize: number,
+  seed: number,
+  obstacles: Circle[],
+  shelterPos: Vec2,
+  mapped: Vec2[] = [],
+): Mine {
+  const real = mapped.find((m) => Math.abs(m.x) <= halfSize && Math.abs(m.z) <= halfSize)
+  let x: number
+  let z: number
+  if (real) {
+    x = real.x
+    z = real.z
+  } else {
+    const rng = mulberry32(seed)
+    const angle = rng() * Math.PI * 2
+    const dist = halfSize * (0.25 + rng() * 0.4)
+    const clamp = (v: number): number => Math.max(-halfSize, Math.min(halfSize, v))
+    const origin = { x: clamp(shelterPos.x + Math.cos(angle) * dist), z: clamp(shelterPos.z + Math.sin(angle) * dist) }
+    ;({ x, z } = findOpenSpot(obstacles, halfSize, origin, MINE_CLEARANCE))
+  }
+
+  const here = ground.heightAt(x, z)
   let bestHeading = 0
   let bestRise = -Infinity
   for (let i = 0; i < HEADING_CANDIDATES; i++) {
     const heading = (i / HEADING_CANDIDATES) * Math.PI * 2
-    const sx = entrance.x + Math.cos(heading) * HEADING_SAMPLE_DIST
-    const sz = entrance.z + Math.sin(heading) * HEADING_SAMPLE_DIST
+    const sx = x + Math.cos(heading) * HEADING_SAMPLE_DIST
+    const sz = z + Math.sin(heading) * HEADING_SAMPLE_DIST
     const rise = ground.heightAt(sx, sz) - here
     if (rise > bestRise) {
       bestRise = rise
       bestHeading = heading
     }
   }
-  return { x: entrance.x, z: entrance.z, y: here, heading: bestHeading }
+  return { x, z, y: here, heading: bestHeading }
 }
 
 /**
@@ -113,6 +151,15 @@ export function mineObstacles(m: Mine): CircleObstacle[] {
   }
 
   return out
+}
+
+/** Where the diamond quest item sits: near the back of the tunnel, off to
+ *  one side of the lantern (`buildMineMesh` puts that at local
+ *  `(TUNNEL_LENGTH * 0.75, ..., 0)`) rather than dead-centre in its light —
+ *  found the same way as everything else back there, not lit for you. */
+export function diamondSpotInMine(m: Mine): { x: number; y: number; z: number } {
+  const { x, z } = localToWorld(m, TUNNEL_LENGTH * 0.85, TUNNEL_WIDTH * 0.28)
+  return { x, y: m.y, z }
 }
 
 /**

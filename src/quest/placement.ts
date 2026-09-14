@@ -1,6 +1,12 @@
 import { mulberry32, randRange, hashString } from '../util/rng'
-import { QUEST_ITEM_IDS, type QuestItemId } from './types'
+import type { QuestItemId } from './types'
 import type { Vec2 } from '../geo/types'
+
+/** The four quest items placed randomly 30-45m from the shelter, each with
+ *  its own water/thicket detour — the diamond is deliberately not here (see
+ *  `placeQuestItems`'s own doc comment): its position comes from the mine
+ *  instead, not this module's own RNG. */
+const FETCH_QUEST_ITEM_IDS: QuestItemId[] = ['axe', 'lamp', 'rod', 'bike']
 
 /** Structurally identical to game/player.ts's Obstacle (a plain circle) —
  *  kept local, same reasoning as world/water.ts's own WaterObstacle: this
@@ -154,23 +160,30 @@ export function placeQuestItem(
 }
 
 /**
- * Places all four quest items from one world seed, each getting its own
- * derived seed (`seed + hashString(id)`, folded into 32 bits the same way
- * `mulberry32` itself already truncates its own input) so the four never
- * draw from the same random stream and never collide — same shape as
- * `world/railway.ts`'s own small fixed seed offsets, just derived from the
- * item id instead of a hand-picked integer, since there are four of them.
+ * Places the four randomly-sited quest items from one world seed, each
+ * getting its own derived seed (`seed + hashString(id)`, folded into 32 bits
+ * the same way `mulberry32` itself already truncates its own input) so the
+ * four never draw from the same random stream and never collide — same
+ * shape as `world/railway.ts`'s own small fixed seed offsets, just derived
+ * from the item id instead of a hand-picked integer, since there are four of
+ * them. The fifth item, the diamond, is not part of this RNG at all: its
+ * position is wherever the wood's own mine put it (`world/mine.ts`'s
+ * diamond spot), passed in as `diamondSpot` rather than rolled here — it
+ * gets no thicket/water detour of its own, since the mine's tunnel is
+ * already its own obstacle.
  */
 export function placeQuestItems(
   seed: number,
   shelterPos: { x: number; z: number },
   water: Vec2[][],
   heightAt: (x: number, z: number) => number,
+  diamondSpot: { x: number; y: number; z: number },
 ): Record<QuestItemId, { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] }> {
   const result = {} as Record<QuestItemId, ReturnType<typeof placeQuestItem>>
-  for (const id of QUEST_ITEM_IDS) {
+  for (const id of FETCH_QUEST_ITEM_IDS) {
     const itemSeed = (seed + hashString(id)) >>> 0
     result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt, id)
   }
+  result.diamond = { position: diamondSpot, obstacles: [] }
   return result
 }

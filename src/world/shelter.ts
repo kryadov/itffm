@@ -35,7 +35,7 @@ const SHELTER_RADIUS = 2.5
 // (interior furniture positions, roof span, wall-panel geometry) is a
 // formula off them already, so it stays in proportion without its own edit.
 const WIDTH = 3.6
-const DEPTH = 3.1
+export const DEPTH = 3.1
 // A live report (2026-09-09) found the hut reading as toy-sized, with the
 // player's own eye level (game/player.ts's STAND_EYE, 1.65m) sitting above
 // the door — the old 1.7m wall was barely taller than the player, let alone
@@ -58,7 +58,7 @@ export const FOUNDATION_DEPTH = 0.8
 // A real human doorway, not the 0.7x1.25m child-sized slab a live report
 // (2026-09-09) caught — that made the player's own eye level sit above the
 // door entirely, part of the same "toy house" bug as the wall height above.
-const DOOR_WIDTH = 1.1
+export const DOOR_WIDTH = 1.1
 const DOOR_HEIGHT = 2.2
 
 /** Spacing of the small circles standing in for a real (thin, straight) wall
@@ -222,6 +222,15 @@ const TABLE_OBSTACLE_RADIUS = 0.4
 const PAINTING_X = -0.7
 const PAINTING_Y = 1.55
 const PAINTING_Z = DEPTH / 2 - WALL_THICKNESS - 0.02
+/** Just to the wall side of the table, along the same wall it already hugs
+ *  — reads as "leaned there in passing", not centred like the cup/lamp are
+ *  on the table itself. */
+const ROD_X = -(WIDTH / 2 - WALL_THICKNESS - 0.05)
+const ROD_Z = TABLE_Z - TABLE_SIZE / 2 - 0.35
+/** Outside the front wall, clear of the doorway — a bike parked by the door
+ *  the way one actually would be, not blocking it. */
+const BIKE_X = DOOR_WIDTH / 2 + 0.55
+const BIKE_Z = -(DEPTH / 2 + 0.32)
 
 /** The bed and table a player can actually bump into — the painting (flat
  *  against the wall) and the cup (a few centimetres, on the table) need
@@ -255,6 +264,15 @@ export interface ShelterFx {
   /** Swings the door and flips `doorObstacle`'s own radius so the player can
    *  actually walk through once it is open. */
   toggleDoor(): void
+  /** Shows/hides the diamond quest item's trophy, resting on the table —
+   *  built once (below) and only toggled, the same "always built, visibility
+   *  flips" approach the door's own leaf already uses, rather than adding
+   *  and removing a mesh from the scene graph on delivery. */
+  setDiamondPlaced(on: boolean): void
+  /** Shows/hides the fishing rod, leaned against the wall by the table. */
+  setRodPlaced(on: boolean): void
+  /** Shows/hides the bicycle, parked outside against the front wall. */
+  setBikePlaced(on: boolean): void
 }
 
 /**
@@ -429,8 +447,86 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   lamp.position.set(-0.14, 0, 0.1)
   table.add(lamp)
 
+  // The diamond quest's own trophy — opposite corner from the cup and clear
+  // of the lamp, so it reads as set down there rather than colliding with
+  // either. Hidden until the quest delivers it (setDiamondPlaced, below);
+  // built once regardless, the same "always built, toggled" choice the
+  // door's own leaf already made.
+  const diamond = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.045),
+    new THREE.MeshStandardMaterial({
+      color: 0xdff6ff, roughness: 0.05, metalness: 0.1, emissive: 0x9fd8e0, emissiveIntensity: 0.15,
+    }),
+  )
+  diamond.name = 'diamond'
+  diamond.position.set(0.14, tableHeight + 0.02 + 0.045, 0.09)
+  diamond.visible = false
+  table.add(diamond)
+
   table.position.set(TABLE_X, 0, TABLE_Z)
   group.add(table)
+
+  // The fishing rod — leaned against the wall the table already hugs, tilted
+  // a few degrees so its top rests on the wall rather than floating clear of
+  // it. Hidden until the rod quest delivers it.
+  const rod = new THREE.Group()
+  rod.name = 'rod'
+  const rodMat = new THREE.MeshStandardMaterial({ color: 0x5a4a30, roughness: 0.7 })
+  const rodPole = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 1.5, 8), rodMat)
+  rodPole.position.y = 0.75
+  rod.add(rodPole)
+  const reelMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.5, metalness: 0.4 })
+  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10), reelMat)
+  reel.rotation.z = Math.PI / 2
+  reel.position.set(0, 0.22, 0.015)
+  rod.add(reel)
+  // Tilts the top toward the wall (local -x, where this hut's left wall
+  // sits) just enough that a 1.5m pole standing on its own base actually
+  // touches it, rather than leaning at an angle that visibly clears it.
+  rod.rotation.z = Math.PI * 0.06
+  rod.position.set(ROD_X, 0, ROD_Z)
+  rod.visible = false
+  group.add(rod)
+
+  // The bicycle — parked outside by the door, not ridden or mounted (see
+  // docs/superpowers/specs/2026-09-13-quest-items-design.md's own decision
+  // on the bike being a passive stat). Two wheels, a frame and a handlebar,
+  // flat primitives only, same as everything else this project draws.
+  const bike = new THREE.Group()
+  bike.name = 'bike'
+  const bikeMat = new THREE.MeshStandardMaterial({ color: 0x2f5f9e, roughness: 0.5, metalness: 0.3 })
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 })
+  const wheelRadius = 0.33
+  const wheelGeo = new THREE.TorusGeometry(wheelRadius, 0.025, 8, 20)
+  const wheelSpan = 0.62
+  for (const wx of [-wheelSpan / 2, wheelSpan / 2]) {
+    const wheel = new THREE.Mesh(wheelGeo, wheelMat)
+    wheel.rotation.y = Math.PI / 2
+    wheel.position.set(wx, wheelRadius, 0)
+    bike.add(wheel)
+  }
+  const frameGeoBike = new THREE.CylinderGeometry(0.014, 0.014, wheelSpan * 0.72, 6)
+  const crossBar = new THREE.Mesh(frameGeoBike, bikeMat)
+  crossBar.rotation.z = Math.PI / 2
+  crossBar.position.set(0, wheelRadius * 1.35, 0)
+  bike.add(crossBar)
+  const seatPost = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 6), bikeMat)
+  seatPost.position.set(-wheelSpan / 2 + 0.05, wheelRadius * 1.35 + 0.16, 0)
+  bike.add(seatPost)
+  const forkPost = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), bikeMat)
+  forkPost.rotation.z = -Math.PI * 0.12
+  forkPost.position.set(wheelSpan / 2 - 0.04, wheelRadius * 1.55, 0)
+  bike.add(forkPost)
+  const handlebar = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.3, 6), bikeMat)
+  handlebar.rotation.x = Math.PI / 2
+  handlebar.position.set(wheelSpan / 2 + 0.02, wheelRadius * 1.35 + 0.19, 0)
+  bike.add(handlebar)
+  // Leaned a few degrees, not standing perfectly upright — an unridden bike
+  // propped on its own kickstand always sits a little off true.
+  bike.rotation.z = -Math.PI * 0.05
+  bike.position.set(BIKE_X, 0, BIKE_Z)
+  bike.visible = false
+  group.add(bike)
 
   // A small painted scene on the back wall — the whole project draws without
   // pictures (see CLAUDE.md's Conventions), so this is a handful of flat
@@ -730,6 +826,15 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
       // a player pressing E to walk in should never feel blocked by a door
       // that reads as already open.
       doorObstacleObj.radius = doorOpen ? 0 : DOOR_CLOSED_RADIUS
+    },
+    setDiamondPlaced: (on: boolean) => {
+      diamond.visible = on
+    },
+    setRodPlaced: (on: boolean) => {
+      rod.visible = on
+    },
+    setBikePlaced: (on: boolean) => {
+      bike.visible = on
     },
   }
 }

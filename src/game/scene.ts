@@ -27,7 +27,7 @@ import {
 import { collectScatterCullers, sweepAll } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
-import { placeMine, mineObstacles, buildMineMesh, isInsideMine, type Mine } from '../world/mine'
+import { placeMine, mineObstacles, buildMineMesh, isInsideMine, diamondSpotInMine, type Mine } from '../world/mine'
 import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
@@ -152,13 +152,22 @@ export interface Forest {
    *  every frame while it is on. */
   updateFlashlight: (camPos: THREE.Vector3, camDir: THREE.Vector3) => void
   /** Whether (x, z) is close enough to this wood's own mine entrance to
-   *  count as "inside" it, for the lamp's own on/off rule — false when this
-   *  wood has no mine at all. */
+   *  count as "inside" it, for the lamp's own on/off rule. Every wood has a
+   *  mine now (world/mine.ts's own procedural fallback), so this is never
+   *  vacuously false the way it was before that existed. */
   playerInsideMine: (x: number, z: number) => boolean
+  /** Where the diamond quest item sits, inside the wood's own mine. */
+  diamondSpot: { x: number; y: number; z: number }
   /** Turns the lamp quest's own PointLight on or off and keeps it at the
    *  player's position — call every frame with whatever `quest/lamp.ts`'s
    *  `lampIsOn` decided this frame. */
   updatePlayerLamp: (on: boolean, pos: THREE.Vector3) => void
+  /** Shows/hides each delivered quest item's own trophy at the shelter —
+   *  the diamond on the table, the rod leaned by it, the bike parked
+   *  outside — see world/shelter.ts's own setters. */
+  setDiamondPlaced: (on: boolean) => void
+  setRodPlaced: (on: boolean) => void
+  setBikePlaced: (on: boolean) => void
   /** Drifts the shelter's chimney smoke — call every frame. */
   updateShelter: (dt: number) => void
   /** Drifts the campfire's smoke and flickers its embers — call every frame. */
@@ -407,18 +416,20 @@ export function createForest(
     extraObstacles.push(fisherHutObstacle(fisherHut))
   }
 
-  // A mine/cave interior, but only where a surveyor actually found one — see
-  // world/mine.ts's own doc comment for why there is no procedural fallback.
-  // In range of the loaded plot at all: OSM's own query area is not the same
-  // shape as this circle, same filter world/shelter.ts's `mapped` uses.
-  const caveEntrance = (source.caves ?? []).find((c) => Math.abs(c.x) <= halfSize && Math.abs(c.z) <= halfSize)
-  let mine: Mine | null = null
-  if (caveEntrance) {
-    mine = placeMine(caveEntrance, source.ground)
-    scene.add(buildMineMesh(mine))
-    extraObstacles.push(...mineObstacles(mine))
-  }
-  const playerInsideMine = (x: number, z: number): boolean => (mine ? isInsideMine(mine, x, z) : false)
+  // A mine/cave interior — a real OSM cave/adit/mineshaft mouth wins when
+  // this plot has one (world/mine.ts's own `mapped` filters it to this
+  // plot's bounds, the same "in range of the loaded plot" check
+  // world/shelter.ts's `mapped` already does), otherwise `placeMine` sites
+  // one itself. Every wood gets a mine now — the diamond quest item needs
+  // somewhere to be regardless of what OSM happened to survey here.
+  const mine: Mine = placeMine(
+    source.ground, halfSize, seed + 32, [...treeCircles, ...extraObstacles, shelterFootprint], shelter,
+    source.caves ?? [],
+  )
+  scene.add(buildMineMesh(mine))
+  extraObstacles.push(...mineObstacles(mine))
+  const playerInsideMine = (x: number, z: number): boolean => isInsideMine(mine, x, z)
+  const diamondSpot = diamondSpotInMine(mine)
 
   // The lamp quest's own ability: a PointLight that follows the player,
   // toggled by `main.ts` (via `quest/lamp.ts`'s pure `lampIsOn`) rather than
@@ -529,7 +540,10 @@ export function createForest(
     campfire: { x: campfire.x, z: campfire.z },
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
-    setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, updatePlayerLamp,
+    setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
+    setDiamondPlaced: (on: boolean) => shelterFx!.setDiamondPlaced(on),
+    setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
+    setBikePlaced: (on: boolean) => shelterFx!.setBikePlaced(on),
     updateShelter, updateCampfire, updateBirds,
     birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
     updateMushroomLod, updateScatterCulling,

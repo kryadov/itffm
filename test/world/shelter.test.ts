@@ -9,6 +9,8 @@ import {
   doorPosition,
   DOOR_INTERACT_RADIUS,
   FOUNDATION_DEPTH,
+  DEPTH,
+  DOOR_WIDTH,
 } from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import { stepPlayer, type PlayerState } from '../../src/game/player'
@@ -357,5 +359,46 @@ describe('buildShelterMesh — furniture', () => {
         .map((c) => (c.material as THREE.MeshBasicMaterial | THREE.MeshStandardMaterial).color.getHex()),
     )
     expect(colors.size).toBeGreaterThan(2)
+  })
+})
+
+describe('buildShelterMesh — quest trophies', () => {
+  const s = { x: 0, z: 0, y: 0, rotationY: 0 }
+
+  it('builds the diamond, rod and bike hidden by default', () => {
+    const { group } = buildShelterMesh(s)
+    expect(group.getObjectByName('diamond')?.visible).toBe(false)
+    expect(group.getObjectByName('rod')?.visible).toBe(false)
+    expect(group.getObjectByName('bike')?.visible).toBe(false)
+  })
+
+  it('shows and hides each one independently of the others', () => {
+    const { group, setDiamondPlaced, setRodPlaced, setBikePlaced } = buildShelterMesh(s)
+    setDiamondPlaced(true)
+    expect(group.getObjectByName('diamond')?.visible).toBe(true)
+    expect(group.getObjectByName('rod')?.visible).toBe(false)
+    expect(group.getObjectByName('bike')?.visible).toBe(false)
+    setRodPlaced(true)
+    setBikePlaced(true)
+    expect(group.getObjectByName('rod')?.visible).toBe(true)
+    expect(group.getObjectByName('bike')?.visible).toBe(true)
+    setDiamondPlaced(false)
+    expect(group.getObjectByName('diamond')?.visible).toBe(false)
+  })
+
+  it('puts the diamond on the table, not loose in the room', () => {
+    const { group } = buildShelterMesh(s)
+    const table = group.getObjectByName('table')
+    const diamond = group.getObjectByName('diamond')
+    expect(diamond?.parent).toBe(table)
+  })
+
+  it('parks the bike outside the hut, clear of the doorway', () => {
+    const { group } = buildShelterMesh(s)
+    const bike = group.getObjectByName('bike')!
+    // Outside the DEPTH/2 front wall (z < -DEPTH/2), and off to the side of
+    // the door rather than centred on it.
+    expect(bike.position.z).toBeLessThan(-DEPTH / 2)
+    expect(Math.abs(bike.position.x)).toBeGreaterThan(DOOR_WIDTH / 2)
   })
 })
