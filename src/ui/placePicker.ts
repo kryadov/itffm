@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { t, getLang } from '../i18n/i18n'
+import { t, getLang, setLang, type Lang } from '../i18n/i18n'
 import { POPULAR_PLACES } from './popularPlaces'
 import { WORLD_SIZES, DEFAULT_WORLD_SIZE } from './worldSize'
 import { buildCollectible } from '../collectible/build'
@@ -17,7 +17,10 @@ declare const __APP_VERSION__: string
  * text itself stays in English regardless of interface language, matching how
  * most software credits its data sources.
  */
-export function openPlacePicker(onPick: (query: string | null, halfSize: number) => void): void {
+export function openPlacePicker(
+  onPick: (query: string | null, halfSize: number) => void,
+  onLangChange?: (lang: Lang) => void,
+): void {
   const overlay = document.createElement('div')
   overlay.id = 'place-picker'
   overlay.dataset.modal = 'true'
@@ -30,7 +33,14 @@ export function openPlacePicker(onPick: (query: string | null, halfSize: number)
       `<option value="${o.id}" ${o.id === DEFAULT_WORLD_SIZE.id ? 'selected' : ''}>${getLang() === 'ru' ? o.ru : o.en}</option>`,
   ).join('')
 
+  const btnStyle = (active: boolean): string =>
+    `padding:5px 12px;border-radius:6px;border:1px solid #444;cursor:pointer;font-size:13px;color:#eee;background:${active ? '#3d5a2f' : '#1a201a'}`
+
   overlay.innerHTML = `
+    <div style="position:fixed;top:10px;right:10px;display:flex;gap:8px">
+      <button id="place-lang-ru" style="${btnStyle(getLang() === 'ru')}">RU</button>
+      <button id="place-lang-en" style="${btnStyle(getLang() === 'en')}">EN</button>
+    </div>
     <h1 style="margin:0;font-size:28px">itffm</h1>
     <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">${t('placeIntro')}</p>
     <input id="place-input" type="text" placeholder="${t('placePlaceholder')}"
@@ -51,6 +61,20 @@ export function openPlacePicker(onPick: (query: string | null, halfSize: number)
     <div style="position:fixed;left:8px;bottom:2px;font-size:10px;text-shadow:0 1px 2px #000;opacity:.35;pointer-events:none">v${__APP_VERSION__}</div>`
 
   document.getElementById('ui')!.appendChild(overlay)
+
+  // The template above is one `innerHTML` block baked with the current
+  // language (sizeOptions, popular-place names), so switching languages here
+  // re-renders the whole screen rather than repainting labels in place like
+  // the settings menu does — simpler, and this is the first screen a player
+  // sees, so there is no typed state worth preserving across the switch.
+  const switchLang = (lang: Lang): void => {
+    setLang(lang)
+    onLangChange?.(lang)
+    overlay.remove()
+    openPlacePicker(onPick, onLangChange)
+  }
+  overlay.querySelector('#place-lang-ru')!.addEventListener('click', () => switchLang('ru'))
+  overlay.querySelector('#place-lang-en')!.addEventListener('click', () => switchLang('en'))
 
   const input = overlay.querySelector<HTMLInputElement>('#place-input')!
   const sizeInput = overlay.querySelector<HTMLSelectElement>('#place-size')!

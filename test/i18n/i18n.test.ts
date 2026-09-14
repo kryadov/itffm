@@ -3,8 +3,8 @@ import { speciesById } from '../../src/species/load'
 import { EDIBILITY, SUBSTRATE, HYMENIUM } from '../../src/species/schema'
 
 describe('i18n', () => {
-  it('defaults to Russian', () => {
-    expect(getLang()).toBe('ru')
+  it('defaults to English', () => {
+    expect(getLang()).toBe('en')
   })
 
   it('switches language', () => {

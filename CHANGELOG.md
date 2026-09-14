@@ -6,6 +6,12 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.90.0
+Default language is English now, matching how most players will first meet
+the game — a fresh save no longer starts in Russian. The title screen also
+gets its own RU/EN switch, top-right, so a player doesn't have to start the
+game and open settings just to change it.
+
 ## v0.89.0
 Four more quest items alongside the lost basket: a hatchet, a lamp, a
 fishing rod and a bicycle, each placed and delivered the same way, each

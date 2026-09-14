@@ -254,7 +254,7 @@ export const EN: Record<keyof typeof RU, string> = {
   lang: 'RU',
 }
 
-let current: Lang = 'ru'
+let current: Lang = 'en'
 
 export function setLang(l: Lang): void {
   current = l

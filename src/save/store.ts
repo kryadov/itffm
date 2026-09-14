@@ -106,7 +106,7 @@ const STORE = 'save'
 const KEY = 'current'
 
 export function emptySave(): SaveData {
-  return { discovered: [], finds: [], lang: 'ru', prefs: defaultPrefs(), calendarStart: Date.now() }
+  return { discovered: [], finds: [], lang: 'en', prefs: defaultPrefs(), calendarStart: Date.now() }
 }
 
 /** Applies a find. Returns a new object and leaves the old one untouched. */

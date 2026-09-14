@@ -162,7 +162,13 @@ async function main(): Promise<void> {
   const [query, pickedHalfSize] = window.__BOOTCHECK
     ? [null, DEFAULT_WORLD_SIZE.halfSize]
     : await new Promise<[string | null, number]>((resolve) =>
-        openPlacePicker((q, hs) => resolve([q, hs])),
+        openPlacePicker(
+          (q, hs) => resolve([q, hs]),
+          (lang) => {
+            save = { ...save, lang }
+            void persistSave(save)
+          },
+        ),
       )
 
   // The click that just picked a place is the only user gesture Pointer Lock
