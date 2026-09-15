@@ -280,13 +280,25 @@ export function mineObstacles(m: Mine): CircleObstacle[] {
   return out
 }
 
-/** Where the diamond quest item sits: near the back of the tunnel, off to
- *  one side of the lantern (`buildMineMesh` puts that at local
- *  `(TUNNEL_LENGTH * 0.75, ..., 0)`) rather than dead-centre in its light —
- *  found the same way as everything else back there, not lit for you. */
+/** Where the diamond quest item sits: near the far end of the one leaf
+ *  marked `isDiamondChamber` (`buildMineGraph`), off to one side rather than
+ *  dead-centre — found the same way as everything else back there, not lit
+ *  for you. */
 export function diamondSpotInMine(m: Mine): { x: number; y: number; z: number } {
-  const { x, z } = localToWorld(m, TUNNEL_LENGTH * 0.85, TUNNEL_WIDTH * 0.28)
-  return { x, y: m.y, z }
+  const chamber = m.segments.find((s) => s.isDiamondChamber)!
+  const dx = chamber.x1 - chamber.x0
+  const dz = chamber.z1 - chamber.z0
+  const length = Math.hypot(dx, dz) || 1
+  const dirX = dx / length
+  const dirZ = dz / length
+  const perpX = -dirZ
+  const perpZ = dirX
+  const along = length * 0.85
+  const across = chamber.width * 0.28
+  const lx = chamber.x0 + dirX * along + perpX * across
+  const lz = chamber.z0 + dirZ * along + perpZ * across
+  const { x, z } = localToWorld(m, lx, lz)
+  return { x, y: m.y + chamber.y1, z }
 }
 
 /**

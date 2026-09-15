@@ -187,16 +187,27 @@ describe('buildMineMesh', () => {
 })
 
 describe('diamondSpotInMine', () => {
-  it('sits inside the tunnel, not at or beyond the entrance', () => {
-    const flat: ElevationProvider = { heightAt: () => 0 }
+  const flat: ElevationProvider = { heightAt: () => 0 }
+
+  it('sits inside the cave, not at or beyond the entrance', () => {
     const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     const spot = diamondSpotInMine(m)
     expect(isInsideMine(m, spot.x, spot.z)).toBe(true)
     expect(Math.hypot(spot.x - m.x, spot.z - m.z)).toBeGreaterThan(1)
   })
 
+  it('sits in the segment marked as the diamond chamber', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const chamber = m.segments.find((s) => s.isDiamondChamber)!
+    const spot = diamondSpotInMine(m)
+    // heading is 0 in this fixture, so world == local here.
+    const alongChamber = Math.hypot(spot.x - chamber.x0, spot.z - chamber.z0)
+    const chamberLength = Math.hypot(chamber.x1 - chamber.x0, chamber.z1 - chamber.z0)
+    expect(alongChamber).toBeLessThanOrEqual(chamberLength + 1e-6)
+    expect(alongChamber).toBeGreaterThan(chamberLength * 0.5)
+  })
+
   it('is deterministic', () => {
-    const flat: ElevationProvider = { heightAt: () => 0 }
     const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     expect(diamondSpotInMine(m)).toEqual(diamondSpotInMine(m))
   })
