@@ -126,6 +126,10 @@ export interface Forest {
    *  player's distance to this to swap the day/night ambience for
    *  campfire.mp3. */
   campfire: { x: number; z: number }
+  /** The wood's one mine entrance — a fixed landmark, same as `shelter`/
+   *  `campfire` above, for ui/minimap.ts's markers (see the 2026-09-15
+   *  addendum). */
+  mine: { x: number; z: number }
   /** Where the hut's own doorway is, in world space — main.ts checks the
    *  player's plain distance to this to decide whether `E` should open/close
    *  the door instead of examining a mushroom. */
@@ -541,6 +545,7 @@ export function createForest(
     scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     campfire: { x: campfire.x, z: campfire.z },
+    mine: { x: mine.x, z: mine.z },
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
