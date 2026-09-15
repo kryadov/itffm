@@ -212,7 +212,10 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   // builds every row of this kind" idea as `slider()` above, extracted once
   // a second toggle (invert-Y, below) needed the exact same wiring the
   // minimap toggle already had.
-  const toggle = (key: 'minimap' | 'invertMouseY', labelKey: 'settingsMinimap' | 'settingsInvertY'): void => {
+  const toggle = (
+    key: 'minimap' | 'minimapQuestHints' | 'invertMouseY',
+    labelKey: 'settingsMinimap' | 'settingsMinimapHints' | 'settingsInvertY',
+  ): void => {
     const row = document.createElement('div')
     row.style.cssText = LABEL_STYLE
     const labelEl = document.createElement('span')
@@ -247,6 +250,10 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   // kills half the point of a walk in the woods. This is the one place a
   // player can opt into it.
   toggle('minimap', 'settingsMinimap')
+  // Off by default, independent of the minimap toggle above — see the
+  // 2026-09-15 addendum: showing the map at all and showing where the
+  // hidden quest items are is two separate choices.
+  toggle('minimapQuestHints', 'settingsMinimapHints')
   // Off by default — most players read "mouse up" as "look up".
   toggle('invertMouseY', 'settingsInvertY')
 
