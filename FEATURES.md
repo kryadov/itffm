@@ -80,9 +80,12 @@ today, each with real field marks, edibility and season.
   its own clearing — its own place in the night's music, too.
 - Where the wood actually has water, a **fisherman's hut and a boat** at the
   shore.
-- A **mine** you can walk into — dead dark inside until the lamp quest item
-  is delivered, sited on a real surveyed cave/adit/mineshaft mouth where one
-  exists, or picked procedurally otherwise, so every wood has one.
+- A **mine** you can walk into — a small branching cave, not a single
+  corridor: a sloped, irregular-mouthed entrance leads down into a handful of
+  forks and dead ends, with the diamond waiting at the end of the one real
+  path. Dead dark inside until the lamp quest item is delivered, sited on a
+  real surveyed cave/adit/mineshaft mouth where one exists, or picked
+  procedurally otherwise, so every wood has one.
 - A **railway** crossing the wood, with a short train — a diesel locomotive
   (cab, exhaust stack puffing smoke, a headlight that switches on at night)
   pulling two wagons, each its own colour, each with windows that glow amber
@@ -120,10 +123,13 @@ hut's doorway to deliver):
   near water; a rod trophy leans by the hut's own table once delivered.
 - **Bicycle** — moves you faster while on a mapped path or track; a bike
   trophy is parked outside by the hut's door once delivered.
-- **Diamond** — found inside the wood's own mine, not near the hut like the
-  other four. Unlike them it unlocks nothing: it's a trophy that ends up on
-  the hut's table once delivered. A returning save from before the diamond
-  existed gets its own one-time prompt pointing at the mine.
+- **Diamond** — found at the end of the mine's own branching cave, not near
+  the hut like the other four; you have to actually search the forks to find
+  it. A many-faceted, asymmetric cut, not a plain gem, and it visibly
+  brightens as you approach it with a lit lamp. Unlike the other four it
+  unlocks nothing: it's a trophy that ends up on the hut's table once
+  delivered. A returning save from before the diamond existed gets its own
+  one-time prompt pointing at the mine.
 
 A **"Rules & Quests" screen**, in the pause menu, lists the basket/
 encyclopedia loop above plus all five items, what each one unlocks, and
