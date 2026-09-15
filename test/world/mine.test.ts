@@ -173,8 +173,9 @@ describe('isInsideMine', () => {
 })
 
 describe('buildMineMesh', () => {
+  const flat: ElevationProvider = { heightAt: () => 0 }
+
   it('keeps the lantern deliberately dim — the interior must read as dark without the lamp', () => {
-    const flat: ElevationProvider = { heightAt: () => 0 }
     const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     const group = buildMineMesh(m)
     let lantern: THREE.PointLight | null = null
@@ -183,6 +184,31 @@ describe('buildMineMesh', () => {
     })
     expect(lantern).not.toBeNull()
     expect(lantern!.intensity).toBeLessThan(1)
+  })
+
+  it('builds one mesh group per segment, not just the first', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const group = buildMineMesh(m)
+    let meshCount = 0
+    group.traverse((o) => {
+      if (o instanceof THREE.Mesh) meshCount++
+    })
+    expect(meshCount).toBeGreaterThanOrEqual(m.segments.length * 3)
+  })
+
+  it('is deterministic in its own right (vertex jitter included)', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const a = buildMineMesh(m)
+    const b = buildMineMesh(m)
+    const posA: number[] = []
+    const posB: number[] = []
+    a.traverse((o) => {
+      if (o instanceof THREE.Mesh) posA.push(...(o.geometry.getAttribute('position').array as Float32Array))
+    })
+    b.traverse((o) => {
+      if (o instanceof THREE.Mesh) posB.push(...(o.geometry.getAttribute('position').array as Float32Array))
+    })
+    expect(posA).toEqual(posB)
   })
 })
 

@@ -51,12 +51,8 @@ interface CircleObstacle {
   radius: number
 }
 
-/** Exported so `isInsideMine` (below) reuses the exact same tunnel size
- *  rather than a second, hand-picked "interior radius" constant. */
-export const TUNNEL_LENGTH = 6
 const TUNNEL_WIDTH = 2.2
 const TUNNEL_HEIGHT = 2.3
-const WALL_THICKNESS = 0.15
 
 /** How far out, and how many directions, `placeMine` samples to find "into
  *  the hillside" — see its own doc comment for why this reads the terrain
@@ -65,12 +61,12 @@ const HEADING_SAMPLE_DIST = 8
 const HEADING_CANDIDATES = 12
 
 /** How far the procedurally-sited entrance needs from anything already
- *  standing, metres — the tunnel's own length, a rough stand-in for its
- *  whole 6x2.2m footprint along whichever heading it ends up boring (the
- *  heading itself is only known after the entrance point is picked, so this
- *  can only protect the mouth, not the full bore — the same simplification
- *  `world/shelter.ts`'s own SHELTER_CLEARANCE already accepts). */
-const MINE_CLEARANCE = TUNNEL_LENGTH
+ *  standing, metres — a rough stand-in for the whole graph's own footprint
+ *  along whichever heading it ends up boring (the heading itself is only
+ *  known after the entrance point is picked, so this can only protect the
+ *  mouth, not the full graph — the same simplification `world/shelter.ts`'s
+ *  own SHELTER_CLEARANCE already accepts). */
+const MINE_CLEARANCE = 6
 
 /** Spacing of the small circles standing in for the tunnel's real (thin,
  *  straight) walls in the player's own circle-based collision — the same
@@ -301,14 +297,124 @@ export function diamondSpotInMine(m: Mine): { x: number; y: number; z: number } 
   return { x, y: m.y + chamber.y1, z }
 }
 
+/** How much a wall/floor/ceiling vertex can wander off its ideal position,
+ *  metres — small enough to stay well inside WALL_CIRCLE_RADIUS's own
+ *  margin from the collision circles (see `mineObstacles`), so the rock can
+ *  never visibly poke through where the player is told they can walk. */
+const ROCK_JITTER = 0.06
+
+/** One deterministic jitter stream for the cave's own rock texture — always
+ *  the same regardless of how many forks the graph happened to grow this
+ *  world, so changing BRANCH_COUNT_RANGE's own roll never changes how
+ *  jittery the rock looks. Re-created fresh each call so buildMineMesh stays
+ *  a pure function of `m`. */
+function jitterStream(m: Mine): () => number {
+  return mulberry32((Math.round(m.x * 131) ^ Math.round(m.z * 733) ^ 0x2545f491) >>> 0)
+}
+
+/** A quad (two triangles) as a small standalone BufferGeometry, its four
+ *  corners individually jittered by `rng` along all three axes — used for
+ *  every floor/ceiling/wall panel below so the cave reads as rough rock
+ *  rather than flawless drywall. */
+function jitteredQuad(
+  rng: () => number,
+  corners: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3],
+): THREE.BufferGeometry {
+  const jittered = corners.map((c) => {
+    const j = (): number => (rng() * 2 - 1) * ROCK_JITTER
+    return new THREE.Vector3(c.x + j(), c.y + j(), c.z + j())
+  })
+  const geom = new THREE.BufferGeometry()
+  const positions = new Float32Array([
+    jittered[0].x, jittered[0].y, jittered[0].z,
+    jittered[1].x, jittered[1].y, jittered[1].z,
+    jittered[2].x, jittered[2].y, jittered[2].z,
+    jittered[0].x, jittered[0].y, jittered[0].z,
+    jittered[2].x, jittered[2].y, jittered[2].z,
+    jittered[3].x, jittered[3].y, jittered[3].z,
+  ])
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geom.computeVertexNormals()
+  return geom
+}
+
+/** Floor, ceiling, two side walls (and a back wall on a leaf) for one
+ *  segment, each panel following that segment's own start/end height —
+ *  where the real slope and turns of the cave graph actually come from,
+ *  rather than an axis-aligned box. */
+function buildSegmentMeshes(seg: MineSegment, rng: () => number, mat: THREE.Material): THREE.Mesh[] {
+  const dx = seg.x1 - seg.x0
+  const dz = seg.z1 - seg.z0
+  const length = Math.hypot(dx, dz) || 1
+  const dirX = dx / length
+  const dirZ = dz / length
+  const perpX = -dirZ
+  const perpZ = dirX
+  const half = seg.width / 2
+
+  const startL = new THREE.Vector3(seg.x0 + perpX * half, seg.y0, seg.z0 + perpZ * half)
+  const startR = new THREE.Vector3(seg.x0 - perpX * half, seg.y0, seg.z0 - perpZ * half)
+  const endL = new THREE.Vector3(seg.x1 + perpX * half, seg.y1, seg.z1 + perpZ * half)
+  const endR = new THREE.Vector3(seg.x1 - perpX * half, seg.y1, seg.z1 - perpZ * half)
+  const startLTop = startL.clone().setY(seg.y0 + TUNNEL_HEIGHT)
+  const startRTop = startR.clone().setY(seg.y0 + TUNNEL_HEIGHT)
+  const endLTop = endL.clone().setY(seg.y1 + TUNNEL_HEIGHT)
+  const endRTop = endR.clone().setY(seg.y1 + TUNNEL_HEIGHT)
+
+  const meshes: THREE.Mesh[] = [
+    new THREE.Mesh(jitteredQuad(rng, [startR, startL, endL, endR]), mat), // floor
+    new THREE.Mesh(jitteredQuad(rng, [startLTop, startRTop, endRTop, endLTop]), mat), // ceiling
+    new THREE.Mesh(jitteredQuad(rng, [startL, startLTop, endLTop, endL]), mat), // left wall
+    new THREE.Mesh(jitteredQuad(rng, [startRTop, startR, endR, endRTop]), mat), // right wall
+  ]
+
+  if (seg.isLeaf) {
+    meshes.push(new THREE.Mesh(jitteredQuad(rng, [endR, endL, endLTop, endRTop]), mat)) // back wall
+  }
+
+  for (const mesh of meshes) mesh.receiveShadow = true
+  return meshes
+}
+
+/** The entrance mouth's own decorative ring — an irregular fan of triangles
+ *  standing in the opening at the very start of the root segment, read as a
+ *  jagged hole in the hillside rather than a rectangular doorway. Visual
+ *  only: the entrance carries no collision of its own, same as before this
+ *  change. */
+function buildEntranceDecoration(root: MineSegment, rng: () => number, mat: THREE.Material): THREE.Mesh {
+  const half = root.width / 2
+  const points = 8
+  const positions: number[] = []
+  const centerY = root.y0 + TUNNEL_HEIGHT / 2
+  const ring: THREE.Vector3[] = []
+  for (let i = 0; i < points; i++) {
+    const t = (i / points) * Math.PI * 2
+    const rx = Math.cos(t) * half * 1.3
+    const ry = Math.sin(t) * (TUNNEL_HEIGHT / 2 + half * 0.3)
+    const wobble = 1 + (rng() * 2 - 1) * 0.35
+    ring.push(new THREE.Vector3(root.x0, centerY + ry * wobble, root.z0 + rx * wobble))
+  }
+  for (let i = 0; i < points; i++) {
+    const a = ring[i]
+    const b = ring[(i + 1) % points]
+    positions.push(root.x0, centerY, root.z0, a.x, a.y, a.z, b.x, b.y, b.z)
+  }
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
+  geom.computeVertexNormals()
+  return new THREE.Mesh(geom, mat)
+}
+
 /**
- * The tunnel's own geometry — floor, ceiling, two side walls, a back wall,
- * and a lantern (the same `PointLight` + small shadow map recipe as the
- * shelter's own hearth light, `world/shelter.ts`) so there is something to
- * actually see by once inside. Built in the group's own local space (its
- * length along local +x, its width along local z) and then rotated as one
- * piece by `m.heading` — the same convention `localToWorld` above works out
- * by hand for collision, so the mesh and the collision can never disagree.
+ * The cave's own geometry — every segment in `m.segments` gets a floor,
+ * ceiling, two side walls, and (if it's a dead end or the diamond chamber) a
+ * back wall, each panel a jittered quad (see `jitteredQuad`) for a rough,
+ * asymmetric rock read rather than flawless boxes. The entrance gets its own
+ * jagged decorative ring. One lantern near the diamond chamber, kept
+ * deliberately dim — see its own doc comment below. Built in the group's own
+ * local space and rotated as one piece by `m.heading`, same convention
+ * `localToWorld` above works out by hand for collision, so the mesh and the
+ * collision can never disagree.
  */
 export function buildMineMesh(m: Mine): THREE.Group {
   const group = new THREE.Group()
@@ -317,38 +423,31 @@ export function buildMineMesh(m: Mine): THREE.Group {
   group.rotation.y = -m.heading
 
   const rockMat = new THREE.MeshStandardMaterial({ color: 0x5b564e, roughness: 1, flatShading: true })
-  const half = TUNNEL_WIDTH / 2
+  const rng = jitterStream(m)
 
-  const floor = new THREE.Mesh(new THREE.BoxGeometry(TUNNEL_LENGTH, WALL_THICKNESS, TUNNEL_WIDTH), rockMat)
-  floor.position.set(TUNNEL_LENGTH / 2, -WALL_THICKNESS / 2, 0)
-  floor.receiveShadow = true
-  group.add(floor)
+  for (const seg of m.segments) {
+    for (const mesh of buildSegmentMeshes(seg, rng, rockMat)) group.add(mesh)
+  }
+  const root = m.segments.find((s) => s.parentId === null)!
+  group.add(buildEntranceDecoration(root, rng, rockMat))
 
-  const ceiling = new THREE.Mesh(new THREE.BoxGeometry(TUNNEL_LENGTH, WALL_THICKNESS, TUNNEL_WIDTH), rockMat)
-  ceiling.position.set(TUNNEL_LENGTH / 2, TUNNEL_HEIGHT + WALL_THICKNESS / 2, 0)
-  group.add(ceiling)
-
-  const sideGeom = new THREE.BoxGeometry(TUNNEL_LENGTH, TUNNEL_HEIGHT, WALL_THICKNESS)
-  const wallL = new THREE.Mesh(sideGeom, rockMat)
-  wallL.position.set(TUNNEL_LENGTH / 2, TUNNEL_HEIGHT / 2, half)
-  group.add(wallL)
-  const wallR = new THREE.Mesh(sideGeom, rockMat)
-  wallR.position.set(TUNNEL_LENGTH / 2, TUNNEL_HEIGHT / 2, -half)
-  group.add(wallR)
-
-  const back = new THREE.Mesh(new THREE.BoxGeometry(WALL_THICKNESS, TUNNEL_HEIGHT, TUNNEL_WIDTH), rockMat)
-  back.position.set(TUNNEL_LENGTH, TUNNEL_HEIGHT / 2, 0)
-  group.add(back)
-
-  // A lantern near the back, not the mouth, but deliberately dim — a mine
-  // without the lamp quest owned has to read as genuinely dark regardless of
-  // time of day (see docs/superpowers/specs/2026-09-13-quest-items-design.md),
-  // so this is barely more than a glint on the rock rather than the earlier,
-  // brighter fixture that lit the whole tunnel by itself. What actually lights
-  // the interior once the player has reason to see is the lamp quest's own
-  // PointLight on the player (game/scene.ts's `updatePlayerLamp`), not this.
+  const chamber = m.segments.find((s) => s.isDiamondChamber)!
+  const chamberDx = chamber.x1 - chamber.x0
+  const chamberDz = chamber.z1 - chamber.z0
+  const chamberLen = Math.hypot(chamberDx, chamberDz) || 1
+  // A lantern near the diamond chamber, not the mouth, but deliberately dim
+  // — a mine without the lamp quest owned has to read as genuinely dark
+  // regardless of time of day (see
+  // docs/superpowers/specs/2026-09-13-quest-items-design.md), so this is
+  // barely more than a glint on the rock. What actually lights the interior
+  // once the player has reason to see is the lamp quest's own PointLight on
+  // the player (game/scene.ts's `updatePlayerLamp`), not this.
   const lantern = new THREE.PointLight(0xffb15c, 0.5, 4)
-  lantern.position.set(TUNNEL_LENGTH * 0.75, TUNNEL_HEIGHT * 0.6, 0)
+  lantern.position.set(
+    chamber.x0 + (chamberDx / chamberLen) * chamberLen * 0.6,
+    chamber.y1 + TUNNEL_HEIGHT * 0.6,
+    chamber.z0 + (chamberDz / chamberLen) * chamberLen * 0.6,
+  )
   lantern.castShadow = true
   lantern.shadow.mapSize.set(256, 256)
   lantern.shadow.bias = -0.002
