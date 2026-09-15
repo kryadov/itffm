@@ -130,6 +130,17 @@ export const RU = {
   questCompleteRod: 'Удочка дома — теперь можно ловить рыбу.',
   questCompleteBike: 'Велосипед дома — на тропах теперь можно ехать быстрее.',
   questCompleteDiamond: 'Бриллиант дома — теперь он лежит на столе.',
+  questGuideTitle: 'Правила и квесты',
+  questGuideIntro:
+    'Собирайте грибы, ягоды, орехи и травы: наведите прицел и нажмите E — находка попадёт в корзину и откроет свою страницу в энциклопедии (Tab). В лесу спрятаны пять особых предметов — принесите каждый домой (тем же E, у двери), и все, кроме бриллианта, дадут что-то новое.',
+  questItemNameAxe: 'Топор',
+  questItemNameLamp: 'Лампа',
+  questItemNameRod: 'Удочка',
+  questItemNameBike: 'Велосипед',
+  questItemNameDiamond: 'Бриллиант',
+  questStatePending: 'не найден',
+  questStateCarrying: 'у вас в руках',
+  questStateDone: 'дома',
   lang: 'EN',
 } as const
 
@@ -257,6 +268,17 @@ export const EN: Record<keyof typeof RU, string> = {
   questCompleteRod: 'The fishing rod is home — you can catch fish now.',
   questCompleteBike: 'The bicycle is home — you move faster on paths now.',
   questCompleteDiamond: 'The diamond is home — it sits on the table now.',
+  questGuideTitle: 'Rules & Quests',
+  questGuideIntro:
+    'Collect mushrooms, berries, nuts and herbs: aim and press E — a find goes in the basket and opens its own page in the encyclopedia (Tab). Five special items are hidden in the wood — bring each one home (the same E, at the door), and every one but the diamond unlocks something new.',
+  questItemNameAxe: 'Hatchet',
+  questItemNameLamp: 'Lamp',
+  questItemNameRod: 'Fishing rod',
+  questItemNameBike: 'Bicycle',
+  questItemNameDiamond: 'Diamond',
+  questStatePending: 'not found',
+  questStateCarrying: 'in hand',
+  questStateDone: 'home',
   lang: 'RU',
 }
 

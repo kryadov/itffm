@@ -22,6 +22,8 @@ import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
 import { createMinimap, headingFromYaw } from './ui/minimap'
 import { buildMinimapMarkers, type Landmark } from './quest/markers'
+import { QUEST_MARKER_COLOR } from './quest/colors'
+import { openQuestGuide } from './ui/questGuide'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
@@ -113,18 +115,6 @@ const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
   rod: 0x5a4a30,
   bike: 0x3f6db0,
   diamond: 0xbfe8ff,
-}
-/** Minimap marker colors for the four hintable quest items — reuses
- *  QUEST_ITEM_COLOR's own hex values as strings, so the map dot and the
- *  in-world pickup mesh read as the same thing, except the lamp: its item
- *  colour (0xd8a04a) is identical to the shelter's own marker amber below,
- *  so its *marker* gets a distinct hex instead (see the 2026-09-15
- *  addendum). Never has an entry for the diamond — it never gets a marker. */
-const QUEST_MARKER_COLOR: Record<'axe' | 'lamp' | 'rod' | 'bike', string> = {
-  axe: '#8a8a92',
-  lamp: '#f2c14e',
-  rod: '#5a4a30',
-  bike: '#3f6db0',
 }
 /** Fixed landmark colors — shelter keeps the minimap's original amber
  *  unchanged, mine and campfire get their own so the three are never
@@ -884,6 +874,7 @@ async function main(): Promise<void> {
          <button id="pause-settings" style="${PAUSE_BTN_STYLE}">${t('settingsTitle')}</button>
          <button id="pause-change-location" style="${PAUSE_BTN_STYLE}">${t('pauseChangeLocation')}</button>
          <button id="pause-encyclopedia" style="${PAUSE_BTN_STYLE}">${t('encyclopedia')}</button>
+         <button id="pause-quests" style="${PAUSE_BTN_STYLE}">${t('questGuideTitle')}</button>
          <button id="pause-tally" style="${PAUSE_BTN_STYLE}">${t('tally')}</button>
        </div>`,
       [],
@@ -918,6 +909,10 @@ async function main(): Promise<void> {
     el.querySelector('#pause-encyclopedia')!.addEventListener('click', () => {
       closeMenu()
       openEncyclopedia(save, getLang())
+    })
+    el.querySelector('#pause-quests')!.addEventListener('click', () => {
+      closeMenu()
+      openQuestGuide(quests)
     })
     el.querySelector('#pause-tally')!.addEventListener('click', () => {
       closeMenu()
