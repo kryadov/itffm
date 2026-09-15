@@ -139,9 +139,15 @@ export function placeQuestItem(
   heightAt: (x: number, z: number) => number,
   /** Threaded through to `thicketObstacles` — see its own doc comment. */
   ownerId = '',
+  /** Which slice of the compass this item's own angle is drawn from —
+   *  `placeQuestItems` (below) gives each of the four its own quarter so
+   *  they never all happen to land in the same direction from the shelter
+   *  and read as one cluster (a live report, 2026-09-15). Standalone calls
+   *  (including this function's own tests) default to the full circle. */
+  angleRange: [number, number] = [0, Math.PI * 2],
 ): { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] } {
   const rng = mulberry32(seed)
-  const angle = randRange(rng, [0, Math.PI * 2])
+  const angle = randRange(rng, angleRange)
   const distance = randRange(rng, [MIN_DISTANCE, MAX_DISTANCE])
   const x = shelterPos.x + Math.cos(angle) * distance
   const z = shelterPos.z + Math.sin(angle) * distance
@@ -166,10 +172,14 @@ export function placeQuestItem(
  * four never draw from the same random stream and never collide — same
  * shape as `world/railway.ts`'s own small fixed seed offsets, just derived
  * from the item id instead of a hand-picked integer, since there are four of
- * them. The fifth item, the diamond, is not part of this RNG at all: its
- * position is wherever the wood's own mine put it (`world/mine.ts`'s
- * diamond spot), passed in as `diamondSpot` rather than rolled here — it
- * gets no thicket/water detour of its own, since the mine's tunnel is
+ * them. Each also gets its own quarter of the compass around the shelter
+ * (`placeQuestItem`'s own `angleRange`), so four independent seeds can never
+ * coincidentally land them all in the same direction and read as one
+ * cluster rather than four separate finds. The fifth item, the diamond, is
+ * not part of this RNG at all: its position is wherever the wood's own mine
+ * put it (`world/mine.ts`'s diamond spot), passed in as `diamondSpot` rather
+ * than rolled here — it gets no thicket/water detour of its own, since the
+ * mine's tunnel is
  * already its own obstacle.
  */
 export function placeQuestItems(
@@ -180,10 +190,11 @@ export function placeQuestItems(
   diamondSpot: { x: number; y: number; z: number },
 ): Record<QuestItemId, { position: { x: number; y: number; z: number }; obstacles: QuestObstacle[] }> {
   const result = {} as Record<QuestItemId, ReturnType<typeof placeQuestItem>>
-  for (const id of FETCH_QUEST_ITEM_IDS) {
+  const sector = (Math.PI * 2) / FETCH_QUEST_ITEM_IDS.length
+  FETCH_QUEST_ITEM_IDS.forEach((id, i) => {
     const itemSeed = (seed + hashString(id)) >>> 0
-    result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt, id)
-  }
+    result[id] = placeQuestItem(itemSeed, shelterPos, water, heightAt, id, [i * sector, (i + 1) * sector])
+  })
   result.diamond = { position: diamondSpot, obstacles: [] }
   return result
 }

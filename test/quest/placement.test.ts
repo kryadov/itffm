@@ -87,6 +87,20 @@ describe('placeQuestItems', () => {
     }
   })
 
+  it('spreads the four fetch items across separate quarters of the compass, never clustering them', () => {
+    // Several seeds, not just one — a single lucky seed could hide the bug
+    // this guards against (a live report: the four looked bunched together).
+    for (const seed of [1, 2, 3, 5, 8, 13, 21]) {
+      const placed = placeQuestItems(seed, shelter, [], flatHeight, diamondSpot)
+      const angles = QUEST_ITEM_IDS.filter((id) => id !== 'diamond').map((id) => {
+        const { position } = placed[id]
+        return Math.atan2(position.z - shelter.z, position.x - shelter.x)
+      })
+      const sectors = new Set(angles.map((a) => Math.floor((((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 2))))
+      expect(sectors.size).toBe(4)
+    }
+  })
+
   it('puts the diamond exactly at the given spot, with no detour obstacles', () => {
     const placed = placeQuestItems(23, shelter, [], flatHeight, diamondSpot)
     expect(placed.diamond).toEqual({ position: diamondSpot, obstacles: [] })
