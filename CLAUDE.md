@@ -14,7 +14,8 @@ Live: https://kryadov.github.io/itffm/
 Current state: plans 1 and 2 done, released as `v0.3.0`. The wood is built from
 a real place name via OpenStreetMap and AWS Terrain Tiles, with an offline demo
 wood as an honest fallback on any failure. Next: expanding the species database
-past three, and the ETL pipeline for photos (see TODO.md).
+further, and the ETL pipeline for photos. See `FEATURES.md` for what has
+actually shipped.
 
 Everything in the project is in English — code, documents, commit messages,
 this file. Russian exists only inside the game itself, as one of the two
@@ -24,7 +25,8 @@ player-facing languages (see Conventions).
   section 0 lists where the implementation taught us better than the spec.
 - Plans: `docs/superpowers/plans/` — each carries ready-to-write code and tests
   per task.
-- Backlog: `TODO.md`.
+- Features: `FEATURES.md` — what has actually shipped, in player-facing terms.
+  Update it in the same change whenever a feature is added or changed.
 
 **Read the spec and the current plan before working.** The plan says what to do;
 the spec says why it is that way.
@@ -115,11 +117,11 @@ buildings, carriageways and lanes is dropped on the way.
 ## Conventions
 
 - **Language.** Everything in the project is English: code, comments, error
-  messages, test names, documents, specs, `TODO.md`, `CHANGELOG.md`, commit
-  messages, this file. The one exception is the game's own player-facing
-  localization: strings live in `src/i18n/` as parallel `RU`/`EN` data and are
-  never hardcoded in modules — Russian belongs there and nowhere else in the
-  project. (`TODO.md`, `CHANGELOG.md` and the specs under
+  messages, test names, documents, specs, `FEATURES.md`, `CHANGELOG.md`,
+  commit messages, this file. The one exception is the game's own
+  player-facing localization: strings live in `src/i18n/` as parallel
+  `RU`/`EN` data and are never hardcoded in modules — Russian belongs there
+  and nowhere else in the project. (`CHANGELOG.md` and the specs under
   `docs/superpowers/specs/` predate this rule and stay Russian where they
   already are — write new entries in English, don't translate old ones.)
 - **Determinism.** No `Math.random` anywhere in `src/`. Everything generated

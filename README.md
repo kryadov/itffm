@@ -114,11 +114,10 @@ Works offline once it has loaded once, and installs to your home screen like
 an app.
 
 Left to do: photographs for the species aren't wired up yet (the taxonomy,
-names and edibility are all curated by hand already), and the season is
-stuck on a permanent September after rain. See `TODO.md` for the rest.
+names and edibility are all curated by hand already).
 
-Design documents and plans live in `docs/superpowers/`. The backlog is
-`TODO.md`.
+Design documents and plans live in `docs/superpowers/`. See `FEATURES.md`
+for the full feature list.
 
 ## Technology and data
 
