@@ -186,6 +186,11 @@ async function main(): Promise<void> {
             save = { ...save, lang }
             void persistSave(save)
           },
+          () => save.prefs,
+          (prefs) => {
+            save = { ...save, prefs }
+            void persistSave(save)
+          },
         ),
       )
 
@@ -838,27 +843,6 @@ async function main(): Promise<void> {
     })
   }
 
-  function openExitConfirm(): void {
-    // Guards against a duplicate on top of itself — openPauseMenu()'s own
-    // Escape handler below calls this on every second Escape press without
-    // tracking whether one is already open (it stays attached across a
-    // cancelled exit, see that function's own comment).
-    if (document.getElementById('exitConfirm')) return
-    const el = overlay(
-      'exitConfirm',
-      `<div style="max-width:380px;padding:30px;text-align:center">
-         <p style="margin:0 0 22px;line-height:1.5">${t('exitConfirm')}</p>
-         <div style="display:flex;gap:12px;justify-content:center">
-           <button id="exit-yes" style="padding:10px 22px;border:0;border-radius:8px;background:#c4514f;color:#fff;font-weight:600;cursor:pointer">${t('exitYes')}</button>
-           <button id="exit-no" style="padding:10px 22px;border:1px solid #555;border-radius:8px;background:transparent;color:#ddd;cursor:pointer">${t('exitNo')}</button>
-         </div>
-       </div>`,
-      ['Escape'],
-    )
-    el.querySelector('#exit-yes')!.addEventListener('click', () => location.reload())
-    el.querySelector('#exit-no')!.addEventListener('click', () => el.remove())
-  }
-
   const PAUSE_BTN_STYLE =
     'padding:11px 18px;border:1px solid #444;border-radius:8px;background:#1f261c;color:#eee;' +
     'font-size:15px;cursor:pointer;width:100%'
@@ -886,15 +870,13 @@ async function main(): Promise<void> {
       [],
     )
 
-    // A second Escape, with the menu still open, is "exit" — openExitConfirm()
-    // unchanged, just reached from here instead of directly. Left attached
-    // rather than one-shot, so cancelling the exit ("Stay") leaves a menu
-    // that still responds to a further Escape; openExitConfirm's own guard
-    // above is what keeps that from ever stacking two confirm dialogs.
+    // A second Escape, with the menu still open, just closes it again —
+    // same as "Continue" (2026-09-15: it used to open the exit confirm,
+    // which meant Escape could never simply back out of the pause menu).
     const onEscape = (e: KeyboardEvent): void => {
       if (e.code !== 'Escape') return
       e.preventDefault()
-      openExitConfirm()
+      closeMenu()
     }
     addEventListener('keydown', onEscape)
 
@@ -907,10 +889,11 @@ async function main(): Promise<void> {
       closeMenu()
       openSettings()
     })
-    // "Change location" is exactly what the exit confirm's own "Leave" button
-    // already does — a full reload back to openPlacePicker() (`ui/placePicker.ts`)
-    // — just without asking first, since choosing it from the menu is already
-    // the deliberate action a second Escape's confirmation exists to catch.
+    // A full reload back to openPlacePicker() (`ui/placePicker.ts`) — no
+    // confirmation, since picking this from the menu is already the
+    // deliberate action (2026-09-15: the "exit confirm" dialog this used to
+    // route through only existed for a second Escape press, which now just
+    // closes the pause menu instead — see onEscape above).
     el.querySelector('#pause-change-location')!.addEventListener('click', () => location.reload())
     el.querySelector('#pause-encyclopedia')!.addEventListener('click', () => {
       closeMenu()

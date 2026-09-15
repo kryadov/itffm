@@ -5,6 +5,8 @@ import { WORLD_SIZES, DEFAULT_WORLD_SIZE } from './worldSize'
 import { buildCollectible } from '../collectible/build'
 import { speciesById } from '../species/load'
 import { hashString } from '../util/rng'
+import { openSettingsMenu } from './settingsMenu'
+import type { Prefs } from '../save/store'
 
 declare const __APP_VERSION__: string
 
@@ -19,7 +21,13 @@ declare const __APP_VERSION__: string
  */
 export function openPlacePicker(
   onPick: (query: string | null, halfSize: number) => void,
-  onLangChange?: (lang: Lang) => void,
+  onLangChange: (lang: Lang) => void,
+  /** So the settings gear here can open the same menu the in-game pause
+   *  menu does — `prefs` read fresh each time (not just at page load) since
+   *  a save can still be loading when this screen first appears (see
+   *  main.ts's own note on that race by loadSave's call site). */
+  getPrefs: () => Prefs,
+  onPrefsChange: (prefs: Prefs) => void,
 ): void {
   const overlay = document.createElement('div')
   overlay.id = 'place-picker'
@@ -40,6 +48,7 @@ export function openPlacePicker(
     <div style="position:fixed;top:10px;right:10px;display:flex;gap:8px">
       <button id="place-lang-ru" style="${btnStyle(getLang() === 'ru')}">RU</button>
       <button id="place-lang-en" style="${btnStyle(getLang() === 'en')}">EN</button>
+      <button id="place-settings" title="${t('settingsTitle')}" style="${btnStyle(false)}">⚙</button>
     </div>
     <h1 style="margin:0;font-size:28px">itffm</h1>
     <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">${t('placeIntro')}</p>
@@ -69,12 +78,25 @@ export function openPlacePicker(
   // sees, so there is no typed state worth preserving across the switch.
   const switchLang = (lang: Lang): void => {
     setLang(lang)
-    onLangChange?.(lang)
+    onLangChange(lang)
     overlay.remove()
-    openPlacePicker(onPick, onLangChange)
+    openPlacePicker(onPick, onLangChange, getPrefs, onPrefsChange)
   }
   overlay.querySelector('#place-lang-ru')!.addEventListener('click', () => switchLang('ru'))
   overlay.querySelector('#place-lang-en')!.addEventListener('click', () => switchLang('en'))
+  overlay.querySelector('#place-settings')!.addEventListener('click', () => {
+    openSettingsMenu(getPrefs(), {
+      // Closes the settings dialog itself before rebuilding this whole
+      // screen in the new language (switchLang's own recipe) — appending
+      // the rebuilt picker would otherwise stack on top of, and hide, the
+      // still-open settings overlay underneath it.
+      onLangChange: (lang) => {
+        document.getElementById('settings')?.remove()
+        switchLang(lang)
+      },
+      onPrefsChange,
+    })
+  })
 
   const input = overlay.querySelector<HTMLInputElement>('#place-input')!
   const sizeInput = overlay.querySelector<HTMLSelectElement>('#place-size')!
