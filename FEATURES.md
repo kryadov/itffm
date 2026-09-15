@@ -22,8 +22,10 @@ you straight into a **baked-in offline demo wood** instead — and if a named
 place ever fails to build (not found, no map data, the network down), the
 game falls back to that same demo wood rather than an error screen. A
 **plot size** picker controls how large an area to build once you've typed a
-place. A **language switch** (Russian/English) sits on this same screen, so
-you never have to start the game just to change it.
+place. A **language switch** (Russian/English) and a **settings** gear (the
+same panel the in-game pause menu opens — walking speed, mouse sensitivity,
+sound, weather, minimap and more) both sit on this same screen, so you never
+have to start the game just to change either.
 
 ---
 
@@ -41,7 +43,7 @@ you never have to start the game just to change it.
 | `Q` | Sort the basket |
 | `M` | Settings |
 | `H` | This same control list, in-game |
-| `Esc` | Pause menu |
+| `Esc` | Pause menu — a second `Esc` closes it again, same as "Continue" |
 
 On a phone or tablet, the same actions come from an on-screen stick, a
 swipe-to-look zone, and a tap.
@@ -89,7 +91,9 @@ today, each with real field marks, edibility and season.
 - A **railway** crossing the wood, with a short train — a diesel locomotive
   (cab, exhaust stack puffing smoke, a headlight that switches on at night)
   pulling two wagons, each its own colour, each with windows that glow amber
-  after dark — shuttling back and forth along its own line.
+  after dark — shuttling back and forth along its own line, stopping for a
+  minute or two at each end like a real train at a station rather than
+  bouncing straight back.
 - **Weather** (clear, rain, snow, fog) and a **day/night cycle** with a real
   sun and moon, changeable in settings or left on a self-running cycle.
 - A **self-running accelerated calendar**: the game clock runs faster than
@@ -112,7 +116,12 @@ today, each with real field marks, edibility and season.
 
 A one-time prompt at the start of a new game points you at five lost items,
 each found in its own place and carried home (`E` to pick up, `E` at the
-hut's doorway to deliver):
+hut's doorway to deliver). Standing close enough to pick one up shows its
+name on screen, the same way aiming at a mushroom does. The four found out in
+the open (everything but the diamond) each render as their own real
+model — an axe, a lantern, a fishing rod, a bicycle — not a shared coloured
+shape, and sit spread around the hut in four separate directions rather than
+clustering in whichever one the dice happened to favour:
 
 - **Hatchet** — once delivered, `E` while facing a bush/thicket clears it;
   the wood's various detour thickets (including ones blocking the other
