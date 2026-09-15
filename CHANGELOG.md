@@ -6,6 +6,14 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.93.0
+The minimap, once turned on, now marks the shelter, the mine and the
+campfire as fixed landmarks, and — under its own separate, off-by-default
+setting — the four fetch-quest items while still hidden in the wood. A new
+"Rules & Quests" screen in the pause menu lists how picking and the
+encyclopedia work, plus all five quest items, what each unlocks, and
+whether it's still out there, in your hands, or already home.
+
 ## v0.92.0
 The train finally looks like a train. The lead car is a proper diesel
 locomotive now — a taller dark body, a cab, an exhaust stack puffing the
