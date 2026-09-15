@@ -168,6 +168,10 @@ export function buildRailMesh(line: RailLine): THREE.Group {
 
 export interface Train {
   update(dt: number): void
+  /** 0 by day, 1 at full night — the locomotive's headlight and every
+   *  wagon's windows glow, the same day/night rule the shelter's own
+   *  windows and lamp already follow (`world/shelter.ts`'s `setNight`). */
+  setNight(t: number): void
   dispose(): void
 }
 
@@ -176,33 +180,192 @@ export interface Train {
  *  something you watch pass. */
 const TRAIN_SPEED = 2.5
 const CAR_COUNT = 3
+/** Every car — the locomotive included — occupies the same length of track,
+ *  so the lead-car-plus-fixed-offset spacing below stays one simple formula
+ *  regardless of what any one slot actually looks like. */
 const CAR_LENGTH = 2.0
 const CAR_GAP = 0.35
 const CAR_WIDTH = 1.0
 const CAR_HEIGHT = 1.05
 
+/** One colour per wagon (the locomotive has its own, below), cycling if
+ *  there are ever more wagons than colours — distinct cars, not one long
+ *  slab in a single random colour like the old build gave every car alike. */
 const CAR_COLORS = [0x7a4a32, 0x5f6b52, 0x8a3b34, 0x4a5a6b]
+
+const LOCO_COLOR = 0x2e3330
+const LOCO_CAB_COLOR = 0x232725
+/** Taller than a wagon — the cab needs headroom over the body it sits on,
+ *  and the height difference alone reads as "this one is different" even
+ *  before its colour or the stack/headlight register. */
+const LOCO_HEIGHT = CAR_HEIGHT * 1.3
+const LOCO_CAB_LENGTH = CAR_LENGTH * 0.4
+const LOCO_CAB_HEIGHT = CAR_HEIGHT * 0.55
+const STACK_RADIUS = 0.08
+const STACK_HEIGHT = 0.3
+
+const WINDOW_COLOR = 0xbfe0e6
+const WINDOW_EMISSIVE = 0xffcf8a
+const WINDOW_COUNT = 3
+const WINDOW_WIDTH = 0.26
+const WINDOW_HEIGHT = 0.32
+
+const SMOKE_N = 4
+
+/** Builds the lead car — a boxy diesel locomotive: a taller body, a cab set
+ *  back toward the rear (the smoke needs the front clear), an exhaust stack
+ *  puffing the same kind of drifting sprite smoke `world/shelter.ts`'s
+ *  chimney already uses, and a real headlight (`THREE.SpotLight`, off by
+ *  day) aimed along local +x — `pose()` below flips the whole group's own
+ *  `rotation.y` between 0 and π as the train reverses, which already aims
+ *  this correctly in world space without the light's own local aim ever
+ *  needing to change.
+ */
+function buildLocomotive(): {
+  group: THREE.Group
+  setNight: (t: number) => void
+  updateSmoke: (elapsed: number) => void
+} {
+  const group = new THREE.Group()
+  group.name = 'locomotive'
+
+  const bodyMat = new THREE.MeshStandardMaterial({ color: LOCO_COLOR, flatShading: true })
+  const body = new THREE.Mesh(new THREE.BoxGeometry(CAR_LENGTH, LOCO_HEIGHT, CAR_WIDTH), bodyMat)
+  body.name = 'body'
+  body.position.y = LOCO_HEIGHT / 2
+  group.add(body)
+
+  const cabMat = new THREE.MeshStandardMaterial({ color: LOCO_CAB_COLOR, flatShading: true })
+  const cab = new THREE.Mesh(
+    new THREE.BoxGeometry(LOCO_CAB_LENGTH, LOCO_CAB_HEIGHT, CAR_WIDTH * 0.92), cabMat,
+  )
+  cab.name = 'cab'
+  cab.position.set(-CAR_LENGTH / 2 + LOCO_CAB_LENGTH / 2 + 0.08, LOCO_HEIGHT + LOCO_CAB_HEIGHT / 2, 0)
+  group.add(cab)
+
+  const stackMat = new THREE.MeshStandardMaterial({ color: 0x1c1e1c, roughness: 0.9 })
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(STACK_RADIUS, STACK_RADIUS * 1.2, STACK_HEIGHT, 8), stackMat)
+  const stackLocal = new THREE.Vector3(CAR_LENGTH * 0.12, LOCO_HEIGHT + STACK_HEIGHT / 2, 0)
+  stack.position.copy(stackLocal)
+  group.add(stack)
+
+  // Small puffs drifting up and fading, looping through their own phase —
+  // the same recipe world/shelter.ts's chimney smoke uses, but in the
+  // locomotive's own local space: being a child of `group` (which `pose()`
+  // repositions/rotates every frame), each sprite's world position follows
+  // the moving, turning train for free.
+  const smokeMat = new THREE.SpriteMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0, depthWrite: false })
+  const smoke: THREE.Sprite[] = []
+  for (let i = 0; i < SMOKE_N; i++) {
+    const sprite = new THREE.Sprite(smokeMat.clone())
+    sprite.userData.phase = i / SMOKE_N
+    sprite.scale.setScalar(0.001)
+    group.add(sprite)
+    smoke.push(sprite)
+  }
+  const updateSmoke = (elapsed: number): void => {
+    for (const sprite of smoke) {
+      const t = (elapsed * 0.5 + sprite.userData.phase) % 1
+      sprite.position.set(
+        stackLocal.x + Math.sin(t * Math.PI * 2 + sprite.userData.phase * 6) * 0.05,
+        stackLocal.y + STACK_HEIGHT / 2 + t * 0.9,
+        stackLocal.z + Math.cos(t * Math.PI * 2 + sprite.userData.phase * 4) * 0.05,
+      )
+      sprite.scale.setScalar(0.1 + t * 0.3)
+      ;(sprite.material as THREE.SpriteMaterial).opacity = 0.35 * (1 - t)
+    }
+  }
+
+  // A visible lens even by day, and the actual light source at night — the
+  // same split the shelter's own lamp shade/bulb pair already makes.
+  const headlightMat = new THREE.MeshStandardMaterial({
+    color: 0xfff6d8, roughness: 0.3, emissive: 0xffcf8a, emissiveIntensity: 0,
+  })
+  const headlightGlow = new THREE.Mesh(new THREE.CircleGeometry(0.09, 12), headlightMat)
+  headlightGlow.name = 'headlightGlow'
+  headlightGlow.position.set(CAR_LENGTH / 2 + 0.01, LOCO_HEIGHT * 0.62, 0)
+  headlightGlow.rotation.y = Math.PI / 2
+  group.add(headlightGlow)
+
+  // Intensity/distance mirror the player's own flashlight (game/scene.ts) —
+  // three's physically-correct lighting makes that tuning read as a real
+  // headlamp a few tens of metres out, not a floodlight.
+  const headlight = new THREE.SpotLight(0xfff2cc, 500, 25, 0.3, 0.4, 2)
+  headlight.position.set(CAR_LENGTH / 2, LOCO_HEIGHT * 0.62, 0)
+  const headlightTarget = new THREE.Object3D()
+  headlightTarget.position.set(CAR_LENGTH / 2 + 5, LOCO_HEIGHT * 0.62, 0)
+  group.add(headlight, headlightTarget)
+  headlight.target = headlightTarget
+  headlight.visible = false
+
+  const setNight = (t: number): void => {
+    headlightMat.emissiveIntensity = t * 2.2
+    headlight.visible = t > 0.02
+    headlight.intensity = 500 * t
+  }
+
+  return { group, setNight, updateSmoke }
+}
+
+/** Builds one wagon — a plain boxy car in its own colour, with a row of
+ *  windows along each side that glow amber at night (the shared
+ *  `windowMat` this returns lets `createTrain` drive every wagon's windows,
+ *  across the whole train, with one `emissiveIntensity` write instead of
+ *  one per car).
+ */
+function buildWagon(color: number): { group: THREE.Group; windowMat: THREE.MeshStandardMaterial } {
+  const group = new THREE.Group()
+  group.name = 'wagon'
+  const bodyMat = new THREE.MeshStandardMaterial({ color, flatShading: true })
+  const body = new THREE.Mesh(new THREE.BoxGeometry(CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH), bodyMat)
+  body.name = 'body'
+  body.position.y = CAR_HEIGHT / 2
+  group.add(body)
+
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: WINDOW_COLOR, roughness: 0.3, emissive: WINDOW_EMISSIVE, emissiveIntensity: 0, side: THREE.DoubleSide,
+  })
+  const windowGeo = new THREE.PlaneGeometry(WINDOW_WIDTH, WINDOW_HEIGHT)
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < WINDOW_COUNT; i++) {
+      const x = (i / (WINDOW_COUNT - 1) - 0.5) * (CAR_LENGTH - WINDOW_WIDTH * 1.6)
+      const win = new THREE.Mesh(windowGeo, windowMat)
+      win.name = 'window'
+      win.position.set(x, CAR_HEIGHT * 0.6, (side * CAR_WIDTH) / 2 + 0.005 * side)
+      win.rotation.y = side > 0 ? 0 : Math.PI
+      group.add(win)
+    }
+  }
+
+  return { group, windowMat }
+}
 
 /**
  * A short train that shuttles back and forth along `line` — a dead-end
  * spur, not a loop, the same honest scope cut `placeRailLine` explains.
- * Cars trail the lead car by a fixed offset along the line's own x, so the
- * whole train reverses direction as one piece at either end rather than
- * each car turning around where it stands.
+ * The lead car (index 0 — always the front, regardless of which way the
+ * train is currently heading, since every other car trails it by a fixed
+ * offset toward the rear) is a locomotive; the rest are wagons, each in
+ * their own colour. Cars trail the lead car by a fixed offset along the
+ * line's own x, so the whole train reverses direction as one piece at
+ * either end rather than each car turning around where it stands.
  */
 export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): Train {
   const rng = mulberry32(seed)
   const group = new THREE.Group()
   group.name = 'train'
-  const mat = new THREE.MeshStandardMaterial({
-    color: CAR_COLORS[Math.floor(rng() * CAR_COLORS.length) % CAR_COLORS.length],
-    flatShading: true,
-  })
-  const cars: THREE.Mesh[] = []
-  for (let i = 0; i < CAR_COUNT; i++) {
-    const car = new THREE.Mesh(new THREE.BoxGeometry(CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH), mat)
-    group.add(car)
-    cars.push(car)
+
+  const loco = buildLocomotive()
+  group.add(loco.group)
+  const cars: THREE.Object3D[] = [loco.group]
+  const windowMats: THREE.MeshStandardMaterial[] = []
+  const colorStart = Math.floor(rng() * CAR_COLORS.length)
+  for (let i = 1; i < CAR_COUNT; i++) {
+    const color = CAR_COLORS[(colorStart + i - 1) % CAR_COLORS.length]
+    const wagon = buildWagon(color)
+    group.add(wagon.group)
+    cars.push(wagon.group)
+    windowMats.push(wagon.windowMat)
   }
   scene.add(group)
 
@@ -218,22 +381,35 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
     const headX = x0 + t * length
     for (let i = 0; i < cars.length; i++) {
       const carX = Math.max(x0, Math.min(x1, headX - i * (CAR_LENGTH + CAR_GAP) * dir))
-      const y = railHeightAt(line, carX) + RAIL_HEIGHT + CAR_HEIGHT / 2
+      const y = railHeightAt(line, carX) + RAIL_HEIGHT
       cars[i].position.set(carX, y, z)
       cars[i].rotation.y = dir > 0 ? 0 : Math.PI
     }
   }
   pose()
 
+  let elapsed = 0
+
   return {
     update(dt) {
       ;({ t, dir } = stepTrainT(t, dir, dt, TRAIN_SPEED, length))
       pose()
+      elapsed += dt
+      loco.updateSmoke(elapsed)
+    },
+    setNight(nt) {
+      loco.setNight(nt)
+      for (const mat of windowMats) mat.emissiveIntensity = nt * 2.2
     },
     dispose() {
       scene.remove(group)
-      for (const car of cars) car.geometry.dispose()
-      mat.dispose()
+      group.traverse((o) => {
+        if (o instanceof THREE.Mesh) {
+          o.geometry.dispose()
+          if (!Array.isArray(o.material)) o.material.dispose()
+        }
+        if (o instanceof THREE.Sprite) o.material.dispose()
+      })
     },
   }
 }

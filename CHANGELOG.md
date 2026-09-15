@@ -6,6 +6,14 @@
 Разработка идёт по `TODO.md`; релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.92.0
+The train finally looks like a train. The lead car is a proper diesel
+locomotive now — a taller dark body, a cab, an exhaust stack puffing the
+same drifting smoke the shelter's chimney already uses, and a real
+headlight that switches on at night. Every wagon behind it gets its own
+colour and a row of windows that glow amber after dark, instead of every
+car being an identical box in one shared colour.
+
 ## v0.91.0
 A fifth quest item: a diamond, sitting in the wood's own mine — every wood
 now has one (the mine's entrance is sited procedurally when no real cave/

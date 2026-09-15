@@ -28,7 +28,7 @@ import { collectScatterCullers, sweepAll } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
 import { placeMine, mineObstacles, buildMineMesh, isInsideMine, diamondSpotInMine, type Mine } from '../world/mine'
-import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine } from '../world/railway'
+import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine, type Train } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
 import { gameMonth, daysSinceRain } from '../world/calendar'
@@ -261,9 +261,10 @@ export function createForest(
   // always drawing a full disc. Computed once: it moves too slowly for a
   // session to notice it hasn't been resampled since load.
   const moonPhaseNow = moonPhase(new Date())
-  // Set once the shelter exists, further down — updateDayNight runs once at
-  // noon before that, when there is nothing to light anyway.
+  // Set once the shelter/train exist, further down — updateDayNight runs
+  // once at noon before that, when there is nothing to light anyway.
   let shelterFx: ShelterFx | null = null
+  let trainFx: Train | null = null
   const updateDayNight = (t: number, camPos: THREE.Vector3): void => {
     const sample = sampleDayNight(t)
     const elevation = sunElevation(t)
@@ -285,6 +286,7 @@ export function createForest(
     const night = nightFactor(t)
     sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow)
     shelterFx?.setNight(night)
+    trainFx?.setNight(night)
   }
   updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look
 
@@ -331,6 +333,7 @@ export function createForest(
   const railLine = source.railLine ?? placeRailLine(source.ground, halfSize, seed + RAIL_SEED_OFFSET)
   scene.add(buildRailMesh(railLine))
   const train = createTrain(scene, railLine, seed + 30)
+  trainFx = train
   const updateTrain = (dt: number): void => train.update(dt)
   const water = buildWaterMeshes(source.water ?? [], source.ground)
   scene.add(water.group)

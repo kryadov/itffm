@@ -165,13 +165,82 @@ describe('createTrain', () => {
     }
   })
 
-  it('is deterministic: the same seed gives the same car colour', () => {
+  it('is deterministic: the same seed gives the same wagon colours', () => {
     const a = build(4)
     const b = build(4)
-    const carA = a.scene.getObjectByName('train')!.children[0] as THREE.Mesh
-    const carB = b.scene.getObjectByName('train')!.children[0] as THREE.Mesh
-    expect((carA.material as THREE.MeshStandardMaterial).color.getHex())
-      .toBe((carB.material as THREE.MeshStandardMaterial).color.getHex())
+    const wagonA = a.scene.getObjectByName('train')!.children[1].getObjectByName('body') as THREE.Mesh
+    const wagonB = b.scene.getObjectByName('train')!.children[1].getObjectByName('body') as THREE.Mesh
+    expect((wagonA.material as THREE.MeshStandardMaterial).color.getHex())
+      .toBe((wagonB.material as THREE.MeshStandardMaterial).color.getHex())
+  })
+
+  it('leads with a locomotive, distinct from the wagons behind it', () => {
+    const { scene } = build(6)
+    const group = scene.getObjectByName('train')!
+    expect(group.children[0].name).toBe('locomotive')
+    for (let i = 1; i < group.children.length; i++) expect(group.children[i].name).toBe('wagon')
+  })
+
+  it('keeps the locomotive always in the lead, whichever way the train is heading', () => {
+    const { scene, train } = build(7)
+    const group = scene.getObjectByName('train')!
+    const headX = () => group.children[0].position.x
+    let prevHead = headX()
+    let prevDelta = 0
+    let sawReverse = false
+    for (let i = 0; i < 500; i++) {
+      train.update(1 / 20)
+      const nowHead = headX()
+      const delta = nowHead - prevHead
+      // Whichever way the head is moving, it must stay strictly ahead of
+      // (or level with, at the very ends) every wagon behind it.
+      for (let c = 1; c < group.children.length; c++) {
+        const wagonX = group.children[c].position.x
+        if (delta >= 0) expect(wagonX).toBeLessThanOrEqual(nowHead + 1e-6)
+        else expect(wagonX).toBeGreaterThanOrEqual(nowHead - 1e-6)
+      }
+      if (prevDelta !== 0 && delta !== 0 && Math.sign(delta) !== Math.sign(prevDelta)) sawReverse = true
+      if (delta !== 0) prevDelta = delta
+      prevHead = nowHead
+    }
+    expect(sawReverse).toBe(true)
+  })
+
+  it('the locomotive carries a headlight, off by day and lit at night', () => {
+    const { scene, train } = build(8)
+    const loco = scene.getObjectByName('train')!.getObjectByName('locomotive')!
+    let light: THREE.SpotLight | undefined
+    loco.traverse((o) => {
+      if (o instanceof THREE.SpotLight) light = o
+    })
+    expect(light).toBeDefined()
+    train.setNight(0)
+    expect(light!.visible).toBe(false)
+    train.setNight(1)
+    expect(light!.visible).toBe(true)
+    expect(light!.intensity).toBeGreaterThan(0)
+  })
+
+  it('every wagon\'s windows glow at night, dark by day', () => {
+    const { scene, train } = build(9)
+    const group = scene.getObjectByName('train')!
+    const windows = group.children
+      .filter((c) => c.name === 'wagon')
+      .flatMap((wagon) => wagon.children.filter((c) => c.name === 'window'))
+    expect(windows.length).toBeGreaterThan(0)
+    train.setNight(0)
+    for (const w of windows) expect(((w as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(0)
+    train.setNight(1)
+    for (const w of windows) {
+      expect(((w as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
+    }
+  })
+
+  it('puffs smoke from the locomotive\'s stack without throwing', () => {
+    const { train } = build(10)
+    expect(() => {
+      for (let i = 0; i < 60; i++) train.update(1 / 20)
+    }).not.toThrow()
   })
 
   it('disposes cleanly', () => {
