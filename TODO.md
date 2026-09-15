@@ -1740,6 +1740,29 @@ actually shipped this pass" section this list mirrors.
       new `bikeSpeedFactor`). `save/store.ts`'s single `quest?` field became
       `quests?: Partial<Record<QuestItemId, Quest>>`.
 
+- [x] **Minimap markers for landmarks and quest items, plus a quest guide
+      screen.** Design: `docs/superpowers/specs/2026-09-15-quest-minimap-
+      and-guide-design.md`, plan: `docs/superpowers/plans/2026-09-15-quest-
+      minimap-and-guide-plan.md`. Done: reverses the quest-items doc's own
+      "no minimap for quests, no new UI screen" call, now that five items
+      and two fixed landmarks exist to navigate around. The minimap's single
+      hardcoded shelter marker became a list (`ui/minimap.ts`'s
+      `setMarkers`/`MinimapMarker`, drawn by the new pure `markerScreenPos`);
+      the shelter, the mine entrance and the campfire (`Forest.mine`, new)
+      always show once the minimap itself is on, as fixed landmarks — they
+      cost the original quest design nothing since they were never hidden.
+      The four fetch-quest items (axe/lamp/rod/bike, never the diamond) get
+      their own coloured dot too, but only while still `pending` and only
+      under a second, independent, off-by-default preference,
+      `Prefs.minimapQuestHints` — so the original find-it-yourself quest is
+      untouched unless a player deliberately turns hints on. New pure
+      `quest/markers.ts`'s `buildMinimapMarkers` assembles the list from
+      landmarks + live quest state; `quest/colors.ts` holds the marker
+      colours shared with the new `ui/questGuide.ts` screen ("Rules &
+      Quests" in the pause menu), which lists the basket/encyclopedia loop
+      and all five items' abilities and live state (not found / in hand /
+      home).
+
 ## 🔧 Внутреннее
 
 - [ ] **Подземные грибы (трюфель и родственные) не влезают в схему.** У

@@ -23,8 +23,43 @@ export function headingFromYaw(yaw: number): number {
   return Math.atan2(-Math.cos(yaw), -Math.sin(yaw))
 }
 
+export interface MinimapMarker {
+  position: Vec2
+  color: string
+}
+
+/**
+ * A marker's offset from the map's own centre, in canvas pixels — bearing
+ * relative to the player's own heading, with up being straight ahead (same
+ * as a real forager keeping their hut in mind), clamped to stay inside the
+ * circular map's edge rather than drawn off it. Pure and testable; `update()`
+ * below just translates to this offset and draws a dot.
+ */
+export function markerScreenPos(
+  marker: Vec2,
+  player: { x: number; z: number; heading: number },
+  half: number,
+  viewRadius: number,
+): { x: number; y: number } {
+  const dx = marker.x - player.x
+  const dz = marker.z - player.z
+  const dist = Math.hypot(dx, dz)
+  const rel = Math.atan2(dz, dx) - player.heading
+  const disp = half / viewRadius
+  let x = Math.sin(rel) * dist * disp
+  let y = -Math.cos(rel) * dist * disp
+  const r = Math.hypot(x, y)
+  const edge = half - 10
+  if (r > edge && r > 1e-6) {
+    x = (x / r) * edge
+    y = (y / r) * edge
+  }
+  return { x, y }
+}
+
 export interface Minimap {
-  setWorld(paths: Vec2[][], water: Vec2[][], shelter: Vec2, halfSize: number): void
+  setWorld(paths: Vec2[][], water: Vec2[][], halfSize: number): void
+  setMarkers(markers: MinimapMarker[]): void
   update(player: { x: number; z: number; heading: number }): void
   setVisible(v: boolean): void
   dispose(): void
@@ -41,7 +76,9 @@ export interface Minimap {
  * Off by default (see ui/compass.ts): a map that shows where you are kills
  * half the point of a walk in the woods. This is an opt-in in settings for
  * players who want it, and it never marks a single mushroom — only the
- * ground itself.
+ * ground itself, plus whatever markers the caller hands it via
+ * `setMarkers()` (fixed landmarks always, quest-item hints only under their
+ * own separate opt-in — see quest/markers.ts and the 2026-09-15 addendum).
  */
 export function createMinimap(root: HTMLElement): Minimap {
   const canvas = document.createElement('canvas')
@@ -56,7 +93,7 @@ export function createMinimap(root: HTMLElement): Minimap {
 
   let offscreen: HTMLCanvasElement | null = null
   let radiusM = 90
-  let shelterPoint: Vec2 = { x: 0, z: 0 }
+  let markers: MinimapMarker[] = []
 
   function trace(g: CanvasRenderingContext2D, pts: Vec2[]): void {
     const p0 = regionToOffscreen(pts[0], radiusM)
@@ -68,9 +105,8 @@ export function createMinimap(root: HTMLElement): Minimap {
   }
 
   const api: Minimap = {
-    setWorld(paths, water, shelter, halfSize) {
+    setWorld(paths, water, halfSize) {
       radiusM = halfSize
-      shelterPoint = shelter
       const dim = Math.max(1, Math.round(2 * halfSize * OS_SCALE))
       const os = document.createElement('canvas')
       os.width = dim
@@ -98,6 +134,10 @@ export function createMinimap(root: HTMLElement): Minimap {
       offscreen = os
     },
 
+    setMarkers(next) {
+      markers = next
+    },
+
     update(player) {
       const half = SIZE / 2
       ctx.clearRect(0, 0, SIZE, SIZE)
@@ -116,26 +156,13 @@ export function createMinimap(root: HTMLElement): Minimap {
         ctx.restore()
       }
 
-      // The shelter: bearing relative to the player's own heading, with up
-      // being straight ahead — the one landmark this map admits to, same as
-      // a real forager would remember where their hut sits.
-      {
-        const dx = shelterPoint.x - player.x
-        const dz = shelterPoint.z - player.z
-        const dist = Math.hypot(dx, dz)
-        const rel = Math.atan2(dz, dx) - player.heading
-        const disp = half / VIEW_RADIUS
-        let sx = Math.sin(rel) * dist * disp
-        let sy = -Math.cos(rel) * dist * disp
-        const r = Math.hypot(sx, sy)
-        const edge = half - 10
-        if (r > edge && r > 1e-6) {
-          sx = (sx / r) * edge
-          sy = (sy / r) * edge
-        }
+      // Every marker the caller handed us (landmarks, plus opt-in quest
+      // hints) — same bearing/clamp math, just one colour per marker now.
+      for (const marker of markers) {
+        const { x: sx, y: sy } = markerScreenPos(marker.position, player, half, VIEW_RADIUS)
         ctx.save()
         ctx.translate(half + sx, half + sy)
-        ctx.fillStyle = '#d8a04a'
+        ctx.fillStyle = marker.color
         ctx.strokeStyle = 'rgba(0,0,0,.6)'
         ctx.lineWidth = 1.5
         ctx.beginPath()

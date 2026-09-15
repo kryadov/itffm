@@ -1,4 +1,4 @@
-import { regionToOffscreen, headingFromYaw } from '../../src/ui/minimap'
+import { regionToOffscreen, headingFromYaw, markerScreenPos } from '../../src/ui/minimap'
 
 describe('regionToOffscreen', () => {
   it('maps the plot centre to the offscreen canvas centre', () => {
@@ -17,6 +17,39 @@ describe('regionToOffscreen', () => {
     const a = regionToOffscreen({ x: 10, z: 0 }, 90)
     const b = regionToOffscreen({ x: 20, z: 0 }, 90)
     expect(b.x - a.x).toBeCloseTo(10 * 0.5)
+  })
+})
+
+describe('markerScreenPos', () => {
+  const half = 86
+  const viewRadius = 130
+
+  it('places a marker straight ahead of the player above centre', () => {
+    const player = { x: 0, z: 0, heading: 0 }
+    const p = markerScreenPos({ x: 5, z: 0 }, player, half, viewRadius)
+    expect(p.x).toBeCloseTo(0)
+    expect(p.y).toBeLessThan(0)
+  })
+
+  it('places a marker directly behind the player below centre', () => {
+    const player = { x: 0, z: 0, heading: 0 }
+    const p = markerScreenPos({ x: -5, z: 0 }, player, half, viewRadius)
+    expect(p.x).toBeCloseTo(0)
+    expect(p.y).toBeGreaterThan(0)
+  })
+
+  it('clamps a marker farther than the view radius to the edge', () => {
+    const player = { x: 0, z: 0, heading: 0 }
+    const p = markerScreenPos({ x: 1000, z: 0 }, player, half, viewRadius)
+    const edge = half - 10
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(edge)
+  })
+
+  it('does not clamp a marker within the view radius', () => {
+    const player = { x: 0, z: 0, heading: 0 }
+    const p = markerScreenPos({ x: 5, z: 0 }, player, half, viewRadius)
+    const disp = half / viewRadius
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(5 * disp)
   })
 })
 

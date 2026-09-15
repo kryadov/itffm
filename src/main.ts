@@ -21,6 +21,9 @@ import type { Placement } from './ecology/spawn'
 import { createHud } from './ui/hud'
 import { createCompass } from './ui/compass'
 import { createMinimap, headingFromYaw } from './ui/minimap'
+import { buildMinimapMarkers, type Landmark } from './quest/markers'
+import { QUEST_MARKER_COLOR } from './quest/colors'
+import { openQuestGuide } from './ui/questGuide'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
@@ -113,6 +116,10 @@ const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
   bike: 0x3f6db0,
   diamond: 0xbfe8ff,
 }
+/** Fixed landmark colors — shelter keeps the minimap's original amber
+ *  unchanged, mine and campfire get their own so the three are never
+ *  confused for each other or for a quest-item hint. */
+const LANDMARK_COLOR = { shelter: '#d8a04a', mine: '#6f7f8f', campfire: '#e2564a' }
 /** Which i18n key names each item's own completion message — see
  *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike/Diamond. */
 const QUEST_COMPLETE_KEY: Record<
@@ -288,8 +295,15 @@ async function main(): Promise<void> {
   hud.setBasket(0, BASKET_CAPACITY)
   const compass = createCompass(ui)
   const minimap = createMinimap(ui)
-  minimap.setWorld(source.paths ?? [], source.water ?? [], forest.shelter, halfSize)
+  minimap.setWorld(source.paths ?? [], source.water ?? [], halfSize)
   minimap.setVisible(save.prefs.minimap)
+  // Fixed geography, sited once at load — same three points every session,
+  // unlike the quest items' own positions below.
+  const landmarks: Landmark[] = [
+    { position: forest.shelter, color: LANDMARK_COLOR.shelter },
+    { position: forest.mine, color: LANDMARK_COLOR.mine },
+    { position: forest.campfire, color: LANDMARK_COLOR.campfire },
+  ]
 
   // Classified once at load — `classifyWater` is pure per-ring geometry, not
   // something that changes while the player walks, so there is no reason to
@@ -860,6 +874,7 @@ async function main(): Promise<void> {
          <button id="pause-settings" style="${PAUSE_BTN_STYLE}">${t('settingsTitle')}</button>
          <button id="pause-change-location" style="${PAUSE_BTN_STYLE}">${t('pauseChangeLocation')}</button>
          <button id="pause-encyclopedia" style="${PAUSE_BTN_STYLE}">${t('encyclopedia')}</button>
+         <button id="pause-quests" style="${PAUSE_BTN_STYLE}">${t('questGuideTitle')}</button>
          <button id="pause-tally" style="${PAUSE_BTN_STYLE}">${t('tally')}</button>
        </div>`,
       [],
@@ -894,6 +909,10 @@ async function main(): Promise<void> {
     el.querySelector('#pause-encyclopedia')!.addEventListener('click', () => {
       closeMenu()
       openEncyclopedia(save, getLang())
+    })
+    el.querySelector('#pause-quests')!.addEventListener('click', () => {
+      closeMenu()
+      openQuestGuide(quests)
     })
     el.querySelector('#pause-tally')!.addEventListener('click', () => {
       closeMenu()
@@ -1022,6 +1041,7 @@ async function main(): Promise<void> {
     compass.update(player.yaw)
     updateQuestHud()
     if (save.prefs.minimap) {
+      minimap.setMarkers(buildMinimapMarkers(landmarks, quests, save.prefs.minimapQuestHints, QUEST_MARKER_COLOR))
       minimap.update({ x: player.x, z: player.z, heading: headingFromYaw(player.yaw) })
     }
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1

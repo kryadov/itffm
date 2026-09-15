@@ -30,6 +30,11 @@ export interface Prefs {
   weather: Weather
   /** Off by default — see ui/compass.ts and ui/minimap.ts for why. */
   minimap: boolean
+  /** Off by default, independent of `minimap` above — whether the four
+   *  pending quest items (axe/lamp/rod/bike) also get their own coloured dot
+   *  on the minimap. See the 2026-09-15 addendum: turning the map on and
+   *  turning on quest-item spoilers are two separate choices, not one. */
+  minimapQuestHints: boolean
   /** 0..1 — the collect/cut sound (audio/audio.ts). 0 is silent; there is no
    *  separate on/off toggle for one short effect. */
   soundVolume: number
@@ -82,6 +87,7 @@ export function defaultPrefs(): Prefs {
     timeMode: 'day',
     weather: 'clear',
     minimap: false,
+    minimapQuestHints: false,
     soundVolume: 0.7,
     musicVolume: 0.5,
     footstepVolume: 0.6,
