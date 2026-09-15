@@ -42,6 +42,7 @@ import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
 import { chopScrub } from './quest/scrub'
 import { lampIsOn } from './quest/lamp'
 import { buildScrubMesh } from './world/scrub'
+import { jitterDiamondGeometry, DIAMOND_GEM_SEED } from './world/diamondGem'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -136,7 +137,7 @@ const QUEST_COMPLETE_KEY: Record<
  *  cylinder like the other four — the rest still share `questItemGeo`
  *  (below), since only the diamond needs its own shape to be legible as a
  *  trophy rather than one more errand marker. */
-const DIAMOND_GEO = new THREE.OctahedronGeometry(0.18)
+const DIAMOND_GEO = jitterDiamondGeometry(DIAMOND_GEM_SEED)
 /** Below this distance the quest's HUD readout reads "near" rather than
  *  "far" — see i18n's questDistanceNear/questDistanceFar. */
 const QUEST_NEAR_RADIUS = 15
