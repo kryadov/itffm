@@ -133,6 +133,19 @@ const QUEST_COMPLETE_KEY: Record<
   bike: 'questCompleteBike',
   diamond: 'questCompleteDiamond',
 }
+/** Which i18n key names each item's own display name — see ui/questGuide.ts's
+ *  own identical map; kept local rather than imported, same as every other
+ *  small per-file lookup table in this module (LANDMARK_COLOR, above). */
+const QUEST_ITEM_NAME_KEY: Record<
+  QuestItemId,
+  'questItemNameAxe' | 'questItemNameLamp' | 'questItemNameRod' | 'questItemNameBike' | 'questItemNameDiamond'
+> = {
+  axe: 'questItemNameAxe',
+  lamp: 'questItemNameLamp',
+  rod: 'questItemNameRod',
+  bike: 'questItemNameBike',
+  diamond: 'questItemNameDiamond',
+}
 /** The diamond's own pickup mesh reads as a gem, not another coloured
  *  cylinder like the other four — the rest still share `questItemGeo`
  *  (below), since only the diamond needs its own shape to be legible as a
@@ -648,8 +661,20 @@ async function main(): Promise<void> {
       hud.setTarget(speciesName(species))
       return
     }
-    // No mushroom in the crosshair — a mushroom never spawns inside the hut,
-    // so this and an aimed mushroom are not really in tension in practice.
+    // No mushroom in the crosshair — check for a quest item within pickup
+    // range next (tryQuestInteract's own `tryPickUp` uses this same radius,
+    // by plain distance rather than aim, so the hint has to use it too or
+    // it would show up too early/late compared to when `E` actually works).
+    for (const id of QUEST_ITEM_IDS) {
+      if (quests[id].state !== 'pending') continue
+      const pos = quests[id].position
+      if (Math.hypot(player.x - pos.x, player.z - pos.z) >= DOOR_INTERACT_RADIUS) continue
+      nearDoor = false
+      hud.setTarget(t(QUEST_ITEM_NAME_KEY[id]))
+      return
+    }
+    // Nothing else nearby — a mushroom never spawns inside the hut, so this
+    // and an aimed mushroom are not really in tension in practice.
     nearDoor = Math.hypot(player.x - forest.shelterDoor.x, player.z - forest.shelterDoor.z) < DOOR_INTERACT_RADIUS
     hud.setTarget(nearDoor ? t('shelterDoor') : null)
   }
