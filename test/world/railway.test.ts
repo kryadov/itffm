@@ -174,6 +174,32 @@ describe('createTrain', () => {
       .toBe((wagonB.material as THREE.MeshStandardMaterial).color.getHex())
   })
 
+  it('sits still at the station for a while after reaching the end of the line, instead of bouncing straight back', () => {
+    const { scene, train } = build(9)
+    const group = scene.getObjectByName('train')!
+    const headX = () => group.children[0].position.x
+    // Run until the head actually reaches an end (stops changing frame to
+    // frame) — worst case one full one-way trip, comfortably inside 200s.
+    let prev = headX()
+    let arrivedAt = -1
+    for (let i = 0; i < 200; i++) {
+      train.update(1)
+      const now = headX()
+      if (now === prev) {
+        arrivedAt = i
+        break
+      }
+      prev = now
+    }
+    expect(arrivedAt).toBeGreaterThanOrEqual(0)
+    // Held there for a real stretch, not released the very next frame — the
+    // shortest roll in STATION_DWELL_RANGE is 60s.
+    for (let i = 0; i < 50; i++) {
+      train.update(1)
+      expect(headX()).toBe(prev)
+    }
+  })
+
   it('leads with a locomotive, distinct from the wagons behind it', () => {
     const { scene } = build(6)
     const group = scene.getObjectByName('train')!
@@ -188,8 +214,13 @@ describe('createTrain', () => {
     let prevHead = headX()
     let prevDelta = 0
     let sawReverse = false
-    for (let i = 0; i < 500; i++) {
-      train.update(1 / 20)
+    // A big-ish dt and enough iterations to comfortably clear a full one-way
+    // trip plus the train's own station dwell at the far end (up to 120s,
+    // see STATION_DWELL_RANGE) and still see it head back the other way —
+    // the invariant below holds at any step size, since pose() always
+    // recomputes every car's position fresh from the current t/dir.
+    for (let i = 0; i < 400; i++) {
+      train.update(1)
       const nowHead = headX()
       const delta = nowHead - prevHead
       // Whichever way the head is moving, it must stay strictly ahead of

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { mulberry32 } from '../util/rng'
+import { mulberry32, randRange } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 
 export interface RailPoint {
@@ -179,6 +179,11 @@ export interface Train {
  *  under 200m, and a train crossing it in seconds would read as a blur, not
  *  something you watch pass. */
 const TRAIN_SPEED = 2.5
+/** How long the train sits at each end of the line before heading back —
+ *  a real request (2026-09-15): the line's own dead-end spurs already read
+ *  as stations, they just used to reverse instantly instead of stopping
+ *  there like a train actually would. */
+const STATION_DWELL_RANGE: [number, number] = [60, 120]
 const CAR_COUNT = 3
 /** Every car — the locomotive included — occupies the same length of track,
  *  so the lead-car-plus-fixed-offset spacing below stays one simple formula
@@ -389,10 +394,20 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
   pose()
 
   let elapsed = 0
+  // >0 while stopped at a station (an end of the line) — set the instant it
+  // arrives, counted down instead of advancing t, so the train actually
+  // waits there rather than bouncing straight back.
+  let stationWait = 0
 
   return {
     update(dt) {
-      ;({ t, dir } = stepTrainT(t, dir, dt, TRAIN_SPEED, length))
+      if (stationWait > 0) {
+        stationWait = Math.max(0, stationWait - dt)
+      } else {
+        const before = t
+        ;({ t, dir } = stepTrainT(t, dir, dt, TRAIN_SPEED, length))
+        if (t !== before && (t === 0 || t === 1)) stationWait = randRange(rng, STATION_DWELL_RANGE)
+      }
       pose()
       elapsed += dt
       loco.updateSmoke(elapsed)
