@@ -239,25 +239,40 @@ function localToWorld(m: Mine, lx: number, lz: number): { x: number; z: number }
 }
 
 /**
- * The tunnel's own collision: two side walls running its length, plus a
- * back wall closing the far end — a dead end, not a passage through to
- * somewhere else.
+ * The cave's own collision: two side walls running each segment's own
+ * length, plus a back wall closing every leaf's far end — every dead end
+ * and the diamond chamber alike are closed, only the graph's shape (see
+ * `buildMineGraph`) decides where those ends are.
  */
 export function mineObstacles(m: Mine): CircleObstacle[] {
-  const half = TUNNEL_WIDTH / 2
   const out: CircleObstacle[] = []
 
-  const sideSteps = Math.ceil(TUNNEL_LENGTH / WALL_CIRCLE_SPACING)
-  for (let i = 0; i <= sideSteps; i++) {
-    const lx = (i / sideSteps) * TUNNEL_LENGTH
-    out.push({ ...localToWorld(m, lx, half), radius: WALL_CIRCLE_RADIUS })
-    out.push({ ...localToWorld(m, lx, -half), radius: WALL_CIRCLE_RADIUS })
-  }
+  for (const seg of m.segments) {
+    const dx = seg.x1 - seg.x0
+    const dz = seg.z1 - seg.z0
+    const length = Math.hypot(dx, dz) || 1
+    const dirX = dx / length
+    const dirZ = dz / length
+    const perpX = -dirZ
+    const perpZ = dirX
+    const half = seg.width / 2
 
-  const backSteps = Math.ceil(TUNNEL_WIDTH / WALL_CIRCLE_SPACING)
-  for (let i = 0; i <= backSteps; i++) {
-    const lz = -half + (i / backSteps) * TUNNEL_WIDTH
-    out.push({ ...localToWorld(m, TUNNEL_LENGTH, lz), radius: WALL_CIRCLE_RADIUS })
+    const sideSteps = Math.ceil(length / WALL_CIRCLE_SPACING)
+    for (let i = 0; i <= sideSteps; i++) {
+      const t = i / sideSteps
+      const lx = seg.x0 + dx * t
+      const lz = seg.z0 + dz * t
+      out.push({ ...localToWorld(m, lx + perpX * half, lz + perpZ * half), radius: WALL_CIRCLE_RADIUS })
+      out.push({ ...localToWorld(m, lx - perpX * half, lz - perpZ * half), radius: WALL_CIRCLE_RADIUS })
+    }
+
+    if (seg.isLeaf) {
+      const backSteps = Math.ceil(seg.width / WALL_CIRCLE_SPACING)
+      for (let i = 0; i <= backSteps; i++) {
+        const s = -half + (i / backSteps) * seg.width
+        out.push({ ...localToWorld(m, seg.x1 + perpX * s, seg.z1 + perpZ * s), radius: WALL_CIRCLE_RADIUS })
+      }
+    }
   }
 
   return out

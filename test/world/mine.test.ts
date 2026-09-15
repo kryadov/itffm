@@ -125,25 +125,29 @@ describe('mine segment graph', () => {
 })
 
 describe('mineObstacles', () => {
-  it('gives obstacles on both sides of the tunnel, plus a back wall at its far end', () => {
-    const flat: ElevationProvider = { heightAt: () => 0 }
+  const flat: ElevationProvider = { heightAt: () => 0 }
+
+  it('gives side obstacles for every segment, plus a back wall on every leaf', () => {
     const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
     const obstacles = mineObstacles(m)
-    // At heading 0 the tunnel bores along +x: every obstacle's own local x
-    // (its distance along the tunnel) stays within [0, length], and z spans
-    // both sides of the centreline plus the far end's own full width.
-    const xs = obstacles.map((o) => o.x)
-    expect(Math.max(...xs)).toBeGreaterThan(4)
-    expect(Math.min(...xs)).toBeGreaterThanOrEqual(-1e-6)
-    const zs = obstacles.map((o) => o.z)
-    expect(Math.max(...zs)).toBeGreaterThan(0)
-    expect(Math.min(...zs)).toBeLessThan(0)
+    expect(obstacles.length).toBeGreaterThanOrEqual(m.segments.length * 2)
+    for (const s of m.segments) {
+      if (!s.isLeaf) continue
+      const nearEnd = obstacles.filter((o) => Math.hypot(o.x - s.x1, o.z - s.z1) <= s.width)
+      expect(nearEnd.length).toBeGreaterThan(0)
+    }
   })
 
   it('is deterministic', () => {
-    const flat: ElevationProvider = { heightAt: () => 0 }
     const m = placeMine(flat, 90, 3, [], shelter, [{ x: 2, z: -3 }])
     expect(mineObstacles(m)).toEqual(mineObstacles(m))
+  })
+
+  it('places every obstacle within reach of the entrance', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    for (const o of mineObstacles(m)) {
+      expect(Math.hypot(o.x - m.x, o.z - m.z)).toBeLessThanOrEqual(m.reach + m.segments[0].width)
+    }
   })
 })
 
