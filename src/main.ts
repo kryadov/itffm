@@ -405,6 +405,11 @@ async function main(): Promise<void> {
         color: QUEST_ITEM_COLOR[id],
         roughness: isDiamond ? 0.05 : 1,
         metalness: isDiamond ? 0.1 : 0,
+        // Starts dark — updated every frame in the animation loop below,
+        // once the player's lamp is close enough and lit to matter (see
+        // docs/superpowers/specs/2026-09-15-mine-cave-design.md §7).
+        emissive: isDiamond ? new THREE.Color(0x8fd8ff) : undefined,
+        emissiveIntensity: 0,
       }),
     )
     const pos = quests[id].position
@@ -1052,6 +1057,19 @@ async function main(): Promise<void> {
       lampIsOn(quests.lamp.state === 'done', nightFactor(clockT), forest.playerInsideMine(player.x, player.z), lampOn),
       camera.position,
     )
+    const diamondMesh = questItemMeshes.diamond
+    if (diamondMesh) {
+      const lit = lampIsOn(
+        quests.lamp.state === 'done', nightFactor(clockT), forest.playerInsideMine(player.x, player.z), lampOn,
+      )
+      const dist = diamondMesh.position.distanceTo(camera.position)
+      // Fades in over the last 6m of the lamp's own reach, fully bright by
+      // 1.5m — a glint you have to actually walk up to and be carrying a
+      // lit lamp to see, matching the mine's own "genuinely dark otherwise"
+      // rule (docs/superpowers/specs/2026-09-15-mine-cave-design.md §7).
+      const closeness = lit ? Math.max(0, Math.min(1, (6 - dist) / (6 - 1.5))) : 0
+      ;(diamondMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = closeness * 1.8
+    }
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
     audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
     forest.updateClouds(camera.position, dt)
