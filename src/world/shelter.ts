@@ -3,6 +3,7 @@ import { findOpenSpot, type Circle } from '../util/openSpot'
 import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Vec2 } from '../geo/types'
+import { buildRodModel, buildBikeModel } from './questItemModels'
 
 export interface Shelter {
   x: number
@@ -468,18 +469,11 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
 
   // The fishing rod — leaned against the wall the table already hugs, tilted
   // a few degrees so its top rests on the wall rather than floating clear of
-  // it. Hidden until the rod quest delivers it.
-  const rod = new THREE.Group()
+  // it. Hidden until the rod quest delivers it. Same model
+  // (`world/questItemModels.ts`) the wood's own pickup mesh uses, so the rod
+  // never looks like two different objects depending on where you see it.
+  const rod = buildRodModel()
   rod.name = 'rod'
-  const rodMat = new THREE.MeshStandardMaterial({ color: 0x5a4a30, roughness: 0.7 })
-  const rodPole = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.014, 1.5, 8), rodMat)
-  rodPole.position.y = 0.75
-  rod.add(rodPole)
-  const reelMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.5, metalness: 0.4 })
-  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.03, 10), reelMat)
-  reel.rotation.z = Math.PI / 2
-  reel.position.set(0, 0.22, 0.015)
-  rod.add(reel)
   // Tilts the top toward the wall (local -x, where this hut's left wall
   // sits) just enough that a 1.5m pole standing on its own base actually
   // touches it, rather than leaning at an angle that visibly clears it.
@@ -490,37 +484,10 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
 
   // The bicycle — parked outside by the door, not ridden or mounted (see
   // docs/superpowers/specs/2026-09-13-quest-items-design.md's own decision
-  // on the bike being a passive stat). Two wheels, a frame and a handlebar,
-  // flat primitives only, same as everything else this project draws.
-  const bike = new THREE.Group()
+  // on the bike being a passive stat). Same model the wood's own pickup mesh
+  // uses (`world/questItemModels.ts`).
+  const bike = buildBikeModel()
   bike.name = 'bike'
-  const bikeMat = new THREE.MeshStandardMaterial({ color: 0x2f5f9e, roughness: 0.5, metalness: 0.3 })
-  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 })
-  const wheelRadius = 0.33
-  const wheelGeo = new THREE.TorusGeometry(wheelRadius, 0.025, 8, 20)
-  const wheelSpan = 0.62
-  for (const wx of [-wheelSpan / 2, wheelSpan / 2]) {
-    const wheel = new THREE.Mesh(wheelGeo, wheelMat)
-    wheel.rotation.y = Math.PI / 2
-    wheel.position.set(wx, wheelRadius, 0)
-    bike.add(wheel)
-  }
-  const frameGeoBike = new THREE.CylinderGeometry(0.014, 0.014, wheelSpan * 0.72, 6)
-  const crossBar = new THREE.Mesh(frameGeoBike, bikeMat)
-  crossBar.rotation.z = Math.PI / 2
-  crossBar.position.set(0, wheelRadius * 1.35, 0)
-  bike.add(crossBar)
-  const seatPost = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 6), bikeMat)
-  seatPost.position.set(-wheelSpan / 2 + 0.05, wheelRadius * 1.35 + 0.16, 0)
-  bike.add(seatPost)
-  const forkPost = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), bikeMat)
-  forkPost.rotation.z = -Math.PI * 0.12
-  forkPost.position.set(wheelSpan / 2 - 0.04, wheelRadius * 1.55, 0)
-  bike.add(forkPost)
-  const handlebar = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.3, 6), bikeMat)
-  handlebar.rotation.x = Math.PI / 2
-  handlebar.position.set(wheelSpan / 2 + 0.02, wheelRadius * 1.35 + 0.19, 0)
-  bike.add(handlebar)
   // Leaned a few degrees, not standing perfectly upright — an unridden bike
   // propped on its own kickstand always sits a little off true.
   bike.rotation.z = -Math.PI * 0.05
