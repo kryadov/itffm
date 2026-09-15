@@ -77,9 +77,24 @@ const WALL_CIRCLE_RADIUS = 0.16
 
 /** Root segment: length of the sloped entrance ramp, metres. */
 const RAMP_LENGTH_RANGE: [number, number] = [4, 5.5]
-/** How far the floor drops over the ramp, metres — "goes down once, at the
- *  mouth," per the design doc, not a staircase. */
-const RAMP_DROP_RANGE: [number, number] = [1.5, 2]
+/** How far below the real terrain surface directly above it every segment's
+ *  own far end sits, metres. `placeMine`'s own heading is only checked to
+ *  rise over `HEADING_SAMPLE_DIST` (8m) in one direction — once the graph
+ *  forks up to `FORK_TURN_RANGE` away from that heading and reaches farther
+ *  than 8m, the real hillside is no longer guaranteed to keep climbing with
+ *  it, and a depth measured only from the entrance's own single height
+ *  sample can leave a far branch poking out of a dip in the terrain (caught
+ *  by the screenshot check in
+ *  docs/superpowers/plans/2026-09-15-mine-cave-plan.md's own Task 8). Each
+ *  segment instead reads the real terrain at its own far end and buries
+ *  itself this far under it, so the graph stays hidden regardless of how the
+ *  ground actually undulates along the way. Measured from the floor, so it
+ *  has to clear `TUNNEL_HEIGHT` (the ceiling's own extra height above the
+ *  floor) with real margin left over, or the ceiling alone breaches the
+ *  surface even when the floor is safely buried — exactly the thin spikes
+ *  the first version of this fix (a shallower [2, 3.5] range) still left
+ *  poking out in the screenshot check. */
+const BURIAL_DEPTH_RANGE: [number, number] = [TUNNEL_HEIGHT + 2.5, TUNNEL_HEIGHT + 4.5]
 /** How many forks the whole tree gets — leaves end up at 1 + this. */
 const BRANCH_COUNT_RANGE: [number, number] = [3, 5]
 const CHILD_LENGTH_RANGE: [number, number] = [3, 6]
@@ -98,17 +113,23 @@ const CHAMBER_WIDTH_FACTOR = 1.6
  * ending with exactly one leaf marked as the diamond chamber and the rest
  * as dead ends. See docs/superpowers/specs/2026-09-15-mine-cave-design.md
  * §1 for the shape this is meant to produce.
+ *
+ * `depthAt(lx, lz)` gives the y (relative to the entrance) that keeps a
+ * point buried a safe margin under the real terrain there — see
+ * `BURIAL_DEPTH_RANGE`'s own doc comment for why every segment's far end
+ * reads this instead of just inheriting a fixed drop from the entrance.
  */
-function buildMineGraph(rng: () => number): MineSegment[] {
+function buildMineGraph(rng: () => number, depthAt: (lx: number, lz: number) => number): MineSegment[] {
+  const rootLength = randRange(rng, RAMP_LENGTH_RANGE)
   const root: MineSegment = {
     id: 0,
     parentId: null,
     x0: 0,
     z0: 0,
-    x1: randRange(rng, RAMP_LENGTH_RANGE),
+    x1: rootLength,
     z1: 0,
     y0: 0,
-    y1: -randRange(rng, RAMP_DROP_RANGE),
+    y1: depthAt(rootLength, 0),
     width: TUNNEL_WIDTH,
     isLeaf: true,
     isDiamondChamber: false,
@@ -126,15 +147,17 @@ function buildMineGraph(rng: () => number): MineSegment[] {
     for (const sign of [1, -1]) {
       const angle = parentAngle + sign * randRange(rng, FORK_TURN_RANGE)
       const length = randRange(rng, CHILD_LENGTH_RANGE)
+      const cx1 = parent.x1 + Math.cos(angle) * length
+      const cz1 = parent.z1 + Math.sin(angle) * length
       const child: MineSegment = {
         id: nextId++,
         parentId: parent.id,
         x0: parent.x1,
         z0: parent.z1,
-        x1: parent.x1 + Math.cos(angle) * length,
-        z1: parent.z1 + Math.sin(angle) * length,
+        x1: cx1,
+        z1: cz1,
         y0: parent.y1,
-        y1: parent.y1,
+        y1: depthAt(cx1, cz1),
         width: TUNNEL_WIDTH * randRange(rng, CHILD_WIDTH_FACTOR_RANGE),
         isLeaf: true,
         isDiamondChamber: false,
@@ -208,7 +231,15 @@ export function placeMine(
       bestHeading = heading
     }
   }
-  const graph = buildMineGraph(mulberry32((seed + 0x9e3779b1) >>> 0))
+  const graphRng = mulberry32((seed + 0x9e3779b1) >>> 0)
+  const cosH = Math.cos(bestHeading)
+  const sinH = Math.sin(bestHeading)
+  const depthAt = (lx: number, lz: number): number => {
+    const wx = x + lx * cosH - lz * sinH
+    const wz = z + lx * sinH + lz * cosH
+    return ground.heightAt(wx, wz) - here - randRange(graphRng, BURIAL_DEPTH_RANGE)
+  }
+  const graph = buildMineGraph(graphRng, depthAt)
   const reach = Math.max(...graph.map((s) => Math.hypot(s.x1, s.z1)))
   return { x, z, y: here, heading: bestHeading, segments: graph, reach }
 }
