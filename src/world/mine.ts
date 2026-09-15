@@ -1,16 +1,47 @@
 import * as THREE from 'three'
 import { findOpenSpot, type Circle } from '../util/openSpot'
-import { mulberry32 } from '../util/rng'
+import { mulberry32, randRange } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Vec2 } from '../geo/types'
+
+export interface MineSegment {
+  id: number
+  /** null for the entrance/root segment. */
+  parentId: number | null
+  /** Local start/end, metres, before `Mine.heading`'s rotation — the same
+   *  local frame `localToWorld` already rotates as one piece. */
+  x0: number
+  z0: number
+  x1: number
+  z1: number
+  /** Floor height relative to the entrance. Only the root segment slopes
+   *  (y0 = 0, y1 < 0); every other segment continues flat from its parent's
+   *  own y1, matching the "goes down once, at the mouth" brief. */
+  y0: number
+  y1: number
+  width: number
+  /** No children — closed by a back wall (mineObstacles/buildMineMesh both
+   *  read this instead of assuming the single old dead end). */
+  isLeaf: boolean
+  /** True for exactly one leaf: the far end of the one path that actually
+   *  leads to the diamond, per the branching cave design
+   *  (docs/superpowers/specs/2026-09-15-mine-cave-design.md §1). */
+  isDiamondChamber: boolean
+}
 
 export interface Mine {
   x: number
   z: number
   /** Ground height at the entrance itself. */
   y: number
-  /** Radians the tunnel bores away from the entrance, 0 along +x. */
+  /** Radians the cave bores away from the entrance, 0 along +x. */
   heading: number
+  /** The cave's own branching graph — see MineSegment. Always has at least
+   *  one segment (the entrance ramp), even with zero forks. */
+  segments: MineSegment[]
+  /** Farthest straight-line distance, in local metres, from the entrance to
+   *  any point in the graph — isInsideMine's own "is it dark here" radius. */
+  reach: number
 }
 
 /** Structurally identical to game/player.ts's Obstacle — see the same note in deadwood.ts. */
@@ -47,6 +78,83 @@ const MINE_CLEARANCE = TUNNEL_LENGTH
  *  together that a player's own radius can never slip between two. */
 const WALL_CIRCLE_SPACING = 0.3
 const WALL_CIRCLE_RADIUS = 0.16
+
+/** Root segment: length of the sloped entrance ramp, metres. */
+const RAMP_LENGTH_RANGE: [number, number] = [4, 5.5]
+/** How far the floor drops over the ramp, metres — "goes down once, at the
+ *  mouth," per the design doc, not a staircase. */
+const RAMP_DROP_RANGE: [number, number] = [1.5, 2]
+/** How many forks the whole tree gets — leaves end up at 1 + this. */
+const BRANCH_COUNT_RANGE: [number, number] = [3, 5]
+const CHILD_LENGTH_RANGE: [number, number] = [3, 6]
+/** Half-angle, radians, each of a fork's two children turns away from the
+ *  parent's own heading — wide enough that the two forks read as genuinely
+ *  different directions, not a barely-there kink. */
+const FORK_TURN_RANGE: [number, number] = [0.5, 0.95]
+const CHILD_WIDTH_FACTOR_RANGE: [number, number] = [0.85, 1.15]
+/** The diamond chamber's own leaf gets wider on its last third — a small
+ *  room, not just a wider corridor. */
+const CHAMBER_WIDTH_FACTOR = 1.6
+
+/**
+ * Builds the cave's own branching graph: a sloped entrance segment, then
+ * `BRANCH_COUNT_RANGE` forks off whichever leaf the RNG picks each time,
+ * ending with exactly one leaf marked as the diamond chamber and the rest
+ * as dead ends. See docs/superpowers/specs/2026-09-15-mine-cave-design.md
+ * §1 for the shape this is meant to produce.
+ */
+function buildMineGraph(rng: () => number): MineSegment[] {
+  const root: MineSegment = {
+    id: 0,
+    parentId: null,
+    x0: 0,
+    z0: 0,
+    x1: randRange(rng, RAMP_LENGTH_RANGE),
+    z1: 0,
+    y0: 0,
+    y1: -randRange(rng, RAMP_DROP_RANGE),
+    width: TUNNEL_WIDTH,
+    isLeaf: true,
+    isDiamondChamber: false,
+  }
+  const segments: MineSegment[] = [root]
+  let openLeaves = [root]
+  let nextId = 1
+
+  const branchCount = Math.floor(randRange(rng, BRANCH_COUNT_RANGE))
+  for (let i = 0; i < branchCount; i++) {
+    const parent = openLeaves[Math.floor(rng() * openLeaves.length)]
+    parent.isLeaf = false
+    const parentAngle = Math.atan2(parent.z1 - parent.z0, parent.x1 - parent.x0)
+    const children: MineSegment[] = []
+    for (const sign of [1, -1]) {
+      const angle = parentAngle + sign * randRange(rng, FORK_TURN_RANGE)
+      const length = randRange(rng, CHILD_LENGTH_RANGE)
+      const child: MineSegment = {
+        id: nextId++,
+        parentId: parent.id,
+        x0: parent.x1,
+        z0: parent.z1,
+        x1: parent.x1 + Math.cos(angle) * length,
+        z1: parent.z1 + Math.sin(angle) * length,
+        y0: parent.y1,
+        y1: parent.y1,
+        width: TUNNEL_WIDTH * randRange(rng, CHILD_WIDTH_FACTOR_RANGE),
+        isLeaf: true,
+        isDiamondChamber: false,
+      }
+      segments.push(child)
+      children.push(child)
+    }
+    openLeaves = openLeaves.filter((s) => s.id !== parent.id).concat(children)
+  }
+
+  const chamber = openLeaves[Math.floor(rng() * openLeaves.length)]
+  chamber.isDiamondChamber = true
+  chamber.width *= CHAMBER_WIDTH_FACTOR
+
+  return segments
+}
 
 /**
  * Where the wood's one mine/cave interior sits. A real OSM cave/adit/
@@ -104,7 +212,9 @@ export function placeMine(
       bestHeading = heading
     }
   }
-  return { x, z, y: here, heading: bestHeading }
+  const graph = buildMineGraph(mulberry32((seed + 0x9e3779b1) >>> 0))
+  const reach = Math.max(...graph.map((s) => Math.hypot(s.x1, s.z1)))
+  return { x, z, y: here, heading: bestHeading, segments: graph, reach }
 }
 
 /**

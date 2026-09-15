@@ -67,6 +67,63 @@ describe('placeMine', () => {
   })
 })
 
+describe('mine segment graph', () => {
+  const flat: ElevationProvider = { heightAt: () => 0 }
+
+  it('has one root segment starting at the entrance', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const root = m.segments.find((s) => s.parentId === null)
+    expect(root).toBeDefined()
+    expect(root!.x0).toBe(0)
+    expect(root!.z0).toBe(0)
+  })
+
+  it('slopes the root segment down from the entrance', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const root = m.segments.find((s) => s.parentId === null)!
+    expect(root.y0).toBe(0)
+    expect(root.y1).toBeLessThan(0)
+  })
+
+  it('every non-root segment continues exactly where its parent ends', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    for (const s of m.segments) {
+      if (s.parentId === null) continue
+      const parent = m.segments.find((p) => p.id === s.parentId)!
+      expect(s.x0).toBeCloseTo(parent.x1, 6)
+      expect(s.z0).toBeCloseTo(parent.z1, 6)
+      expect(s.y0).toBeCloseTo(parent.y1, 6)
+    }
+  })
+
+  it('has exactly one diamond chamber, and every other leaf is a dead end', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const leaves = m.segments.filter((s) => s.isLeaf)
+    const chambers = leaves.filter((s) => s.isDiamondChamber)
+    expect(chambers.length).toBe(1)
+    expect(leaves.length).toBeGreaterThanOrEqual(4) // 1 + BRANCH_COUNT, BRANCH_COUNT is 3 or 4
+    expect(leaves.length).toBeLessThanOrEqual(5)
+  })
+
+  it('is deterministic for the same seed', () => {
+    const a = placeMine(flat, 90, 11, [], shelter, [{ x: 0, z: 0 }])
+    const b = placeMine(flat, 90, 11, [], shelter, [{ x: 0, z: 0 }])
+    expect(a.segments).toEqual(b.segments)
+  })
+
+  it('gives a different graph for a different seed', () => {
+    const a = placeMine(flat, 90, 1, [], shelter, [{ x: 0, z: 0 }])
+    const b = placeMine(flat, 90, 2, [], shelter, [{ x: 0, z: 0 }])
+    expect(a.segments).not.toEqual(b.segments)
+  })
+
+  it('reach covers the farthest segment endpoint from the entrance', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const farthest = Math.max(...m.segments.map((s) => Math.hypot(s.x1, s.z1)))
+    expect(m.reach).toBeCloseTo(farthest, 6)
+  })
+})
+
 describe('mineObstacles', () => {
   it('gives obstacles on both sides of the tunnel, plus a back wall at its far end', () => {
     const flat: ElevationProvider = { heightAt: () => 0 }
