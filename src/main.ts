@@ -43,6 +43,7 @@ import { chopScrub } from './quest/scrub'
 import { lampIsOn } from './quest/lamp'
 import { buildScrubMesh } from './world/scrub'
 import { jitterDiamondGeometry, DIAMOND_GEM_SEED } from './world/diamondGem'
+import { buildAxeModel, buildLampModel, buildRodModel, buildBikeModel } from './world/questItemModels'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -106,17 +107,6 @@ const DAY_LENGTH_SECONDS = 600
  *  as anything else the wood already seeds). Each item then derives its own
  *  seed from this one (see quest/placement.ts's placeQuestItems). */
 const QUEST_SEED_OFFSET = 31
-/** One colour per quest item, so the four standalone pickup meshes read as
- *  different things at a glance even though v1 gives none of them a real
- *  carried-item model (see the fetch-quest design doc's "no carried-item
- *  mesh in hand for v1" — still true here, just four colours instead of one). */
-const QUEST_ITEM_COLOR: Record<QuestItemId, number> = {
-  axe: 0x8a8a92,
-  lamp: 0xd8a04a,
-  rod: 0x5a4a30,
-  bike: 0x3f6db0,
-  diamond: 0xbfe8ff,
-}
 /** Fixed landmark colors — shelter keeps the minimap's original amber
  *  unchanged, mine and campfire get their own so the three are never
  *  confused for each other or for a quest-item hint. */
@@ -409,31 +399,57 @@ async function main(): Promise<void> {
   // aim at; a doorway is a fixed, room-sized target you just walk up to).
   let nearDoor = false
 
-  // Each quest item itself: a simple standalone mesh (no carried-item mesh
-  // in hand for v1, per the design doc) that sits at its own position while
+  // Each quest item itself: a standalone mesh (no carried-item mesh in hand
+  // for v1, per the design doc) that sits at its own position while
   // `pending` and disappears the instant it's picked up — cosmetic, not the
-  // objective's own state, which lives in `quests` above.
-  const questItemGeo = new THREE.CylinderGeometry(0.22, 0.28, 0.32, 10)
-  const questItemMeshes = {} as Record<QuestItemId, THREE.Mesh | null>
+  // objective's own state, which lives in `quests` above. Axe, lamp, rod and
+  // bike each get their own real-world-shaped model
+  // (`world/questItemModels.ts`, shared with the shelter's own rod/bike
+  // trophies) instead of a shared coloured cylinder (a live report,
+  // 2026-09-15: it wasn't clear at a glance what you were even picking up).
+  const questItemMeshes = {} as Record<QuestItemId, THREE.Object3D | null>
   function showQuestItem(id: QuestItemId): void {
-    const isDiamond = id === 'diamond'
-    const mesh = new THREE.Mesh(
-      isDiamond ? DIAMOND_GEO : questItemGeo,
-      new THREE.MeshStandardMaterial({
-        color: QUEST_ITEM_COLOR[id],
-        roughness: isDiamond ? 0.05 : 1,
-        metalness: isDiamond ? 0.1 : 0,
-        // Starts dark — updated every frame in the animation loop below,
-        // once the player's lamp is close enough and lit to matter (see
-        // docs/superpowers/specs/2026-09-15-mine-cave-design.md §7).
-        emissive: isDiamond ? new THREE.Color(0x8fd8ff) : undefined,
-        emissiveIntensity: 0,
-      }),
-    )
     const pos = quests[id].position
-    mesh.position.set(pos.x, pos.y + (isDiamond ? 0.2 : 0.16), pos.z)
-    forest.scene.add(mesh)
-    questItemMeshes[id] = mesh
+    let obj: THREE.Object3D
+    switch (id) {
+      case 'axe':
+        obj = buildAxeModel()
+        break
+      case 'lamp':
+        obj = buildLampModel().group
+        break
+      case 'rod':
+        // Laid flat, not standing 1.5m straight up out of the grass — there's
+        // no wall to lean it on out here, unlike the shelter's own trophy.
+        obj = buildRodModel()
+        obj.rotation.z = Math.PI / 2
+        obj.position.y = 0.02
+        break
+      case 'bike':
+        obj = buildBikeModel()
+        break
+      case 'diamond':
+        obj = new THREE.Mesh(
+          DIAMOND_GEO,
+          new THREE.MeshStandardMaterial({
+            color: 0xbfe8ff,
+            roughness: 0.05,
+            metalness: 0.1,
+            // Starts dark — updated every frame in the animation loop below,
+            // once the player's lamp is close enough and lit to matter (see
+            // docs/superpowers/specs/2026-09-15-mine-cave-design.md §7).
+            emissive: new THREE.Color(0x8fd8ff),
+            emissiveIntensity: 0,
+          }),
+        )
+        obj.position.y = 0.2
+        break
+    }
+    obj.position.x += pos.x
+    obj.position.y += pos.y
+    obj.position.z += pos.z
+    forest.scene.add(obj)
+    questItemMeshes[id] = obj
   }
   function hideQuestItem(id: QuestItemId): void {
     questItemMeshes[id]?.removeFromParent()
@@ -1076,7 +1092,7 @@ async function main(): Promise<void> {
       // lit lamp to see, matching the mine's own "genuinely dark otherwise"
       // rule (docs/superpowers/specs/2026-09-15-mine-cave-design.md §7).
       const closeness = lit ? Math.max(0, Math.min(1, (6 - dist) / (6 - 1.5))) : 0
-      ;(diamondMesh.material as THREE.MeshStandardMaterial).emissiveIntensity = closeness * 1.8
+      ;((diamondMesh as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity = closeness * 1.8
     }
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
     audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
