@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { placeMine, mineObstacles, isInsideMine, buildMineMesh, diamondSpotInMine, TUNNEL_LENGTH } from '../../src/world/mine'
+import { placeMine, mineObstacles, isInsideMine, buildMineMesh, diamondSpotInMine } from '../../src/world/mine'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const shelter = { x: 0, z: 0 }
@@ -159,12 +159,16 @@ describe('isInsideMine', () => {
     expect(isInsideMine(m, 0, 0)).toBe(true)
   })
 
-  it('is true within the tunnel length', () => {
-    expect(isInsideMine(m, TUNNEL_LENGTH * 0.5, 0)).toBe(true)
+  it('is true at the farthest point the graph actually reaches', () => {
+    const farthest = m.segments.reduce((best, s) =>
+      Math.hypot(s.x1, s.z1) > Math.hypot(best.x1, best.z1) ? s : best,
+    )
+    const world = { x: m.x + farthest.x1, z: m.z + farthest.z1 } // heading is 0 in this fixture
+    expect(isInsideMine(m, world.x, world.z)).toBe(true)
   })
 
-  it('is false well outside the tunnel length', () => {
-    expect(isInsideMine(m, TUNNEL_LENGTH * 5, TUNNEL_LENGTH * 5)).toBe(false)
+  it('is false well outside the whole graph', () => {
+    expect(isInsideMine(m, m.reach * 5, m.reach * 5)).toBe(false)
   })
 })
 

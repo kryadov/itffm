@@ -218,14 +218,16 @@ export function placeMine(
 }
 
 /**
- * Whether a point is close enough to this mine's entrance to count as
+ * Whether a point is close enough to this mine's own graph to count as
  * "inside" for the lamp's own on/off rule (`quest/lamp.ts`'s `lampIsOn`) — a
- * plain distance check against the tunnel's own length, not a precise
- * inside-the-box test: standing right at the mouth already counts, which is
- * the honest reading of "you're at the mine, it's dark in there."
+ * plain distance check against the graph's own reach (`m.reach`, see
+ * `placeMine`), not a precise inside-the-tunnel test: the honest reading of
+ * "you're at the mine, it's dark in there" stays the same as the original
+ * single-corridor version, just sized to whatever the graph turned out to
+ * be this world.
  */
 export function isInsideMine(m: Mine, x: number, z: number): boolean {
-  return Math.hypot(x - m.x, z - m.z) <= TUNNEL_LENGTH
+  return Math.hypot(x - m.x, z - m.z) <= m.reach
 }
 
 /** A point `lx` deep and `lz` across from the entrance, in world metres —
