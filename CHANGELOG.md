@@ -5,6 +5,12 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.95.1
+Fixed the mine: the player's own height, and the slope check that gates
+forward movement, now follow the cave's own sloped floor once you cross
+into it, instead of the real hillside outside — the mine was, for some
+worlds, physically unenterable.
+
 ## v0.93.0
 The minimap, once turned on, now marks the shelter, the mine and the
 campfire as fixed landmarks, and — under its own separate, off-by-default
