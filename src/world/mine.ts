@@ -267,6 +267,47 @@ function localToWorld(m: Mine, lx: number, lz: number): { x: number; z: number }
   return { x: m.x + lx * cos - lz * sin, z: m.z + lx * sin + lz * cos }
 }
 
+/** The inverse of `localToWorld` — world metres back to the graph's own
+ *  local frame. */
+function worldToLocal(m: Mine, x: number, z: number): { lx: number; lz: number } {
+  const cos = Math.cos(m.heading)
+  const sin = Math.sin(m.heading)
+  const dx = x - m.x
+  const dz = z - m.z
+  return { lx: dx * cos + dz * sin, lz: -dx * sin + dz * cos }
+}
+
+/**
+ * The cave's own floor height (world metres) directly under a point, or
+ * `null` when that point isn't over any segment's corridor at all. This is
+ * the seam that lets the player actually walk down into the graph: every
+ * segment slopes and buries itself under the real terrain (see
+ * `BURIAL_DEPTH_RANGE`'s own doc comment), so the real terrain height alone
+ * — what `ElevationProvider` gives outside the mine — would have the player
+ * either stuck against the real hillside at the mouth (the terrain there was
+ * deliberately picked as the steepest-rising direction, see `placeMine`) or
+ * standing well above the buried floor once inside. A caller wraps its own
+ * `ElevationProvider` to prefer this over the real terrain wherever it
+ * isn't null (game/scene.ts's `createForest`).
+ */
+export function mineFloorHeightAt(m: Mine, x: number, z: number): number | null {
+  const { lx, lz } = worldToLocal(m, x, z)
+  for (const seg of m.segments) {
+    const dx = seg.x1 - seg.x0
+    const dz = seg.z1 - seg.z0
+    const length = Math.hypot(dx, dz) || 1
+    const dirX = dx / length
+    const dirZ = dz / length
+    const alongLen = (lx - seg.x0) * dirX + (lz - seg.z0) * dirZ
+    const t = alongLen / length
+    if (t < 0 || t > 1) continue
+    const across = (lx - seg.x0) * -dirZ + (lz - seg.z0) * dirX
+    if (Math.abs(across) > seg.width / 2) continue
+    return m.y + seg.y0 + (seg.y1 - seg.y0) * t
+  }
+  return null
+}
+
 /**
  * The cave's own collision: two side walls running each segment's own
  * length, plus a back wall closing every leaf's far end — every dead end

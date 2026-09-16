@@ -27,7 +27,9 @@ import {
 import { collectScatterCullers, sweepAll } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
-import { placeMine, mineObstacles, buildMineMesh, isInsideMine, diamondSpotInMine, type Mine } from '../world/mine'
+import {
+  placeMine, mineObstacles, buildMineMesh, isInsideMine, diamondSpotInMine, mineFloorHeightAt, type Mine,
+} from '../world/mine'
 import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine, type Train } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
@@ -438,6 +440,19 @@ export function createForest(
   const playerInsideMine = (x: number, z: number): boolean => isInsideMine(mine, x, z)
   const diamondSpot = diamondSpotInMine(mine)
 
+  // The graph slopes down and buries itself under the real terrain (see
+  // world/mine.ts's own BURIAL_DEPTH_RANGE doc comment), so the real terrain
+  // height alone — what `source.ground` gives everywhere else — would have
+  // the player stuck against the hillside right at the mouth (deliberately
+  // the steepest-rising direction, see placeMine) instead of walking down
+  // into the tunnel. `groundWithMine` is what every consumer of `Forest.ground`
+  // actually gets, so the player, the camera and the slope check all agree
+  // once they cross into the cave, with no separate "inside the mine" branch
+  // needed anywhere else.
+  const groundWithMine: ElevationProvider = {
+    heightAt: (x, z) => mineFloorHeightAt(mine, x, z) ?? source.ground.heightAt(x, z),
+  }
+
   // The lamp quest's own ability: a PointLight that follows the player,
   // toggled by `main.ts` (via `quest/lamp.ts`'s pure `lampIsOn`) rather than
   // driven by anything in here — this file only owns the light itself and
@@ -542,7 +557,7 @@ export function createForest(
   }
 
   return {
-    scene, ground: source.ground, trees: source.trees, placements, mushroomObjects, extraObstacles,
+    scene, ground: groundWithMine, trees: source.trees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     campfire: { x: campfire.x, z: campfire.z },
     mine: { x: mine.x, z: mine.z },

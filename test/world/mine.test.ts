@@ -1,5 +1,7 @@
 import * as THREE from 'three'
-import { placeMine, mineObstacles, isInsideMine, buildMineMesh, diamondSpotInMine } from '../../src/world/mine'
+import {
+  placeMine, mineObstacles, isInsideMine, buildMineMesh, diamondSpotInMine, mineFloorHeightAt,
+} from '../../src/world/mine'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const shelter = { x: 0, z: 0 }
@@ -169,6 +171,30 @@ describe('isInsideMine', () => {
 
   it('is false well outside the whole graph', () => {
     expect(isInsideMine(m, m.reach * 5, m.reach * 5)).toBe(false)
+  })
+})
+
+describe('mineFloorHeightAt', () => {
+  const flat: ElevationProvider = { heightAt: () => 0 }
+
+  it('follows the root segment down from the entrance, not the real terrain height', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    const root = m.segments.find((s) => s.parentId === null)!
+    // heading is 0 on flat ground, so local == world here.
+    const midX = (root.x0 + root.x1) / 2
+    const expected = m.y + (root.y0 + root.y1) / 2
+    expect(mineFloorHeightAt(m, midX, 0)).toBeCloseTo(expected, 6)
+  })
+
+  it('is exactly the entrance height right at the mouth', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    expect(mineFloorHeightAt(m, m.x, m.z)).toBeCloseTo(m.y, 6)
+  })
+
+  it('is null outside every segment corridor — callers fall back to real terrain there', () => {
+    const m = placeMine(flat, 90, 3, [], shelter, [{ x: 0, z: 0 }])
+    expect(mineFloorHeightAt(m, m.x, m.z + 50)).toBeNull()
+    expect(mineFloorHeightAt(m, m.x, m.z + 5)).toBeNull() // well off to the side of a 2.2m-wide root
   })
 })
 
