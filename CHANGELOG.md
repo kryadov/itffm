@@ -5,6 +5,11 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.95.4
+The train has wheels now, and no longer merges into a single car at the end of
+the line: the whole train stays on the track with its cars apart, stands at a
+station with the locomotive in front, and turns round as it leaves.
+
 ## v0.95.3
 The loading screen no longer freezes. The wood's mushrooms used to be built in
 one block that stalled the spinner for up to 20-30 s on a large wood; they are
