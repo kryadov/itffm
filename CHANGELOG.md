@@ -5,6 +5,11 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.95.2
+The bicycle now looks like a bicycle. Its wheels stood across the frame like
+two loose rings; it is now a side-on diamond-frame bike with spoked wheels,
+fork, handlebar, saddle and pedals, in the wood and parked at the shelter.
+
 ## v0.95.1
 Fixed the mine: the player's own height, and the slope check that gates
 forward movement, now follow the cave's own sloped floor once you cross
