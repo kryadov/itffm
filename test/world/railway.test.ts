@@ -213,6 +213,9 @@ describe('createTrain', () => {
     const headX = () => group.children[0].position.x
     let prevHead = headX()
     let prevDelta = 0
+    // Which way the head last actually moved: a train stopped at a station
+    // keeps the formation it arrived in, and turns round only as it leaves.
+    let heading = 0
     let sawReverse = false
     // A big-ish dt and enough iterations to comfortably clear a full one-way
     // trip plus the train's own station dwell at the far end (up to 120s,
@@ -223,11 +226,11 @@ describe('createTrain', () => {
       train.update(1)
       const nowHead = headX()
       const delta = nowHead - prevHead
-      // Whichever way the head is moving, it must stay strictly ahead of
-      // (or level with, at the very ends) every wagon behind it.
+      if (delta !== 0) heading = Math.sign(delta)
+      // Whichever way the head last moved, it stays ahead of every wagon.
       for (let c = 1; c < group.children.length; c++) {
         const wagonX = group.children[c].position.x
-        if (delta >= 0) expect(wagonX).toBeLessThanOrEqual(nowHead + 1e-6)
+        if (heading >= 0) expect(wagonX).toBeLessThanOrEqual(nowHead + 1e-6)
         else expect(wagonX).toBeGreaterThanOrEqual(nowHead - 1e-6)
       }
       if (prevDelta !== 0 && delta !== 0 && Math.sign(delta) !== Math.sign(prevDelta)) sawReverse = true
@@ -235,6 +238,58 @@ describe('createTrain', () => {
       prevHead = nowHead
     }
     expect(sawReverse).toBe(true)
+  })
+
+  it('keeps every car on the line, and never lets two of them overlap, at either end', () => {
+    // A live report (2026-09-19): at the end of the line the wagons piled onto
+    // one spot and the train "merged into one car". Big steps so both ends and
+    // several turn-arounds are covered.
+    for (const seed of [3, 7, 9]) {
+      const { scene, train } = build(seed)
+      const line = placeRailLine(flat, 90, seed)
+      const minX = line.points[0].x
+      const maxX = line.points[line.points.length - 1].x
+      const cars = scene.getObjectByName('train')!.children
+      let stops = 0
+      let prevHead = cars[0].position.x
+      for (let i = 0; i < 1500; i++) {
+        train.update(1)
+        const xs = cars.map((c) => c.position.x).sort((a, b) => a - b)
+        for (const x of xs) {
+          expect(x).toBeGreaterThanOrEqual(minX - 1e-6)
+          expect(x).toBeLessThanOrEqual(maxX + 1e-6)
+        }
+        for (let k = 1; k < xs.length; k++) expect(xs[k] - xs[k - 1]).toBeGreaterThanOrEqual(2.0)
+        if (cars[0].position.x === prevHead) stops++
+        prevHead = cars[0].position.x
+      }
+      expect(stops).toBeGreaterThan(0) // it really did reach a station
+    }
+  })
+
+  it('has wheels on every car, treads on the rail heads', () => {
+    const { scene, train } = build(11)
+    const line = placeRailLine(flat, 90, 11)
+    for (let i = 0; i < 40; i++) train.update(1)
+    scene.updateMatrixWorld(true)
+    const cars = scene.getObjectByName('train')!.children
+    for (const car of cars) {
+      const wheels = car.children.filter((c) => c.name === 'wheel')
+      expect(wheels.length).toBeGreaterThanOrEqual(4)
+      const box = new THREE.Box3()
+      for (const w of wheels) box.expandByObject(w)
+      // Flat ground at 0: the rail head is RAIL_HEIGHT (0.08) up.
+      expect(box.min.y).toBeCloseTo(0.08, 2)
+      // One wheel on each rail: across the car's width, the gauge apart.
+      const zs = wheels.map((w) => Math.round(w.getWorldPosition(new THREE.Vector3()).z * 100) / 100)
+      expect(new Set(zs).size).toBe(2)
+      expect(Math.abs(Math.max(...zs) - Math.min(...zs))).toBeCloseTo(0.7, 2)
+      // ...and the body sits on them, not through them.
+      const body = car.getObjectByName('body')!
+      const bodyBottom = new THREE.Box3().setFromObject(body).min.y
+      expect(bodyBottom).toBeGreaterThanOrEqual(box.max.y - 1e-6)
+    }
+    expect(line.points.length).toBeGreaterThan(0)
   })
 
   it('the locomotive carries a headlight, off by day and lit at night', () => {

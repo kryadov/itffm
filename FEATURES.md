@@ -91,9 +91,10 @@ today, each with real field marks, edibility and season.
 - A **railway** crossing the wood, with a short train — a diesel locomotive
   (cab, exhaust stack puffing smoke, a headlight that switches on at night)
   pulling two wagons, each its own colour, each with windows that glow amber
-  after dark — shuttling back and forth along its own line, stopping for a
-  minute or two at each end like a real train at a station rather than
-  bouncing straight back.
+  after dark, all of them riding on wheels set on the rails — shuttling back
+  and forth along its own line, stopping for a minute or two at each end like
+  a real train at a station rather than bouncing straight back. The whole train
+  stays on the track, wagons apart, at either end.
 - **Weather** (clear, rain, snow, fog) and a **day/night cycle** with a real
   sun and moon, changeable in settings or left on a self-running cycle.
 - A **self-running accelerated calendar**: the game clock runs faster than

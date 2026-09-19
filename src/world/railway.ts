@@ -209,6 +209,40 @@ const LOCO_CAB_HEIGHT = CAR_HEIGHT * 0.55
 const STACK_RADIUS = 0.08
 const STACK_HEIGHT = 0.3
 
+/** Wheels: two axles a car, a wheel on each rail. The body rides
+ *  `UNDERFRAME` above the rail head so the wheels have somewhere to be —
+ *  `pose()` lifts every car by it, and each wheel sits that far back down,
+ *  its tread on the rail. (The first version had no wheels at all: boxes set
+ *  straight onto the track — a live report, 2026-09-19.) */
+const WHEEL_RADIUS = 0.16
+const WHEEL_WIDTH = 0.06
+const UNDERFRAME = WHEEL_RADIUS * 2
+const AXLE_X = CAR_LENGTH * 0.3
+const CHASSIS_HEIGHT = 0.07
+const WHEEL_COLOR = 0x1c1e1c
+
+const wheelGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_WIDTH, 14)
+wheelGeo.rotateX(Math.PI / 2) // axis along z, across the car
+const chassisGeo = new THREE.BoxGeometry(CAR_LENGTH * 0.96, CHASSIS_HEIGHT, CAR_WIDTH * 0.78)
+
+/** The running gear every car shares — an underframe slab and four named
+ *  wheels — in the car's own local space (y = 0 is the body's floor). */
+function addRunningGear(group: THREE.Group): void {
+  const wheelMat = new THREE.MeshStandardMaterial({ color: WHEEL_COLOR, roughness: 0.6, metalness: 0.5 })
+  const chassis = new THREE.Mesh(chassisGeo, wheelMat)
+  chassis.name = 'chassis'
+  chassis.position.y = -CHASSIS_HEIGHT / 2
+  group.add(chassis)
+  for (const ax of [-1, 1]) {
+    for (const side of [-1, 1]) {
+      const wheel = new THREE.Mesh(wheelGeo, wheelMat)
+      wheel.name = 'wheel'
+      wheel.position.set(ax * AXLE_X, WHEEL_RADIUS - UNDERFRAME, (side * RAIL_GAUGE) / 2)
+      group.add(wheel)
+    }
+  }
+}
+
 const WINDOW_COLOR = 0xbfe0e6
 const WINDOW_EMISSIVE = 0xffcf8a
 const WINDOW_COUNT = 3
@@ -239,6 +273,7 @@ function buildLocomotive(): {
   body.name = 'body'
   body.position.y = LOCO_HEIGHT / 2
   group.add(body)
+  addRunningGear(group)
 
   const cabMat = new THREE.MeshStandardMaterial({ color: LOCO_CAB_COLOR, flatShading: true })
   const cab = new THREE.Mesh(
@@ -326,6 +361,7 @@ function buildWagon(color: number): { group: THREE.Group; windowMat: THREE.MeshS
   body.name = 'body'
   body.position.y = CAR_HEIGHT / 2
   group.add(body)
+  addRunningGear(group)
 
   const windowMat = new THREE.MeshStandardMaterial({
     color: WINDOW_COLOR, roughness: 0.3, emissive: WINDOW_EMISSIVE, emissiveIntensity: 0, side: THREE.DoubleSide,
@@ -377,18 +413,31 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
   const x0 = line.points[0].x
   const x1 = line.points[line.points.length - 1].x
   const z = line.points[0].z
-  const length = x1 - x0
+  // The locomotive leads whichever way the train runs, so the wagons trail on
+  // one side of it going one way and on the other going back. The head is
+  // therefore kept a whole train's length clear of both ends: wherever it is,
+  // in either formation, every car is on the line. (Before this the cars were
+  // clamped to the line's ends, which at a terminus piled every wagon onto the
+  // same spot — the train "merged into one car" — a live report, 2026-09-19.)
+  const trainLength = (cars.length - 1) * (CAR_LENGTH + CAR_GAP)
+  const headMin = x0 + trainLength
+  const length = Math.max(1, x1 - trainLength - headMin)
 
   let t = rng()
   let dir: 1 | -1 = rng() < 0.5 ? 1 : -1
+  // Which way the train is FORMED up — the way it last moved. It follows `dir`
+  // only once the train pulls away, not at the instant it arrives: standing
+  // at a station it keeps the formation it arrived in (locomotive in front),
+  // and turns round for the way back as it leaves.
+  let formation: 1 | -1 = dir
 
   function pose(): void {
-    const headX = x0 + t * length
+    const headX = headMin + t * length
     for (let i = 0; i < cars.length; i++) {
-      const carX = Math.max(x0, Math.min(x1, headX - i * (CAR_LENGTH + CAR_GAP) * dir))
-      const y = railHeightAt(line, carX) + RAIL_HEIGHT
+      const carX = headX - i * (CAR_LENGTH + CAR_GAP) * formation
+      const y = railHeightAt(line, carX) + RAIL_HEIGHT + UNDERFRAME
       cars[i].position.set(carX, y, z)
-      cars[i].rotation.y = dir > 0 ? 0 : Math.PI
+      cars[i].rotation.y = formation > 0 ? 0 : Math.PI
     }
   }
   pose()
@@ -406,7 +455,9 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
       } else {
         const before = t
         ;({ t, dir } = stepTrainT(t, dir, dt, TRAIN_SPEED, length))
-        if (t !== before && (t === 0 || t === 1)) stationWait = randRange(rng, STATION_DWELL_RANGE)
+        const arrived = t !== before && (t === 0 || t === 1)
+        if (arrived) stationWait = randRange(rng, STATION_DWELL_RANGE)
+        else if (t !== before) formation = dir
       }
       pose()
       elapsed += dt
