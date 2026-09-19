@@ -5,6 +5,13 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.95.3
+The loading screen no longer freezes. The wood's mushrooms used to be built in
+one block that stalled the spinner for up to 20-30 s on a large wood; they are
+now built in small slices while the mushroom keeps turning and the bar moves,
+the screen stays up until the first frame is drawn, and building them is
+about twice as fast.
+
 ## v0.95.2
 The bicycle now looks like a bicycle. Its wheels stood across the frame like
 two loose rings; it is now a side-on diamond-frame bike with spoked wheels,
