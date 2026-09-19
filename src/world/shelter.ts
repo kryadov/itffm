@@ -490,7 +490,7 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   bike.name = 'bike'
   // Leaned a few degrees, not standing perfectly upright — an unridden bike
   // propped on its own kickstand always sits a little off true.
-  bike.rotation.z = -Math.PI * 0.05
+  bike.rotation.x = Math.PI * 0.05
   bike.position.set(BIKE_X, 0, BIKE_Z)
   bike.visible = false
   group.add(bike)
