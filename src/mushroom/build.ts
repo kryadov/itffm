@@ -42,13 +42,24 @@ function tipOffset(bendAngle: number, bendAmount: number): { x: number; z: numbe
  *  neither the tip nor the underside's inner edge gets a stray hole. */
 function wobbleCap(geo: THREE.BufferGeometry, capR: number, seed: number, age: number): void {
   const pos = geo.getAttribute('position') as THREE.BufferAttribute
+  // The wobble depends on the angle alone, and a lathe puts every one of its
+  // rings at the same handful of angles — so it is worked out once per angle
+  // (snapped to a millionth of a radian, far below anything visible), not
+  // once per vertex. Noise here was ~half of the whole wood's load time.
+  const wobbleAt = new Map<number, number>()
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i)
     const z = pos.getZ(i)
     const r = Math.hypot(x, z)
     if (r < 1e-9) continue
     const taper = Math.min(1, r / capR)
-    const newR = r * (1 + capWobble(Math.atan2(z, x), seed, age) * taper)
+    const phiKey = Math.round(Math.atan2(z, x) * 1e6)
+    let wobble = wobbleAt.get(phiKey)
+    if (wobble === undefined) {
+      wobble = capWobble(phiKey / 1e6, seed, age)
+      wobbleAt.set(phiKey, wobble)
+    }
+    const newR = r * (1 + wobble * taper)
     pos.setX(i, (x / r) * newR)
     pos.setZ(i, (z / r) * newR)
   }

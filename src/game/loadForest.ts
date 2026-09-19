@@ -15,6 +15,7 @@ import { placeRailLine, RAIL_SEED_OFFSET } from '../world/railway'
 import { buildBiomeMap } from '../world/biome'
 import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
+import { yieldToPaint } from '../util/yield'
 import { CHUNK_SIZE, CHUNK_GROUND_SEGMENTS } from '../world/chunking'
 import { DEFAULT_HALF_SIZE, groundSegmentsFor, type ForestSource } from './scene'
 import type { WorldData, BBox } from '../geo/types'
@@ -177,6 +178,9 @@ export async function loadForestData(
         onStage('terrain')
         const ground = await realGround(bbox, projector, seed, halfSize)
         onStage('build')
+        // The tree/biome placement below is one long synchronous block: let
+        // the loading screen paint this stage's message before it starts.
+        await yieldToPaint()
         return {
           source: buildSource(world, ground, center.lat, seed, halfSize),
           fellBackTo: null,
@@ -195,6 +199,7 @@ export async function loadForestData(
   }
 
   onStage('build')
+  await yieldToPaint()
   const { world, center } = demoForest()
   // The demo wood is the one that goes on forever (game/worldStream.ts) —
   // see docs/superpowers/specs/2026-09-10-infinite-world-design.md's "Scope

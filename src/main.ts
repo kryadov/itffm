@@ -27,6 +27,7 @@ import { openQuestGuide } from './ui/questGuide'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
+import { yieldToPaint } from './util/yield'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
@@ -145,14 +146,22 @@ const DIAMOND_GEO = jitterDiamondGeometry(DIAMOND_GEM_SEED)
  *  "far" — see i18n's questDistanceNear/questDistanceFar. */
 const QUEST_NEAR_RADIUS = 15
 
-const STAGE_KEY: Record<LoadStage, 'stageGeocode' | 'stageOsm' | 'stageTerrain' | 'stageBuild'> = {
+/** `grow` is main.ts's own last stage: `loadForestData` is done by then, but
+ *  the wood's mushrooms are still being built (see `buildPlacements`). */
+type BootStage = LoadStage | 'grow'
+const STAGE_KEY: Record<BootStage, 'stageGeocode' | 'stageOsm' | 'stageTerrain' | 'stageBuild' | 'stageGrow'> = {
   geocode: 'stageGeocode',
   osm: 'stageOsm',
   terrain: 'stageTerrain',
   build: 'stageBuild',
+  grow: 'stageGrow',
 }
-const STAGE_ORDER: LoadStage[] = ['geocode', 'osm', 'terrain', 'build']
-const stageFraction = (stage: LoadStage): number => (STAGE_ORDER.indexOf(stage) + 1) / STAGE_ORDER.length
+const STAGE_ORDER: BootStage[] = ['geocode', 'osm', 'terrain', 'build', 'grow']
+/** Where the bar sits once `stage` has started, 0..1. */
+const stageFraction = (stage: BootStage): number => (STAGE_ORDER.indexOf(stage) + 1) / STAGE_ORDER.length
+/** How long one slice of mushroom-building may hold the thread before the
+ *  loading screen gets a frame — short enough that the spinner keeps turning. */
+const GROW_SLICE_MS = 30
 
 async function main(): Promise<void> {
   const ui = document.getElementById('ui')!
@@ -219,7 +228,6 @@ async function main(): Promise<void> {
     },
     pickedHalfSize,
   )
-  loading.close()
 
   if (fellBackTo && query) toast(t('fellBackNotice'))
 
@@ -237,7 +245,23 @@ async function main(): Promise<void> {
   // function's own doc comment for the live report this fixed.
   const gameDays =
     gameDaysElapsed(save.calendarStart, Date.now()) + (realMonthAt(save.calendarStart) - 1) * DAYS_PER_MONTH
-  const forest = createForest(source, seed, halfSize, groundSegments, gameDays)
+  // The loading screen stays up until every mushroom has a mesh: building
+  // them all in one go was ~85% of the whole load, a single freeze that took
+  // the spinner with it (a live report, 2026-09-19: "it starts spinning and
+  // then hangs", 20-30 s on a large wood). Sliced instead, with a frame for
+  // the spinner and the bar between slices.
+  loading.update(t(STAGE_KEY.grow), stageFraction('build'))
+  await yieldToPaint()
+  const forest = createForest(source, seed, halfSize, groundSegments, gameDays, true)
+  const totalPlacements = forest.pendingPlacements()
+  const growFrom = stageFraction('build')
+  while (forest.buildPlacements(GROW_SLICE_MS) > 0) {
+    const done = 1 - forest.pendingPlacements() / Math.max(1, totalPlacements)
+    loading.update(t(STAGE_KEY.grow), growFrom + (stageFraction('grow') - growFrom) * done)
+    await yieldToPaint()
+  }
+  // The loading screen is closed by the render loop, after the first frame
+  // has actually been drawn (see `loadingOpen` below) — not here.
   forest.setWeather(save.prefs.weather)
   // Infinite wilderness beyond the home plot — the demo wood only
   // (fellBackTo === 'demo' covers both a deliberate "just show the forest"
@@ -1003,6 +1027,12 @@ async function main(): Promise<void> {
   // start of every walk the same way the flashlight resets to off.
   let lampOn = true
   const camDir = new THREE.Vector3()
+  // Compiling every shader used to happen inside the first frame, after the
+  // loading screen had already gone: seconds of dark, frozen screen. Do it
+  // now, while the screen is still up (`compileAsync` does not block on a GPU
+  // with parallel shader compilation). Not worth failing the boot over.
+  await renderer.compileAsync(forest.scene, camera).catch(() => {})
+  let loadingOpen = true
   renderer.setAnimationLoop(() => {
     const now = performance.now()
     const dt = Math.min(0.05, (now - last) / 1000)
@@ -1119,6 +1149,10 @@ async function main(): Promise<void> {
     updateAim()
     updateDebugOverlay()
     renderer.render(forest.scene, camera)
+    if (loadingOpen) {
+      loadingOpen = false
+      loading.close()
+    }
 
     // Boot-check needs only a handful of frames, and can't afford more: a few
     // rather than exactly one gives the compositor a chance to actually

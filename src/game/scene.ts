@@ -200,6 +200,13 @@ export interface Forest {
    *  camera — three.js's LOD does not do this on its own. Call every frame;
    *  cheap (one pass over the placements, no rebuilding). */
   updateMushroomLod: (camera: THREE.Camera) => void
+  /** How many spawned finds still have no mesh — always 0 unless
+   *  `createForest` was asked to defer them (see its `deferPlacements`). */
+  pendingPlacements: () => number
+  /** Builds meshes for still-pending finds until `budgetMs` has passed (at
+   *  least one, so it always makes progress), and returns how many remain.
+   *  `mushroomObjects` grows in place. */
+  buildPlacements: (budgetMs: number) => number
   /** Real distance culling for the wood's static InstancedMesh scatter
    *  (trees, boulders, deadwood, undergrowth, flora, grass) — see
    *  world/instanceCulling.ts. Meant to be called periodically (every few
@@ -223,6 +230,12 @@ export function createForest(
    *  one, month one, no rain yet) is a fine default for callers (tests,
    *  mainly) that don't care about the calendar at all. */
   gameDays = 0,
+  /** Leave every find's mesh unbuilt and let the caller spend it out in
+   *  slices through `buildPlacements` — building them all here is by far the
+   *  biggest single block of a load (~85% of it), and a loading screen that
+   *  is blocked for all of it cannot animate. Off by default: a caller with
+   *  no loading screen (the tests) wants the whole wood back at once. */
+  deferPlacements = false,
 ): Forest {
   const scene = new THREE.Scene()
   scene.fog = new THREE.Fog(0xa8c0a2, 30, 140)
@@ -536,13 +549,22 @@ export function createForest(
   // — three.js's LOD does not update itself, so updateMushroomLod below
   // needs the exact objects to call .update(camera) on every frame.
   const lods: THREE.LOD[] = []
-  for (const p of placements) {
-    const built = buildPlacementObject(p, source.ground)
-    if (!built) continue
-    lods.push(built.lod)
-    scene.add(built.object)
-    mushroomObjects.push(built.object)
+  let placementCursor = 0
+  const pendingPlacements = (): number => placements.length - placementCursor
+  const buildPlacements = (budgetMs: number): number => {
+    const deadline = performance.now() + budgetMs
+    while (placementCursor < placements.length) {
+      const built = buildPlacementObject(placements[placementCursor++], source.ground)
+      if (built) {
+        lods.push(built.lod)
+        scene.add(built.object)
+        mushroomObjects.push(built.object)
+      }
+      if (performance.now() >= deadline) break
+    }
+    return pendingPlacements()
   }
+  if (!deferPlacements) buildPlacements(Infinity)
   const updateMushroomLod = (camera: THREE.Camera): void => {
     for (const lod of lods) lod.update(camera)
   }
@@ -569,6 +591,6 @@ export function createForest(
     setBikePlaced: (on: boolean) => shelterFx!.setBikePlaced(on),
     updateShelter, updateCampfire, updateBirds,
     birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
-    updateMushroomLod, updateScatterCulling,
+    updateMushroomLod, pendingPlacements, buildPlacements, updateScatterCulling,
   }
 }
