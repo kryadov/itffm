@@ -5,6 +5,13 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.97.1
+Carrying the bicycle now means riding it: you go faster (most on a path), the view
+stops swaying like a walk, and there are no footsteps. The fishing rod lying in the
+wood can be seen again (it was buried under trails). Fish no longer sprout huge red
+spikes for a tail, and a fish you cannot take yet says it needs a fishing rod
+instead of ignoring `E`.
+
 ## v0.97.0
 The quests can be reset. Settings (from the pause menu or the start screen) have
 a new Quests row: Reset..., then a confirmation. All five items go back into the
