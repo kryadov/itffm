@@ -5,6 +5,14 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.96.0
+The mine is rebuilt: a wide, tall doorway in a rock outcrop opening onto level
+ground, closed rock all the way round, dark inside except for your own lamp,
+and walkable in and out with no invisible walls across the trail. The bicycle
+you carry now shows its handlebar and front wheel in your view, turning as you
+turn, and is left against whichever wall of the hut you stand at, on the real
+ground rather than sunk into a slope.
+
 ## v0.95.4
 The train has wheels now, and no longer merges into a single car at the end of
 the line: the whole train stays on the track with its cars apart, stands at a
