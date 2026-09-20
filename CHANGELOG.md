@@ -5,6 +5,12 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.97.0
+The quests can be reset. Settings (from the pause menu or the start screen) have
+a new Quests row: Reset..., then a confirmation. All five items go back into the
+wood and the hut's trophies and the bicycle's wall are forgotten; found
+mushrooms, the encyclopedia, settings and the calendar stay.
+
 ## v0.96.0
 The mine is rebuilt: a wide, tall doorway in a rock outcrop opening onto level
 ground, closed rock all the way round, dark inside except for your own lamp,
