@@ -28,6 +28,7 @@ import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
 import { yieldToPaint } from './util/yield'
+import { createBikeView } from './game/bikeView'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
@@ -35,7 +36,7 @@ import { gameDaysElapsed, realMonthAt, DAYS_PER_MONTH } from './world/calendar'
 import { speciesById, loadSpecies } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
-import { emptySave, loadSave, persistSave, applyFind, setFindNote, type SaveData } from './save/store'
+import { emptySave, loadSave, persistSave, applyFind, setFindNote, readBikeSpot, type SaveData } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { tryPickUp, tryDeliver } from './quest/state'
@@ -282,6 +283,10 @@ async function main(): Promise<void> {
   // clipped away — the fog (scene.ts) still hides the forest floor at 140m
   // regardless, so this only decides whether the sky above it is visible.
   const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.02, 2000)
+  // The bicycle in your hands (its bar and front wheel, low in the view) while
+  // you are carrying it home — see game/bikeView.ts. Gone the moment it is left
+  // against the hut, and never there before it is picked up.
+  const bikeView = createBikeView(forest.scene)
   // Whatever `save` holds right now — likely the real loaded save by this
   // point, same trade-off `setLang` above already accepts: a real user's
   // place-picker interaction takes far longer than the IndexedDB round trip.
@@ -367,6 +372,11 @@ async function main(): Promise<void> {
   for (const id of QUEST_ITEM_IDS) {
     quests[id] = save.quests?.[id] ?? { position: questPlacements[id].position, state: 'pending' }
   }
+  // The mine was redrawn (its tunnels, size and site all changed — see
+  // world/mine.ts), so a diamond position saved against the old one would now
+  // be inside solid rock. Where the diamond lies is a pure function of the
+  // wood's seed, so a pending one is simply put back at the mine's current spot.
+  if (quests.diamond.state === 'pending') quests.diamond = { ...quests.diamond, position: forest.diamondSpot }
   if (isFreshQuests) {
     save = { ...save, quests }
     void persistSave(save)
@@ -490,7 +500,10 @@ async function main(): Promise<void> {
   }
   for (const id of QUEST_ITEM_IDS) {
     if (quests[id].state === 'pending') showQuestItem(id)
-    if (quests[id].state === 'done') TROPHY_SETTER[id]?.(true)
+    if (quests[id].state === 'done') {
+      if (id === 'bike') forest.setBikePlaced(true, readBikeSpot(save.bikeSpot))
+      else TROPHY_SETTER[id]?.(true)
+    }
   }
 
   /**
@@ -508,13 +521,22 @@ async function main(): Promise<void> {
     for (const id of QUEST_ITEM_IDS) {
       const before = quests[id].state
       quests[id] = tryPickUp(quests[id], player, DOOR_INTERACT_RADIUS)
-      quests[id] = tryDeliver(quests[id], player, forest.shelterDoor, DOOR_INTERACT_RADIUS)
+      // The bicycle is left against whichever wall of the hut the player is
+      // standing at, not handed in at the doorway like the rest: its delivery
+      // point is the nearest point on the hut's outline.
+      const bikeDrop = id === 'bike' ? forest.bikeSpotNear(player) : null
+      quests[id] = tryDeliver(quests[id], player, bikeDrop?.point ?? forest.shelterDoor, DOOR_INTERACT_RADIUS)
       if (quests[id].state === before) continue
       changed = true
       if (before === 'pending') hideQuestItem(id)
       if (quests[id].state === 'done') {
         toast(t(QUEST_COMPLETE_KEY[id]))
-        TROPHY_SETTER[id]?.(true)
+        if (id === 'bike' && bikeDrop) {
+          save = { ...save, bikeSpot: bikeDrop.spot }
+          forest.setBikePlaced(true, bikeDrop.spot)
+        } else {
+          TROPHY_SETTER[id]?.(true)
+        }
       }
     }
     if (!changed) return false
@@ -1148,7 +1170,10 @@ async function main(): Promise<void> {
     }
     updateAim()
     updateDebugOverlay()
+    bikeView.setVisible(quests.bike.state === 'carrying')
+    bikeView.update(dt, player.yaw, camera)
     renderer.render(forest.scene, camera)
+    bikeView.render(renderer, camera)
     if (loadingOpen) {
       loadingOpen = false
       loading.close()

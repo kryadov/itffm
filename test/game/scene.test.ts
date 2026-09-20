@@ -2,6 +2,8 @@ import { createForest } from '../../src/game/scene'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import { waterObstacles } from '../../src/world/water'
 import type { ForestSource } from '../../src/game/scene'
+import { stepPlayer, type PlayerState } from '../../src/game/player'
+import * as THREE from 'three'
 
 const ground = proceduralTerrain(1)
 const biomeAt = (): 'forest-mixed' => 'forest-mixed' as const
@@ -61,5 +63,85 @@ describe('createForest deferred placements', () => {
       f.mushroomObjects.map((o) => [o.position.x, o.position.y, o.position.z, o.userData.placement.speciesId].join(','))
     expect(key(sliced)).toEqual(key(eager))
     expect(eager.pendingPlacements()).toBe(0)
+  })
+})
+
+describe('createForest with the mine — walking in and out through the real ground and collision', () => {
+  // Real terrain, real scatter, real obstacle list: the same objects main.ts
+  // hands stepPlayer, with the same per-frame playerInsideMine call.
+  const HALF = 90
+  const source: ForestSource = { ground, trees: [], biomeAt }
+  const forest = createForest(source, 5, HALF, 100)
+  const group = forest.scene.getObjectByName('mine')!
+  group.updateMatrixWorld(true)
+  const toWorld = (lx: number, lz: number): { x: number; z: number } => {
+    const v = group.localToWorld(new THREE.Vector3(lx, 0, lz))
+    return { x: v.x, z: v.z }
+  }
+
+  const walkTo = (p: PlayerState, target: { x: number; z: number }): { p: PlayerState; maxJump: number; steps: number } => {
+    let maxJump = 0
+    let steps = 0
+    let last = forest.ground.heightAt(p.x, p.z)
+    while (Math.hypot(target.x - p.x, target.z - p.z) > 0.6 && steps < 3000) {
+      const yaw = Math.atan2(-(target.x - p.x), -(target.z - p.z))
+      p = stepPlayer(
+        p, { forward: 1, strafe: 0, dYaw: yaw - p.yaw, dPitch: 0, crouching: false, sprinting: false, jumping: false, dt: 1 / 60 },
+        forest.ground, forest.extraObstacles,
+      )
+      forest.playerInsideMine(p.x, p.z)
+      const h = forest.ground.heightAt(p.x, p.z)
+      maxJump = Math.max(maxJump, Math.abs(h - last))
+      last = h
+      steps++
+    }
+    return { p, maxJump, steps }
+  }
+
+  it('the player can walk from the doorstep to the diamond and back out to the meadow', () => {
+    const start = toWorld(-4, 0)
+    let p: PlayerState = {
+      x: start.x, z: start.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0, bobPhase: 0,
+    }
+    forest.playerInsideMine(p.x, p.z)
+    expect(forest.playerInsideMine(p.x, p.z)).toBe(false)
+
+    const inward = walkTo(p, toWorld(1.5, 0))
+    expect(Math.hypot(inward.p.x - toWorld(1.5, 0).x, inward.p.z - toWorld(1.5, 0).z)).toBeLessThan(0.7)
+    expect(forest.playerInsideMine(inward.p.x, inward.p.z)).toBe(true)
+    expect(inward.maxJump).toBeLessThan(0.08)
+
+    // From the doorway to the diamond along the mine's own passages is the
+    // pure-geometry test's job (test/world/mine.test.ts); here the point is
+    // that the wired-up scene agrees: the ground under the player is the
+    // floor, and stepping back out returns to the meadow smoothly.
+    const spot = forest.diamondSpot
+    expect(forest.ground.heightAt(spot.x, spot.z)).toBeCloseTo(spot.y, 1)
+    const outward = walkTo(inward.p, toWorld(-4, 0))
+    expect(Math.hypot(outward.p.x - toWorld(-4, 0).x, outward.p.z - toWorld(-4, 0).z)).toBeLessThan(0.7)
+    expect(forest.playerInsideMine(outward.p.x, outward.p.z)).toBe(false)
+    expect(outward.maxJump).toBeLessThan(0.08)
+  })
+
+  it('leaves no scatter standing in the passages: no scatter collides inside the first passage', () => {
+    const lattice = forest.extraObstacles.filter((o) => {
+      const l = group.worldToLocal(new THREE.Vector3(o.x, 0, o.z))
+      return l.x > 0.5 && l.x < 5.5 && Math.abs(l.z) < 1
+    })
+    expect(lattice).toHaveLength(0)
+  })
+
+  it('draws the ground from the mine-reshaped surface, so the doorstep is level with the floor', () => {
+    const mesh = forest.scene.getObjectByName('ground') as THREE.Mesh
+    const pos = mesh.geometry.getAttribute('position')
+    const door = toWorld(-0.3, 0)
+    // nearest ground-mesh vertex to the doorstep
+    let best = Infinity
+    let bestY = 0
+    for (let i = 0; i < pos.count; i++) {
+      const d = Math.hypot(pos.getX(i) - door.x, pos.getZ(i) - door.z)
+      if (d < best) { best = d; bestY = pos.getY(i) }
+    }
+    expect(Math.abs(bestY - forest.ground.heightAt(door.x, door.z))).toBeLessThan(0.15)
   })
 })

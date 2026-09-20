@@ -22,14 +22,14 @@ import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import {
   placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, interiorObstacles, doorPosition,
-  type ShelterFx,
+  nearestBikeSpot, type ShelterFx, type BikeSpot,
 } from '../world/shelter'
-import { collectScatterCullers, sweepAll } from '../world/instanceCulling'
+import { collectScatterCullers, sweepAll, STATIC_SCATTER_GROUP_NAMES } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
-import {
-  placeMine, mineObstacles, buildMineMesh, isInsideMine, diamondSpotInMine, mineFloorHeightAt, type Mine,
-} from '../world/mine'
+import { placeMine, mineObstacles, diamondSpotInMine, type Mine } from '../world/mine'
+import { createMineTerrain } from '../world/mineTerrain'
+import { buildMineMesh, setMineLighting, clearScatterOnMine } from '../world/mineMesh'
 import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine, type Train } from '../world/railway'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
@@ -49,6 +49,7 @@ import { buildPlacementObject } from '../collectible/placement'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Biome } from '../species/schema'
 import type { Vec2 } from '../geo/types'
+import { densify } from '../util/geometry'
 
 /** Default half the plot's side, metres. Ninety is about a quarter-hour's
  *  slow walk across — the player can ask for a bigger or smaller wood on the
@@ -173,7 +174,11 @@ export interface Forest {
    *  outside — see world/shelter.ts's own setters. */
   setDiamondPlaced: (on: boolean) => void
   setRodPlaced: (on: boolean) => void
-  setBikePlaced: (on: boolean) => void
+  setBikePlaced: (on: boolean, spot?: BikeSpot) => void
+  /** Which wall of the hut is nearest `p`, where along it, and the point on
+   *  the hut's outline that is (for a range check) — where a bicycle handed
+   *  over from `p` would be left. */
+  bikeSpotNear: (p: { x: number; z: number }) => { spot: BikeSpot; point: { x: number; z: number } }
   /** Drifts the shelter's chimney smoke — call every frame. */
   updateShelter: (dt: number) => void
   /** Drifts the campfire's smoke and flickers its embers — call every frame. */
@@ -284,6 +289,9 @@ export function createForest(
   // once at noon before that, when there is nothing to light anyway.
   let shelterFx: ShelterFx | null = null
   let trainFx: Train | null = null
+  // The mine's own group, set once it is built below — updateDayNight (defined
+  // first) feeds it how much daylight spills in at the mouth.
+  let mineGroup: THREE.Group | null = null
   const updateDayNight = (t: number, camPos: THREE.Vector3): void => {
     const sample = sampleDayNight(t)
     const elevation = sunElevation(t)
@@ -306,6 +314,7 @@ export function createForest(
     sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow)
     shelterFx?.setNight(night)
     trainFx?.setNight(night)
+    if (mineGroup) setMineLighting(mineGroup, { day: 1 - night })
   }
   updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look
 
@@ -337,14 +346,18 @@ export function createForest(
   scene.add(flashlight, flashlight.target)
   const setFlashlight = (on: boolean): void => {
     flashlight.visible = on
+    if (mineGroup) setMineLighting(mineGroup, { flashOn: on })
   }
   const updateFlashlight = (camPos: THREE.Vector3, camDir: THREE.Vector3): void => {
     flashlight.position.copy(camPos)
     flashlight.target.position.copy(camPos).add(camDir)
+    if (mineGroup) setMineLighting(mineGroup, { flashPos: camPos, flashDir: camDir })
   }
 
-  scene.add(buildGround(source.ground, halfSize, groundSegments ?? groundSegmentsFor(halfSize), source.biomeAt, seed + 17))
-  scene.add(buildPathMeshes(source.paths ?? [], source.ground, halfSize))
+  // The ground mesh and the trail ribbons are built further down, once the
+  // mine is placed: the mine reshapes the hillside around its mouth (see
+  // world/mineTerrain.ts), and they have to be drawn from that surface.
+  const groundCells = groundSegments ?? groundSegmentsFor(halfSize)
 
   // A narrow-gauge line and a small train shuttling along it — the lowest-
   // priority TODO item, a live request ported from race-the-city's own
@@ -370,13 +383,15 @@ export function createForest(
   const logs = placeLogs(source.ground, halfSize, seed + 5)
   const stumps = placeStumps(source.ground, halfSize, seed + 6)
   scene.add(buildDeadwoodMeshes(logs, stumps))
+  // Kept apart so the mine's clearing (below) never lets the player walk into water.
+  const waterCircles = waterObstacles(source.water ?? [])
   const extraObstacles = [
     ...logs.flatMap((l) => logObstacles(l)),
     ...stumps.map((s) => ({ x: s.x, z: s.z, radius: s.radius, topHeight: s.height })),
     // Real water becomes a real obstacle everywhere, not just near the quest
     // item — it was already parsed and drawn (buildWaterMeshes above) but had
     // no collision at all (see world/water.ts's own doc comment).
-    ...waterObstacles(source.water ?? []),
+    ...waterCircles,
   ]
 
   const leaningTrees = placeLeaningTrees(source.ground, halfSize, seed + 14)
@@ -404,7 +419,7 @@ export function createForest(
   const shelter = placeShelter(
     source.ground, halfSize, seed + 10, [...treeCircles, ...extraObstacles], source.shelters ?? [],
   )
-  shelterFx = buildShelterMesh(shelter)
+  shelterFx = buildShelterMesh(shelter, source.ground)
   scene.add(shelterFx.group)
   // The player's own collision uses the fine wall ring + door below, so they
   // can actually walk in through the doorway (a live request, 2026-09-09) —
@@ -446,25 +461,63 @@ export function createForest(
   // somewhere to be regardless of what OSM happened to survey here.
   const mine: Mine = placeMine(
     source.ground, halfSize, seed + 32, [...treeCircles, ...extraObstacles, shelterFootprint], shelter,
-    source.caves ?? [],
+    source.caves ?? [], source.paths ?? [],
   )
-  scene.add(buildMineMesh(mine))
-  extraObstacles.push(...mineObstacles(mine))
-  const playerInsideMine = (x: number, z: number): boolean => isInsideMine(mine, x, z)
   const diamondSpot = diamondSpotInMine(mine)
 
-  // The graph slopes down and buries itself under the real terrain (see
-  // world/mine.ts's own BURIAL_DEPTH_RANGE doc comment), so the real terrain
-  // height alone — what `source.ground` gives everywhere else — would have
-  // the player stuck against the hillside right at the mouth (deliberately
-  // the steepest-rising direction, see placeMine) instead of walking down
-  // into the tunnel. `groundWithMine` is what every consumer of `Forest.ground`
-  // actually gets, so the player, the camera and the slope check all agree
-  // once they cross into the cave, with no separate "inside the mine" branch
-  // needed anywhere else.
-  const groundWithMine: ElevationProvider = {
-    heightAt: (x, z) => mineFloorHeightAt(mine, x, z) ?? source.ground.heightAt(x, z),
+  // The mine reshapes the hillside around its mouth (world/mineTerrain.ts): a
+  // level apron in front of the doorway, a mound over the tunnels with a rock
+  // face at the mouth. `mineTerrain.meshGround` is what the ground mesh is
+  // drawn from, `mineTerrain.surface` is what the player, the camera and the
+  // trail ribbons stand on — and, being in this file's `Forest.ground`, what
+  // every other consumer of the ground reads too, so they all agree.
+  const mineTerrain = createMineTerrain(mine, source.ground, (2 * halfSize) / groundCells)
+  const groundWithMine: ElevationProvider = mineTerrain.surface
+  // What things laid on the hill stand on (mushrooms, animals): the same surface,
+  // but not switching with where the player is — see MineTerrain.outsideSurface.
+  const staticGround: ElevationProvider = mineTerrain.outsideSurface
+  scene.add(buildGround(mineTerrain.meshGround, halfSize, groundCells, source.biomeAt, seed + 17))
+  // Trails stop short of the mound: a ribbon laid across a rock face is a
+  // ramp through a wall.
+  const trails = (source.paths ?? []).flatMap((rawPath) => {
+    const path = densify(rawPath, 2)
+    const runs: Vec2[][] = []
+    let run: Vec2[] = []
+    for (const p of path) {
+      if (mineTerrain.onMound(p.x, p.z, 1)) {
+        if (run.length > 1) runs.push(run)
+        run = []
+      } else {
+        run.push(p)
+      }
+    }
+    if (run.length > 1) runs.push(run)
+    return runs
+  })
+  scene.add(buildPathMeshes(trails, groundWithMine, halfSize))
+  mineGroup = buildMineMesh(mine, mineTerrain)
+  scene.add(mineGroup)
+  // Clear the mound and the doorstep of everything the scatter already put
+  // there at the raw ground height (a trunk standing in a passage, a bush
+  // under the mound): the meshes go (world/mineMesh.ts), and so do their
+  // collision circles and their trees. Nothing is left behind as an invisible
+  // obstacle, and nothing keeps its own collision without its mesh.
+  for (const child of scene.children) {
+    if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) clearScatterOnMine(child, (x, z) => mineTerrain.occupies(x, z))
   }
+  for (let i = extraObstacles.length - 1; i >= 0; i--) {
+    if (!waterCircles.includes(extraObstacles[i]) && mineTerrain.occupies(extraObstacles[i].x, extraObstacles[i].z)) {
+      extraObstacles.splice(i, 1)
+    }
+  }
+  const woodTrees = source.trees.filter((tr) => !mineTerrain.occupies(tr.x, tr.z, tr.radius))
+  extraObstacles.push(...mineObstacles(mine, mineTerrain.deckRadius))
+  // Whether the player is in the tunnels is a state of the walk in (through the
+  // doorway) and out again, not a function of where they stand — the hill
+  // above a tunnel is over the same x/z. This is called every frame with the
+  // player's position (the lamp rule reads it), which is also what keeps the
+  // height under the player's feet (`groundWithMine`) in step with it.
+  const playerInsideMine = (x: number, z: number): boolean => mineTerrain.update(x, z)
 
   // The lamp quest's own ability: a PointLight that follows the player,
   // toggled by `main.ts` (via `quest/lamp.ts`'s pure `lampIsOn`) rather than
@@ -478,9 +531,10 @@ export function createForest(
   const updatePlayerLamp = (on: boolean, pos: THREE.Vector3): void => {
     playerLamp.visible = on
     playerLamp.position.copy(pos)
+    if (mineGroup) setMineLighting(mineGroup, { lampOn: on, lampPos: pos })
   }
 
-  const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(source.trees))
+  const birds = createBirds(scene, mulberry32(seed + 15), 8, source.ground, treePerches(woodTrees))
   const updateBirds = (dt: number, playerX: number, playerZ: number): void => birds.update(dt, playerX, playerZ)
   const birdPositions = (): ReturnType<typeof birds.positions> => birds.positions()
 
@@ -488,15 +542,15 @@ export function createForest(
   // Homes are scattered independently of the tree perches birds/squirrels
   // land in — a squirrel idles on the ground and only takes to a trunk when
   // it flees.
-  const perches = treePerches(source.trees)
-  const hareHomes = placeCritterHomes(source.ground, halfSize, seed + 20, 5, [...treeCircles, ...extraObstacles])
-  const hares = createHares(scene, mulberry32(seed + 21), 5, source.ground, hareHomes)
-  const squirrelHomes = placeCritterHomes(source.ground, halfSize, seed + 22, 5, [...treeCircles, ...extraObstacles])
-  const squirrels = createSquirrels(scene, mulberry32(seed + 23), 5, source.ground, squirrelHomes, perches)
+  const perches = treePerches(woodTrees)
+  const hareHomes = placeCritterHomes(staticGround, halfSize, seed + 20, 5, [...treeCircles, ...extraObstacles])
+  const hares = createHares(scene, mulberry32(seed + 21), 5, staticGround, hareHomes)
+  const squirrelHomes = placeCritterHomes(staticGround, halfSize, seed + 22, 5, [...treeCircles, ...extraObstacles])
+  const squirrels = createSquirrels(scene, mulberry32(seed + 23), 5, staticGround, squirrelHomes, perches)
   // Rare, per the brainstorm: two snakes to a wood, not five — same species
   // count order of magnitude smaller than hares/squirrels.
-  const snakeHomes = placeCritterHomes(source.ground, halfSize, seed + 24, 2, [...treeCircles, ...extraObstacles])
-  const snakes = createSnakes(scene, mulberry32(seed + 25), 2, source.ground, snakeHomes)
+  const snakeHomes = placeCritterHomes(staticGround, halfSize, seed + 24, 2, [...treeCircles, ...extraObstacles])
+  const snakes = createSnakes(scene, mulberry32(seed + 25), 2, staticGround, snakeHomes)
   const updateCritters = (dt: number, playerX: number, playerZ: number): void => {
     hares.update(dt, playerX, playerZ)
     squirrels.update(dt, playerX, playerZ)
@@ -507,7 +561,7 @@ export function createForest(
   // 2026-09-10-wildlife-design.md. A wild hive against a real tree (or none,
   // honestly, same as the fisherman's hut with no water); dragonflies only
   // where the wood actually has a pond to hover over.
-  const hive = placeHive(source.trees, seed + 26)
+  const hive = placeHive(woodTrees, seed + 26)
   let bees: ReturnType<typeof createBees> | null = null
   if (hive) {
     scene.add(buildHiveMesh(hive))
@@ -527,20 +581,22 @@ export function createForest(
     dragonflies?.update(dt)
   }
 
-  const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l))
-  const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b))
+  const onFree = (p: { x: number; z: number }): boolean => !mineTerrain.occupies(p.x, p.z)
+  const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l)).filter(onFree)
+  const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b)).filter(onFree)
   const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
   const sites = buildSites(
-    source.ground, source.trees, halfSize, seed + 2, source.biomeAt, siteCount, deadwoodPoints, mossPoints,
+    staticGround, woodTrees, halfSize, seed + 2, source.biomeAt, siteCount, deadwoodPoints, mossPoints,
     source.water ?? [],
   )
   const month = gameMonth(gameDays)
+  // Nothing grows on the mine's rock mound or its levelled doorstep.
   const placements = spawnMushrooms(loadSpecies(), sites, {
     month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays),
-  })
+  }).filter((p) => !mineTerrain.occupies(p.x, p.z))
 
   for (const marker of fairyRingMarkers(placements)) {
-    scene.add(buildFairyRingMesh(marker, source.ground))
+    scene.add(buildFairyRingMesh(marker, staticGround))
   }
 
   const mushroomObjects: THREE.Object3D[] = []
@@ -554,7 +610,7 @@ export function createForest(
   const buildPlacements = (budgetMs: number): number => {
     const deadline = performance.now() + budgetMs
     while (placementCursor < placements.length) {
-      const built = buildPlacementObject(placements[placementCursor++], source.ground)
+      const built = buildPlacementObject(placements[placementCursor++], staticGround)
       if (built) {
         lods.push(built.lod)
         scene.add(built.object)
@@ -579,7 +635,7 @@ export function createForest(
   }
 
   return {
-    scene, ground: groundWithMine, trees: source.trees, placements, mushroomObjects, extraObstacles,
+    scene, ground: groundWithMine, trees: woodTrees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     campfire: { x: campfire.x, z: campfire.z },
     mine: { x: mine.x, z: mine.z },
@@ -588,7 +644,8 @@ export function createForest(
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
     setDiamondPlaced: (on: boolean) => shelterFx!.setDiamondPlaced(on),
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
-    setBikePlaced: (on: boolean) => shelterFx!.setBikePlaced(on),
+    setBikePlaced: (on: boolean, spot?: BikeSpot) => shelterFx!.setBikePlaced(on, spot),
+    bikeSpotNear: (p: { x: number; z: number }) => nearestBikeSpot(shelter, p),
     updateShelter, updateCampfire, updateBirds,
     birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
     updateMushroomLod, pendingPlacements, buildPlacements, updateScatterCulling,

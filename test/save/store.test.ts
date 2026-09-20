@@ -1,4 +1,6 @@
-import { emptySave, applyFind, setFindNote, mergeSave, defaultPrefs, type Find, type SaveData } from '../../src/save/store'
+import {
+  emptySave, applyFind, setFindNote, mergeSave, defaultPrefs, readBikeSpot, type Find, type SaveData,
+} from '../../src/save/store'
 
 const find = (id: string, at = 1000): Find => ({ speciesId: id, x: 1, z: 2, at })
 
@@ -112,5 +114,28 @@ describe('setFindNote', () => {
     const before = applyFind(emptySave(), find('boletus-edulis', 1000))
     setFindNote(before, 1000, 'a note')
     expect(before.finds[0].note).toBeUndefined()
+  })
+})
+
+describe('bikeSpot', () => {
+  it('survives a round trip through mergeSave', () => {
+    const merged = mergeSave({ bikeSpot: { wall: 'left', along: -0.4 } })
+    expect(readBikeSpot(merged.bikeSpot)).toEqual({ wall: 'left', along: -0.4 })
+  })
+
+  it('is absent on a save from before the choice existed', () => {
+    expect(readBikeSpot(mergeSave({}).bikeSpot)).toBeUndefined()
+  })
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a string', 'left'],
+    ['an unknown wall', { wall: 'roof', along: 0 }],
+    ['a missing offset', { wall: 'left' }],
+    ['a non-number offset', { wall: 'left', along: '1' }],
+    ['a non-finite offset', { wall: 'left', along: Infinity }],
+  ])('rejects %s read back from storage', (_label, raw) => {
+    expect(readBikeSpot(raw)).toBeUndefined()
   })
 })

@@ -102,90 +102,156 @@ function tube(a: THREE.Vector3, b: THREE.Vector3, radius: number, mat: THREE.Mat
   return mesh
 }
 
+// The bike is a side profile in the x-y plane, front wheel toward +x, wheels
+// resting on y = 0. (The first version rotated the wheels a quarter turn about
+// y, so they stood across the bike instead of along it and nothing read as a
+// bicycle — a live report, 2026-09-19.)
+const BIKE_WHEEL_RADIUS = 0.32
+const BIKE_TIRE_RADIUS = 0.025
+const BIKE_AXLE_Y = BIKE_WHEEL_RADIUS + BIKE_TIRE_RADIUS
+const BIKE_WHEELBASE = 1.0
+const BIKE_REAR_AXLE = new THREE.Vector3(-BIKE_WHEELBASE / 2, BIKE_AXLE_Y, 0)
+const BIKE_FRONT_AXLE = new THREE.Vector3(BIKE_WHEELBASE / 2, BIKE_AXLE_Y, 0)
+const BIKE_BOTTOM_BRACKET = new THREE.Vector3(-0.08, 0.3, 0)
+const BIKE_SEAT_TOP = new THREE.Vector3(-0.2, 0.78, 0)
+const BIKE_HEAD_TOP = new THREE.Vector3(0.34, 0.82, 0)
+const BIKE_STEM_TOP = new THREE.Vector3(0.31, 0.92, 0)
+const BIKE_FRAME_RADIUS = 0.016
+
+function bikeMaterials() {
+  return {
+    frame: new THREE.MeshStandardMaterial({ color: 0x2f5f9e, roughness: 0.5, metalness: 0.3 }),
+    tire: new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 }),
+    metal: new THREE.MeshStandardMaterial({ color: 0xa8adb3, roughness: 0.4, metalness: 0.6 }),
+    rubber: new THREE.MeshStandardMaterial({ color: 0x2a1f18, roughness: 0.8 }),
+  }
+}
+type BikeMaterials = ReturnType<typeof bikeMaterials>
+
+/** A spoked wheel in its own local space, centred on its axle, turning in x-y. */
+function buildBikeWheel(m: BikeMaterials): THREE.Group {
+  const wheel = new THREE.Group()
+  wheel.name = 'wheel'
+  wheel.add(new THREE.Mesh(new THREE.TorusGeometry(BIKE_WHEEL_RADIUS, BIKE_TIRE_RADIUS, 8, 24), m.tire))
+  const spokeGeo = new THREE.CylinderGeometry(0.003, 0.003, BIKE_WHEEL_RADIUS * 2, 4)
+  for (let i = 0; i < 3; i++) {
+    const spoke = new THREE.Mesh(spokeGeo, m.metal)
+    spoke.rotation.z = (i * Math.PI) / 3
+    wheel.add(spoke)
+  }
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.05, 8), m.metal)
+  hub.rotation.x = Math.PI / 2
+  wheel.add(hub)
+  return wheel
+}
+
+/** The bar across the bike (along z) with a rubber grip at each end, centred
+ *  where it is fixed to the stem. */
+function buildBikeHandlebar(m: BikeMaterials): THREE.Group {
+  const bar = new THREE.Group()
+  bar.name = 'handlebar'
+  const tubeMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.44, 6), m.metal)
+  tubeMesh.rotation.x = Math.PI / 2
+  bar.add(tubeMesh)
+  const gripGeo = new THREE.CylinderGeometry(0.017, 0.017, 0.1, 8)
+  for (const side of [-1, 1]) {
+    const grip = new THREE.Mesh(gripGeo, m.rubber)
+    grip.rotation.x = Math.PI / 2
+    grip.position.z = side * 0.19
+    bar.add(grip)
+  }
+  bar.position.copy(BIKE_STEM_TOP)
+  return bar
+}
+
+/** The parts that turn with the handlebar: the fork (head tube and blades in
+ *  one line, down to the front axle), the front wheel, the stem and the bar.
+ *  Built in the bike's own coordinates. */
+function buildBikeSteering(m: BikeMaterials): THREE.Group {
+  const steering = new THREE.Group()
+  steering.name = 'steering'
+  steering.add(tube(BIKE_HEAD_TOP, BIKE_FRONT_AXLE, BIKE_FRAME_RADIUS * 0.9, m.frame))
+  const wheel = buildBikeWheel(m)
+  wheel.position.copy(BIKE_FRONT_AXLE)
+  steering.add(wheel)
+  steering.add(tube(BIKE_HEAD_TOP, BIKE_STEM_TOP, 0.012, m.metal))
+  steering.add(buildBikeHandlebar(m))
+  return steering
+}
+
 /** A bicycle: two spoked wheels, a diamond frame, a fork, handlebar, saddle
  *  and a chainring, flat primitives only, same as everything else this
  *  project draws — see
  *  docs/superpowers/specs/2026-09-13-quest-items-design.md's own decision
- *  on the bike being a passive stat, never ridden or mounted.
- *
- *  Side profile in the x-y plane, front wheel toward +x, wheels resting on
- *  y = 0. (The first version rotated the wheels a quarter turn about y, so
- *  they stood across the bike instead of along it and nothing read as a
- *  bicycle — a live report, 2026-09-19.) */
+ *  on the bike being a passive stat, never ridden or mounted. */
 export function buildBikeModel(): THREE.Group {
   const bike = new THREE.Group()
   bike.name = 'bikeModel'
-  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2f5f9e, roughness: 0.5, metalness: 0.3 })
-  const tireMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 })
-  const metalMat = new THREE.MeshStandardMaterial({ color: 0xa8adb3, roughness: 0.4, metalness: 0.6 })
-  const seatMat = new THREE.MeshStandardMaterial({ color: 0x2a1f18, roughness: 0.8 })
+  const m = bikeMaterials()
 
-  const wheelRadius = 0.32
-  const tireRadius = 0.025
-  const axleY = wheelRadius + tireRadius
-  const wheelbase = 1.0
-  const rear = new THREE.Vector3(-wheelbase / 2, axleY, 0)
-  const front = new THREE.Vector3(wheelbase / 2, axleY, 0)
+  const rearWheel = buildBikeWheel(m)
+  rearWheel.position.copy(BIKE_REAR_AXLE)
+  bike.add(rearWheel)
+  bike.add(buildBikeSteering(m))
 
-  const tireGeo = new THREE.TorusGeometry(wheelRadius, tireRadius, 8, 24)
-  const spokeGeo = new THREE.CylinderGeometry(0.003, 0.003, wheelRadius * 2, 4)
-  const hubGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.05, 8)
-  for (const axle of [rear, front]) {
-    const wheel = new THREE.Group()
-    wheel.name = 'wheel'
-    wheel.position.copy(axle)
-    wheel.add(new THREE.Mesh(tireGeo, tireMat))
-    for (let i = 0; i < 3; i++) {
-      const spoke = new THREE.Mesh(spokeGeo, metalMat)
-      spoke.rotation.z = (i * Math.PI) / 3
-      wheel.add(spoke)
-    }
-    const hub = new THREE.Mesh(hubGeo, metalMat)
-    hub.rotation.x = Math.PI / 2
-    wheel.add(hub)
-    bike.add(wheel)
-  }
-
-  const bottomBracket = new THREE.Vector3(-0.08, 0.3, 0)
-  const seatTop = new THREE.Vector3(-0.2, 0.78, 0)
-  const headTop = new THREE.Vector3(0.34, 0.82, 0)
   const headBottom = new THREE.Vector3(0.385, 0.66, 0)
-  const frameR = 0.016
   const frameTubes: [THREE.Vector3, THREE.Vector3][] = [
-    [bottomBracket, seatTop], // seat tube
-    [seatTop, headTop], // top tube
-    [bottomBracket, headBottom], // down tube
-    [bottomBracket, rear], // chain stay
-    [seatTop, rear], // seat stay
+    [BIKE_BOTTOM_BRACKET, BIKE_SEAT_TOP], // seat tube
+    [BIKE_SEAT_TOP, BIKE_HEAD_TOP], // top tube
+    [BIKE_BOTTOM_BRACKET, headBottom], // down tube
+    [BIKE_BOTTOM_BRACKET, BIKE_REAR_AXLE], // chain stay
+    [BIKE_SEAT_TOP, BIKE_REAR_AXLE], // seat stay
   ]
-  for (const [a, b] of frameTubes) bike.add(tube(a, b, frameR, frameMat))
-  // Head tube and fork in one line, down to the front axle.
-  bike.add(tube(headTop, front, frameR * 0.9, frameMat))
+  for (const [a, b] of frameTubes) bike.add(tube(a, b, BIKE_FRAME_RADIUS, m.frame))
 
   // Seat post and saddle.
   const postTop = new THREE.Vector3(-0.22, 0.86, 0)
-  bike.add(tube(seatTop, postTop, 0.012, metalMat))
-  const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.09), seatMat)
+  bike.add(tube(BIKE_SEAT_TOP, postTop, 0.012, m.metal))
+  const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.09), m.rubber)
   saddle.position.set(-0.19, 0.88, 0)
   bike.add(saddle)
 
-  // Stem and handlebar (across the bike, along z).
-  const stemTop = new THREE.Vector3(0.31, 0.92, 0)
-  bike.add(tube(headTop, stemTop, 0.012, metalMat))
-  const handlebar = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.011, 0.44, 6), metalMat)
-  handlebar.rotation.x = Math.PI / 2
-  handlebar.position.copy(stemTop)
-  bike.add(handlebar)
-
   // Chainring and a crank with its pedal.
-  const chainring = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 14), metalMat)
+  const bb = BIKE_BOTTOM_BRACKET
+  const chainring = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.008, 14), m.metal)
   chainring.rotation.x = Math.PI / 2
-  chainring.position.set(bottomBracket.x, bottomBracket.y, 0.035)
+  chainring.position.set(bb.x, bb.y, 0.035)
   bike.add(chainring)
-  const crankEnd = new THREE.Vector3(bottomBracket.x + 0.06, bottomBracket.y - 0.1, 0.06)
-  bike.add(tube(new THREE.Vector3(bottomBracket.x, bottomBracket.y, 0.06), crankEnd, 0.01, metalMat))
-  const pedal = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.05), seatMat)
+  const crankEnd = new THREE.Vector3(bb.x + 0.06, bb.y - 0.1, 0.06)
+  bike.add(tube(new THREE.Vector3(bb.x, bb.y, 0.06), crankEnd, 0.01, m.metal))
+  const pedal = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.02, 0.05), m.rubber)
   pedal.position.set(crankEnd.x, crankEnd.y, crankEnd.z + 0.02)
   bike.add(pedal)
   return bike
+}
+
+/** What a rider sees of their own bicycle: the bar and grips, the stem, the
+ *  fork and the front wheel out ahead, plus the stub of the top tube behind
+ *  them. Same parts, same dimensions as `buildBikeModel` (front toward +x),
+ *  with the steering assembly on its own pivot: `steer(angle)` turns it about
+ *  the fork's own axis, positive toward the rider's left (matching a positive
+ *  camera yaw), so the bar and wheel swing together like a real front end. */
+export function buildBikeCockpitModel(): { group: THREE.Group; steer: (angle: number) => void } {
+  const m = bikeMaterials()
+  const group = new THREE.Group()
+  group.name = 'bikeCockpit'
+
+  const pivot = new THREE.Group()
+  pivot.name = 'steeringPivot'
+  pivot.position.copy(BIKE_HEAD_TOP)
+  const steering = buildBikeSteering(m)
+  steering.position.copy(BIKE_HEAD_TOP).negate() // its parts are in bike coordinates
+  pivot.add(steering)
+  group.add(pivot)
+
+  const topTubeEnd = new THREE.Vector3(BIKE_HEAD_TOP.x - 0.3, BIKE_HEAD_TOP.y - 0.02, 0)
+  group.add(tube(BIKE_HEAD_TOP, topTubeEnd, BIKE_FRAME_RADIUS, m.frame))
+
+  const axis = BIKE_HEAD_TOP.clone().sub(BIKE_FRONT_AXLE).normalize()
+  return {
+    group,
+    steer: (angle) => {
+      pivot.quaternion.setFromAxisAngle(axis, angle)
+    },
+  }
 }

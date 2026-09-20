@@ -1,27 +1,54 @@
-import * as THREE from 'three'
 import { findOpenSpot, type Circle } from '../util/openSpot'
 import { mulberry32, randRange } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Vec2 } from '../geo/types'
+import { densify } from '../util/geometry'
+
+/**
+ * The wood's one mine: a branching system of tunnels driven into the ground,
+ * a rough-hewn rock mouth on the meadow, and a floor the player can actually
+ * walk. This file is the pure core of it — the shape of the tunnels
+ * (`placeMine`), which points are cave and which are rock (`caveSdf`), the
+ * lattice the tunnel mesh and the tunnel collision are both read off
+ * (`caveLattice`), and where the player stands (`mineFloorHeightAt`). How the
+ * hillside is dressed around it lives in `mineTerrain.ts`, how it is drawn in
+ * `mineMesh.ts`; both read this file, so the mesh, the collision and the
+ * height the player walks at can never disagree.
+ *
+ * Design notes, and what changed from the first version (see the fix in
+ * v0.95.5 — the mine used to be buried 5-7 m under the terrain, behind a
+ * single-sided mesh):
+ *
+ *  - The floor is FLAT, at the height of the ground at the mouth. The first
+ *    version dropped 5+ m over a 5 m ramp (a 45 degree wall the player's own
+ *    slope limit refused), and hid the whole thing under the terrain mesh,
+ *    which is opaque and single-sided.
+ *  - The tunnels are the union of round-ended capsules, one per segment, so a
+ *    fork is one open junction rather than two rectangles with a notch and a
+ *    stray wall standing in the passage.
+ *  - The mesh is built from a lattice of cells over that union, so it is
+ *    watertight by construction: every wall, floor and ceiling quad shares
+ *    its corner vertices with its neighbours.
+ */
 
 export interface MineSegment {
   id: number
   /** null for the entrance/root segment. */
   parentId: number | null
   /** Local start/end, metres, before `Mine.heading`'s rotation — the same
-   *  local frame `localToWorld` already rotates as one piece. */
+   *  local frame `localToWorld` already rotates as one piece. The mouth is
+   *  the local origin, and the tunnels bore along local +x. */
   x0: number
   z0: number
   x1: number
   z1: number
-  /** Floor height relative to the entrance. Only the root segment slopes
-   *  (y0 = 0, y1 < 0); every other segment continues flat from its parent's
-   *  own y1, matching the "goes down once, at the mouth" brief. */
+  /** Floor height relative to the entrance. Always 0 now — the floor is flat,
+   *  see the note at the top of the file. Kept on the segment so a future
+   *  sloped shaft has somewhere to put it. */
   y0: number
   y1: number
   width: number
-  /** No children — closed by a back wall (mineObstacles/buildMineMesh both
-   *  read this instead of assuming the single old dead end). */
+  /** No children — a dead end (or the diamond chamber). */
   isLeaf: boolean
   /** True for exactly one leaf: the far end of the one path that actually
    *  leads to the diamond, per the branching cave design
@@ -32,15 +59,16 @@ export interface MineSegment {
 export interface Mine {
   x: number
   z: number
-  /** Ground height at the entrance itself. */
+  /** Ground height at the entrance itself — also the height of the whole
+   *  floor. */
   y: number
   /** Radians the cave bores away from the entrance, 0 along +x. */
   heading: number
   /** The cave's own branching graph — see MineSegment. Always has at least
-   *  one segment (the entrance ramp), even with zero forks. */
+   *  one segment (the entrance), even with zero forks. */
   segments: MineSegment[]
   /** Farthest straight-line distance, in local metres, from the entrance to
-   *  any point in the graph — isInsideMine's own "is it dark here" radius. */
+   *  the far end of any segment. */
   reach: number
 }
 
@@ -51,8 +79,14 @@ interface CircleObstacle {
   radius: number
 }
 
-const TUNNEL_WIDTH = 2.2
-const TUNNEL_HEIGHT = 2.3
+/** A tunnel comfortable to walk in, and to turn round in: the first version
+ *  was 2.2 m wide, and a first-person player's 0.3 m body radius plus the
+ *  wall circles' own left barely a metre and a half to steer through. */
+export const TUNNEL_WIDTH = 3.2
+export const TUNNEL_HEIGHT = 2.8
+/** The floor mesh sits this far above the ground the player is told they
+ *  stand on — hides the seam against the apron terrain. */
+export const FLOOR_LIFT = 0.02
 
 /** How far out, and how many directions, `placeMine` samples to find "into
  *  the hillside" — see its own doc comment for why this reads the terrain
@@ -61,66 +95,47 @@ const HEADING_SAMPLE_DIST = 8
 const HEADING_CANDIDATES = 12
 
 /** How far the procedurally-sited entrance needs from anything already
- *  standing, metres — a rough stand-in for the whole graph's own footprint
- *  along whichever heading it ends up boring (the heading itself is only
- *  known after the entrance point is picked, so this can only protect the
- *  mouth, not the full graph — the same simplification `world/shelter.ts`'s
- *  own SHELTER_CLEARANCE already accepts). */
-const MINE_CLEARANCE = 6
+ *  standing, metres. The mound the tunnels sit under is wider than this, but
+ *  the mouth is the part that must stay clear. */
+const MINE_CLEARANCE = 8
 
-/** Spacing of the small circles standing in for the tunnel's real (thin,
- *  straight) walls in the player's own circle-based collision — the same
- *  technique `world/shelter.ts`'s `wallObstacles` uses, close enough
- *  together that a player's own radius can never slip between two. */
-const WALL_CIRCLE_SPACING = 0.3
-const WALL_CIRCLE_RADIUS = 0.16
+/** How far the levelled apron in front of the mouth reaches, metres (see
+ *  mineTerrain.ts), and the slack kept between the whole system — mound rim
+ *  included — and the plot's edge. */
+const APRON_EXTENT = 12
+const EDGE_MARGIN = 8
 
-/** Root segment: length of the sloped entrance ramp, metres. */
-const RAMP_LENGTH_RANGE: [number, number] = [4, 5.5]
-/** How far below the real terrain surface directly above it every segment's
- *  own far end sits, metres. `placeMine`'s own heading is only checked to
- *  rise over `HEADING_SAMPLE_DIST` (8m) in one direction — once the graph
- *  forks up to `FORK_TURN_RANGE` away from that heading and reaches farther
- *  than 8m, the real hillside is no longer guaranteed to keep climbing with
- *  it, and a depth measured only from the entrance's own single height
- *  sample can leave a far branch poking out of a dip in the terrain (caught
- *  by the screenshot check in
- *  docs/superpowers/plans/2026-09-15-mine-cave-plan.md's own Task 8). Each
- *  segment instead reads the real terrain at its own far end and buries
- *  itself this far under it, so the graph stays hidden regardless of how the
- *  ground actually undulates along the way. Measured from the floor, so it
- *  has to clear `TUNNEL_HEIGHT` (the ceiling's own extra height above the
- *  floor) with real margin left over, or the ceiling alone breaches the
- *  surface even when the floor is safely buried — exactly the thin spikes
- *  the first version of this fix (a shallower [2, 3.5] range) still left
- *  poking out in the screenshot check. */
-const BURIAL_DEPTH_RANGE: [number, number] = [TUNNEL_HEIGHT + 2.5, TUNNEL_HEIGHT + 4.5]
+/** A trail this close to a passage (metres, outline to point) counts as
+ *  running over the mound; the mound's own radius depends on the terrain mesh
+ *  (mineTerrain.ts), and this is a little over its usual reach. */
+const TRAIL_CLEARANCE = 6
+const TRAIL_SAMPLE = 2
+
+/** Root segment: length of the entrance passage, metres. */
+const ROOT_LENGTH_RANGE: [number, number] = [5, 7]
 /** How many forks the whole tree gets — leaves end up at 1 + this. */
 const BRANCH_COUNT_RANGE: [number, number] = [3, 5]
-const CHILD_LENGTH_RANGE: [number, number] = [3, 6]
+const CHILD_LENGTH_RANGE: [number, number] = [4.5, 7.5]
 /** Half-angle, radians, each of a fork's two children turns away from the
  *  parent's own heading — wide enough that the two forks read as genuinely
  *  different directions, not a barely-there kink. */
 const FORK_TURN_RANGE: [number, number] = [0.5, 0.95]
+/** No passage may head more than this far off the entrance's own axis, so the
+ *  system fans out into the hill instead of curling back through the mouth. */
+const MAX_HEADING = 1.15
 const CHILD_WIDTH_FACTOR_RANGE: [number, number] = [0.85, 1.15]
-/** The diamond chamber's own leaf gets wider on its last third — a small
- *  room, not just a wider corridor. */
-const CHAMBER_WIDTH_FACTOR = 1.6
+/** The diamond chamber's own leaf is wider — a small room, not just a wider
+ *  corridor. */
+const CHAMBER_WIDTH_FACTOR = 1.5
 
 /**
- * Builds the cave's own branching graph: a sloped entrance segment, then
+ * Builds the cave's own branching graph: an entrance passage, then
  * `BRANCH_COUNT_RANGE` forks off whichever leaf the RNG picks each time,
- * ending with exactly one leaf marked as the diamond chamber and the rest
- * as dead ends. See docs/superpowers/specs/2026-09-15-mine-cave-design.md
- * §1 for the shape this is meant to produce.
- *
- * `depthAt(lx, lz)` gives the y (relative to the entrance) that keeps a
- * point buried a safe margin under the real terrain there — see
- * `BURIAL_DEPTH_RANGE`'s own doc comment for why every segment's far end
- * reads this instead of just inheriting a fixed drop from the entrance.
+ * ending with exactly one leaf marked as the diamond chamber and the rest as
+ * dead ends. See docs/superpowers/specs/2026-09-15-mine-cave-design.md §1.
  */
-function buildMineGraph(rng: () => number, depthAt: (lx: number, lz: number) => number): MineSegment[] {
-  const rootLength = randRange(rng, RAMP_LENGTH_RANGE)
+function buildMineGraph(rng: () => number): MineSegment[] {
+  const rootLength = randRange(rng, ROOT_LENGTH_RANGE)
   const root: MineSegment = {
     id: 0,
     parentId: null,
@@ -129,7 +144,7 @@ function buildMineGraph(rng: () => number, depthAt: (lx: number, lz: number) => 
     x1: rootLength,
     z1: 0,
     y0: 0,
-    y1: depthAt(rootLength, 0),
+    y1: 0,
     width: TUNNEL_WIDTH,
     isLeaf: true,
     isDiamondChamber: false,
@@ -145,19 +160,18 @@ function buildMineGraph(rng: () => number, depthAt: (lx: number, lz: number) => 
     const parentAngle = Math.atan2(parent.z1 - parent.z0, parent.x1 - parent.x0)
     const children: MineSegment[] = []
     for (const sign of [1, -1]) {
-      const angle = parentAngle + sign * randRange(rng, FORK_TURN_RANGE)
+      const raw = parentAngle + sign * randRange(rng, FORK_TURN_RANGE)
+      const angle = Math.max(-MAX_HEADING, Math.min(MAX_HEADING, raw))
       const length = randRange(rng, CHILD_LENGTH_RANGE)
-      const cx1 = parent.x1 + Math.cos(angle) * length
-      const cz1 = parent.z1 + Math.sin(angle) * length
       const child: MineSegment = {
         id: nextId++,
         parentId: parent.id,
         x0: parent.x1,
         z0: parent.z1,
-        x1: cx1,
-        z1: cz1,
-        y0: parent.y1,
-        y1: depthAt(cx1, cz1),
+        x1: parent.x1 + Math.cos(angle) * length,
+        z1: parent.z1 + Math.sin(angle) * length,
+        y0: 0,
+        y1: 0,
         width: TUNNEL_WIDTH * randRange(rng, CHILD_WIDTH_FACTOR_RANGE),
         isLeaf: true,
         isDiamondChamber: false,
@@ -180,9 +194,8 @@ function buildMineGraph(rng: () => number, depthAt: (lx: number, lz: number) => 
  * mineshaft mouth (`geo/parse.ts`'s `CaveEntrance`, `mapped` here) always
  * wins when this plot has one — the same rule `world/shelter.ts`'s
  * `placeShelter` already follows for a mapped hut. Every wood gets a mine
- * either way now (a live request, 2026-09-15: the diamond quest item needs
- * somewhere to be in every wood, not only the ones a surveyor happened to
- * map a real entrance in) — where nothing was surveyed, the entrance is
+ * either way (a live request, 2026-09-15: the diamond quest item needs
+ * somewhere to be in every wood) — where nothing was surveyed, the entrance is
  * sited the same way the shelter and campfire already are: a random
  * direction from the shelter, `findOpenSpot` keeping it clear of everything
  * else already standing.
@@ -191,9 +204,8 @@ function buildMineGraph(rng: () => number, depthAt: (lx: number, lz: number) => 
  * has no such record either, so the heading is always read off the terrain
  * itself rather than guessed or seeded: whichever of a ring of candidate
  * directions climbs the most over `HEADING_SAMPLE_DIST` is treated as "into
- * the hillside" — the same thing a real visitor would look for, and no
- * worse an approximation on a procedurally-sited mouth than a mapped one,
- * since neither ever carried a real heading to begin with.
+ * the hillside" — the same thing a real visitor would look for. The mouth
+ * ends up with the hill rising behind it and open ground in front.
  */
 export function placeMine(
   ground: ElevationProvider,
@@ -202,7 +214,25 @@ export function placeMine(
   obstacles: Circle[],
   shelterPos: Vec2,
   mapped: Vec2[] = [],
+  /** Trails (local metres): the tunnels are pointed away from them where the
+   *  hillside allows, so a trail arrives at the doorway rather than at the
+   *  back of the mound. */
+  trails: Vec2[][] = [],
 ): Mine {
+  // The tunnels, the mound over them and the levelled apron in front must all
+  // stand inside this plot: past its edge the ground is another chunk's
+  // (game/worldStream.ts), which knows nothing of the mine. The graph does not
+  // depend on where it sits, so it is built first and its size decides how far
+  // from the edge the mouth may be sited.
+  const graphRng = mulberry32((seed + 0x9e3779b1) >>> 0)
+  const graph = buildMineGraph(graphRng)
+  const reach = Math.max(...graph.map((s) => Math.hypot(s.x1, s.z1)))
+  const extent = Math.max(
+    APRON_EXTENT,
+    ...graph.flatMap((s) => [Math.hypot(s.x0, s.z0) + s.width / 2, Math.hypot(s.x1, s.z1) + s.width / 2]),
+  )
+  const edge = halfSize - extent - EDGE_MARGIN
+
   const real = mapped.find((m) => Math.abs(m.x) <= halfSize && Math.abs(m.z) <= halfSize)
   let x: number
   let z: number
@@ -213,55 +243,61 @@ export function placeMine(
     const rng = mulberry32(seed)
     const angle = rng() * Math.PI * 2
     const dist = halfSize * (0.25 + rng() * 0.4)
-    const clamp = (v: number): number => Math.max(-halfSize, Math.min(halfSize, v))
+    const limit = Math.max(0, edge)
+    const clamp = (v: number): number => Math.max(-limit, Math.min(limit, v))
     const origin = { x: clamp(shelterPos.x + Math.cos(angle) * dist), z: clamp(shelterPos.z + Math.sin(angle) * dist) }
-    ;({ x, z } = findOpenSpot(obstacles, halfSize, origin, MINE_CLEARANCE))
+    ;({ x, z } = findOpenSpot(obstacles, limit, origin, MINE_CLEARANCE))
   }
 
   const here = ground.heightAt(x, z)
-  let bestHeading = 0
-  let bestRise = -Infinity
+  // Every candidate heading, best climb first. A mapped mouth can stand near
+  // the plot's edge; then the best heading that keeps the whole system inside
+  // wins over a slightly better hillside pointing off the plot.
+  const trailPoints = trails.flatMap((t) => densify(t, TRAIL_SAMPLE))
+  const candidates: { heading: number; rise: number; overshoot: number; onTrail: number }[] = []
   for (let i = 0; i < HEADING_CANDIDATES; i++) {
     const heading = (i / HEADING_CANDIDATES) * Math.PI * 2
-    const sx = x + Math.cos(heading) * HEADING_SAMPLE_DIST
-    const sz = z + Math.sin(heading) * HEADING_SAMPLE_DIST
-    const rise = ground.heightAt(sx, sz) - here
-    if (rise > bestRise) {
-      bestRise = rise
-      bestHeading = heading
+    const rise = ground.heightAt(x + Math.cos(heading) * HEADING_SAMPLE_DIST, z + Math.sin(heading) * HEADING_SAMPLE_DIST) - here
+    let overshoot = 0
+    const cos = Math.cos(heading)
+    const sin = Math.sin(heading)
+    for (const s of graph) {
+      for (const [lx, lz] of [[s.x1, s.z1], [s.x0, s.z0]] as const) {
+        const r = s.width / 2 + EDGE_MARGIN
+        const wx = x + lx * cos - lz * sin
+        const wz = z + lx * sin + lz * cos
+        overshoot = Math.max(overshoot, Math.abs(wx) + r - halfSize, Math.abs(wz) + r - halfSize)
+      }
     }
+    const fx = x - APRON_EXTENT * cos
+    const fz = z - APRON_EXTENT * sin
+    overshoot = Math.max(overshoot, Math.abs(fx) - halfSize, Math.abs(fz) - halfSize)
+    // Trail points lying on the mound (behind the mouth's plane, within its
+    // radius of the tunnels): the trail would run into the back of the rock.
+    let onTrail = 0
+    if (trailPoints.length > 0) {
+      const probe: Mine = { x, z, y: here, heading, segments: graph, reach }
+      for (const tp of trailPoints) {
+        const { lx, lz } = worldToLocal(probe, tp.x, tp.z)
+        if (lx > 1 && caveSdf(probe, lx, lz) < TRAIL_CLEARANCE) onTrail++
+      }
+    }
+    candidates.push({ heading, rise, overshoot: Math.max(0, overshoot), onTrail })
   }
-  const graphRng = mulberry32((seed + 0x9e3779b1) >>> 0)
-  const cosH = Math.cos(bestHeading)
-  const sinH = Math.sin(bestHeading)
-  const depthAt = (lx: number, lz: number): number => {
-    const wx = x + lx * cosH - lz * sinH
-    const wz = z + lx * sinH + lz * cosH
-    return ground.heightAt(wx, wz) - here - randRange(graphRng, BURIAL_DEPTH_RANGE)
+  let best = candidates[0]
+  const better = (a: (typeof candidates)[number], b: (typeof candidates)[number]): boolean => {
+    // Staying on the plot always wins; then keeping off the trails; then the
+    // steepest climb into the hill.
+    if (Math.abs(a.overshoot - b.overshoot) > 1e-9) return a.overshoot < b.overshoot
+    if (a.onTrail !== b.onTrail) return a.onTrail < b.onTrail
+    return a.rise > b.rise
   }
-  const graph = buildMineGraph(graphRng, depthAt)
-  const reach = Math.max(...graph.map((s) => Math.hypot(s.x1, s.z1)))
-  return { x, z, y: here, heading: bestHeading, segments: graph, reach }
+  for (const c of candidates) if (better(c, best)) best = c
+  return { x, z, y: here, heading: best.heading, segments: graph, reach }
 }
 
-/**
- * Whether a point is close enough to this mine's own graph to count as
- * "inside" for the lamp's own on/off rule (`quest/lamp.ts`'s `lampIsOn`) — a
- * plain distance check against the graph's own reach (`m.reach`, see
- * `placeMine`), not a precise inside-the-tunnel test: the honest reading of
- * "you're at the mine, it's dark in there" stays the same as the original
- * single-corridor version, just sized to whatever the graph turned out to
- * be this world.
- */
-export function isInsideMine(m: Mine, x: number, z: number): boolean {
-  return Math.hypot(x - m.x, z - m.z) <= m.reach
-}
-
-/** A point `lx` deep and `lz` across from the entrance, in world metres —
- *  shared by the collision (`mineObstacles`) and the mesh (`buildMineMesh`,
- *  via the same rotation applied to its whole group) so the two can never
- *  drift apart. */
-function localToWorld(m: Mine, lx: number, lz: number): { x: number; z: number } {
+/** A point `lx` deep and `lz` across from the entrance, in world metres. */
+export function localToWorld(m: Mine, lx: number, lz: number): { x: number; z: number } {
   const cos = Math.cos(m.heading)
   const sin = Math.sin(m.heading)
   return { x: m.x + lx * cos - lz * sin, z: m.z + lx * sin + lz * cos }
@@ -269,7 +305,7 @@ function localToWorld(m: Mine, lx: number, lz: number): { x: number; z: number }
 
 /** The inverse of `localToWorld` — world metres back to the graph's own
  *  local frame. */
-function worldToLocal(m: Mine, x: number, z: number): { lx: number; lz: number } {
+export function worldToLocal(m: Mine, x: number, z: number): { lx: number; lz: number } {
   const cos = Math.cos(m.heading)
   const sin = Math.sin(m.heading)
   const dx = x - m.x
@@ -277,76 +313,288 @@ function worldToLocal(m: Mine, x: number, z: number): { lx: number; lz: number }
   return { lx: dx * cos + dz * sin, lz: -dx * sin + dz * cos }
 }
 
+/** Value returned by `caveSdf` for anything behind the mouth's own plane —
+ *  large, so it reads as "solid" to every caller. */
+const OUTSIDE = 1e3
+
 /**
- * The cave's own floor height (world metres) directly under a point, or
- * `null` when that point isn't over any segment's corridor at all. This is
- * the seam that lets the player actually walk down into the graph: every
- * segment slopes and buries itself under the real terrain (see
- * `BURIAL_DEPTH_RANGE`'s own doc comment), so the real terrain height alone
- * — what `ElevationProvider` gives outside the mine — would have the player
- * either stuck against the real hillside at the mouth (the terrain there was
- * deliberately picked as the steepest-rising direction, see `placeMine`) or
- * standing well above the buried floor once inside. A caller wraps its own
- * `ElevationProvider` to prefer this over the real terrain wherever it
- * isn't null (game/scene.ts's `createForest`).
+ * Signed distance from a local point to the tunnel system: negative inside a
+ * passage (how far from the nearest wall), positive in rock. The union of one
+ * round-ended capsule per segment, clipped to the mouth's own plane (nothing
+ * of the cave exists at lx < 0). The single source of truth for "is this
+ * cave?" — the mesh lattice, the collision and the player's floor all ask it.
+ */
+export function caveSdf(m: Mine, lx: number, lz: number): number {
+  if (lx < 0) return OUTSIDE
+  let best = Infinity
+  for (const seg of m.segments) {
+    const dx = seg.x1 - seg.x0
+    const dz = seg.z1 - seg.z0
+    const len2 = dx * dx + dz * dz || 1
+    const t = Math.max(0, Math.min(1, ((lx - seg.x0) * dx + (lz - seg.z0) * dz) / len2))
+    const d = Math.hypot(lx - (seg.x0 + dx * t), lz - (seg.z0 + dz * t)) - seg.width / 2
+    if (d < best) best = d
+  }
+  return best
+}
+
+/**
+ * Whether a point is over (or right at the mouth of) this mine's own tunnels
+ * in plan view — a metre of slack included so the doorway itself counts. Pure
+ * geometry: the hill above a tunnel is over the same x/z, so this does NOT
+ * tell whether the player is actually down in it. The game asks
+ * `MineTerrain.update` (mineTerrain.ts) for that.
+ */
+export function isInsideMine(m: Mine, x: number, z: number): boolean {
+  const { lx, lz } = worldToLocal(m, x, z)
+  return caveSdf(m, lx, lz) < 1
+}
+
+/**
+ * The height the player stands at inside the tunnels (world metres), or
+ * `null` when a point is not over any passage. `game/scene.ts` wraps the real
+ * terrain with `mineTerrain.ts`, which decides when this answer is the right
+ * one for the player (the hill above the tunnels shares their x/z).
  */
 export function mineFloorHeightAt(m: Mine, x: number, z: number): number | null {
   const { lx, lz } = worldToLocal(m, x, z)
-  for (const seg of m.segments) {
-    const dx = seg.x1 - seg.x0
-    const dz = seg.z1 - seg.z0
-    const length = Math.hypot(dx, dz) || 1
-    const dirX = dx / length
-    const dirZ = dz / length
-    const alongLen = (lx - seg.x0) * dirX + (lz - seg.z0) * dirZ
-    const t = alongLen / length
-    if (t < 0 || t > 1) continue
-    const across = (lx - seg.x0) * -dirZ + (lz - seg.z0) * dirX
-    if (Math.abs(across) > seg.width / 2) continue
-    return m.y + seg.y0 + (seg.y1 - seg.y0) * t
-  }
-  return null
+  return caveSdf(m, lx, lz) < 0 ? m.y : null
+}
+
+// --------------------------------------------------------------------------
+// The lattice: the one description of the tunnel walls the mesh and the
+// collision are both read from.
+
+/** Cell size of the tunnel lattice, metres. Fine enough for a rough-hewn
+ *  wall, coarse enough that the whole system is a few thousand quads. */
+export const LATTICE = 0.5
+/** How much lower the vault comes at the wall than in the middle of a
+ *  passage, metres — a rounded, hewn profile instead of a rectangular box. */
+const VAULT_DROP = 0.7
+/** How far from the wall the vault has fully risen, metres. */
+const VAULT_SPAN = 1.3
+/** Deterministic wobble of a lattice corner, metres — must stay well inside
+ *  what the wall circles below leave the player (see WALL_RADIUS). */
+const ROCK_JITTER_XZ = 0.07
+/** How far a boundary corner is pulled onto the true outline (a share of its
+ *  distance from it, capped). Not all the way: pulling every boundary corner
+ *  fully onto a diagonal outline flattens the cells along it to slivers, and a
+ *  sliver can fold over and face the wrong way. */
+const PULL = 0.6
+const PULL_MAX = 0.3 * LATTICE
+const ROCK_JITTER_Y = 0.14
+/** Collision circle on every wall corner. Together with the player's own
+ *  radius (0.3) it keeps the camera at least ~0.4 m from any visible wall
+ *  face, which is more than the near plane and the jitter above need. */
+const WALL_RADIUS = 0.22
+
+export interface CaveVertex {
+  /** Local metres. */
+  x: number
+  z: number
+  /** Ceiling height above the floor, metres. */
+  ceil: number
+}
+
+export interface WallEdge {
+  a: CaveVertex
+  b: CaveVertex
+  /** Unit direction (local x/z) the wall faces — into the passage. */
+  nx: number
+  nz: number
+}
+
+export interface CaveCell {
+  i: number
+  j: number
+  /** Its four corners in order (i,j) (i+1,j) (i+1,j+1) (i,j+1) — x then z. */
+  corners: [CaveVertex, CaveVertex, CaveVertex, CaveVertex]
+  cx: number
+  cz: number
+}
+
+export interface CaveLattice {
+  cells: CaveCell[]
+  walls: WallEdge[]
+}
+
+const latticeCache = new WeakMap<Mine, CaveLattice>()
+
+function smoothstep(a: number, b: number, v: number): number {
+  const t = Math.max(0, Math.min(1, (v - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
+
+/** A deterministic pair of [-1, 1] values for one lattice corner. */
+function cornerNoise(i: number, j: number, salt: number): [number, number, number] {
+  const rng = mulberry32((Math.imul(i + 4096, 73856093) ^ Math.imul(j + 4096, 19349663) ^ salt) >>> 0)
+  return [rng() * 2 - 1, rng() * 2 - 1, rng() * 2 - 1]
 }
 
 /**
- * The cave's own collision: two side walls running each segment's own
- * length, plus a back wall closing every leaf's far end — every dead end
- * and the diamond chamber alike are closed, only the graph's shape (see
- * `buildMineGraph`) decides where those ends are.
+ * The tunnel system as a grid of cells: every cell whose centre is cave is a
+ * floor + ceiling quad, every cell edge between cave and rock is a wall. The
+ * corners on the boundary are pulled onto the true cave outline (`caveSdf`
+ * zero), and every corner wobbles by a fixed deterministic amount, so the
+ * walls read as rock — while the corners stay SHARED between neighbouring
+ * quads, which is what makes the surface closed with no cracks to see the
+ * outside through. Cached per mine.
  */
-export function mineObstacles(m: Mine): CircleObstacle[] {
-  const out: CircleObstacle[] = []
+export function caveLattice(m: Mine): CaveLattice {
+  const cached = latticeCache.get(m)
+  if (cached) return cached
 
-  for (const seg of m.segments) {
-    const dx = seg.x1 - seg.x0
-    const dz = seg.z1 - seg.z0
-    const length = Math.hypot(dx, dz) || 1
-    const dirX = dx / length
-    const dirZ = dz / length
-    const perpX = -dirZ
-    const perpZ = dirX
-    const half = seg.width / 2
-
-    const sideSteps = Math.ceil(length / WALL_CIRCLE_SPACING)
-    for (let i = 0; i <= sideSteps; i++) {
-      const t = i / sideSteps
-      const lx = seg.x0 + dx * t
-      const lz = seg.z0 + dz * t
-      out.push({ ...localToWorld(m, lx + perpX * half, lz + perpZ * half), radius: WALL_CIRCLE_RADIUS })
-      out.push({ ...localToWorld(m, lx - perpX * half, lz - perpZ * half), radius: WALL_CIRCLE_RADIUS })
-    }
-
-    if (seg.isLeaf) {
-      const backSteps = Math.ceil(seg.width / WALL_CIRCLE_SPACING)
-      for (let i = 0; i <= backSteps; i++) {
-        const s = -half + (i / backSteps) * seg.width
-        out.push({ ...localToWorld(m, seg.x1 + perpX * s, seg.z1 + perpZ * s), radius: WALL_CIRCLE_RADIUS })
-      }
+  const salt = (Math.round(m.x * 131) ^ Math.round(m.z * 733) ^ 0x2545f491) >>> 0
+  let maxX = 0
+  let maxZ = 0
+  for (const s of m.segments) {
+    const r = s.width / 2 + 1
+    maxX = Math.max(maxX, s.x0 + r, s.x1 + r)
+    maxZ = Math.max(maxZ, Math.abs(s.z0) + r, Math.abs(s.z1) + r)
+  }
+  const ni = Math.ceil(maxX / LATTICE)
+  const j0 = -Math.ceil(maxZ / LATTICE)
+  const nj = -j0 * 2
+  const occupied = new Uint8Array(ni * nj)
+  const occ = (i: number, j: number): boolean =>
+    i >= 0 && i < ni && j >= j0 && j < j0 + nj && occupied[i * nj + (j - j0)] === 1
+  for (let i = 0; i < ni; i++) {
+    for (let j = j0; j < j0 + nj; j++) {
+      if (caveSdf(m, (i + 0.5) * LATTICE, (j + 0.5) * LATTICE) < 0) occupied[i * nj + (j - j0)] = 1
     }
   }
 
+  const vertexCache = new Map<number, CaveVertex>()
+  const vertex = (i: number, j: number): CaveVertex => {
+    const key = i * 100003 + j
+    const hit = vertexCache.get(key)
+    if (hit) return hit
+    let x = i * LATTICE
+    let z = j * LATTICE
+    const sdf0 = caveSdf(m, x, z)
+    // On the boundary when the four cells around it are not all cave.
+    const around = [occ(i - 1, j - 1), occ(i, j - 1), occ(i - 1, j), occ(i, j)]
+    const boundary = around.some(Boolean) && !around.every(Boolean)
+    if (i > 0) {
+      if (boundary) {
+        const e = 0.05
+        let gx = caveSdf(m, x + e, z) - caveSdf(m, x - e, z)
+        let gz = caveSdf(m, x, z + e) - caveSdf(m, x, z - e)
+        const gl = Math.hypot(gx, gz) || 1
+        gx /= gl
+        gz /= gl
+        const pull = Math.max(-PULL_MAX, Math.min(PULL_MAX, sdf0 * PULL))
+        x -= gx * pull
+        z -= gz * pull
+      }
+      const [nx, nz] = cornerNoise(i, j, salt)
+      x += nx * ROCK_JITTER_XZ
+      z += nz * ROCK_JITTER_XZ
+    } else if (boundary) {
+      // The mouth plane itself: slide along it onto the outline, never off it.
+      const gz = Math.sign(caveSdf(m, 0, z + 0.05) - caveSdf(m, 0, z - 0.05)) || 1
+      z -= gz * Math.max(-PULL_MAX, Math.min(PULL_MAX, sdf0 * PULL))
+    }
+    const [, , ny] = cornerNoise(i, j, salt ^ 0x9e3779b1)
+    const depth = Math.max(0, -caveSdf(m, Math.max(0, x), z))
+    const ceil = TUNNEL_HEIGHT - VAULT_DROP * (1 - smoothstep(0, VAULT_SPAN, depth)) + (i > 0 ? ny * ROCK_JITTER_Y : 0)
+    const v = { x, z, ceil }
+    vertexCache.set(key, v)
+    return v
+  }
+
+  const cells: CaveCell[] = []
+  const walls: WallEdge[] = []
+  for (let i = 0; i < ni; i++) {
+    for (let j = j0; j < j0 + nj; j++) {
+      if (!occ(i, j)) continue
+      const v00 = vertex(i, j)
+      const v10 = vertex(i + 1, j)
+      const v11 = vertex(i + 1, j + 1)
+      const v01 = vertex(i, j + 1)
+      const cx = (i + 0.5) * LATTICE
+      const cz = (j + 0.5) * LATTICE
+      cells.push({ i, j, corners: [v00, v10, v11, v01], cx, cz })
+      // Walls: toward every neighbour that is rock. The neighbour behind the
+      // mouth plane (i - 1 at i = 0) is the doorway, not a wall.
+      if (i > 0 && !occ(i - 1, j)) walls.push({ a: v01, b: v00, nx: 1, nz: 0 })
+      if (!occ(i + 1, j)) walls.push({ a: v10, b: v11, nx: -1, nz: 0 })
+      if (!occ(i, j - 1)) walls.push({ a: v00, b: v10, nx: 0, nz: 1 })
+      if (!occ(i, j + 1)) walls.push({ a: v11, b: v01, nx: 0, nz: -1 })
+    }
+  }
+
+  const lattice = { cells, walls }
+  latticeCache.set(m, lattice)
+  return lattice
+}
+
+/**
+ * The cave's own collision: a small circle on every wall corner (and one
+ * mid-way along any long wall edge), read off the very lattice the mesh is
+ * built from — so the walls the player bumps are exactly the walls they see.
+ * Nothing is placed across the doorway itself. Dead ends and the diamond
+ * chamber need nothing special: their walls are lattice walls like any other.
+ *
+ * `moundRadius` (mineTerrain.ts's `deckRadius`) adds the outside of the mine:
+ * the rock face either side of the doorway, and a ring along the foot of the
+ * mound over the tunnels. The mound is a steep outcrop, and a slope limit is
+ * not a wall (walk at an angle to the fall line and any grade becomes a
+ * climb), so its foot is collision, at the height where it has visibly
+ * risen into a cliff.
+ */
+export function mineObstacles(m: Mine, moundRadius?: number): CircleObstacle[] {
+  const out: CircleObstacle[] = []
+  const seen = new Set<CaveVertex>()
+  const push = (lx: number, lz: number): void => {
+    out.push({ ...localToWorld(m, lx, lz), radius: WALL_RADIUS })
+  }
+  for (const w of caveLattice(m).walls) {
+    for (const v of [w.a, w.b]) {
+      if (seen.has(v)) continue
+      seen.add(v)
+      push(v.x, v.z)
+    }
+    if (Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) > 0.55) push((w.a.x + w.b.x) / 2, (w.a.z + w.b.z) / 2)
+  }
+
+  const half = m.segments[0].width / 2
+  const faceExtra = moundRadius === undefined ? FACE_HALF_EXTRA : moundRadius + 0.5
+  for (let s = half + LATTICE; s <= half + faceExtra; s += 0.4) {
+    push(0, s)
+    push(0, -s)
+  }
+
+  if (moundRadius !== undefined) {
+    // Where the mound has risen to about a metre: a cliff by then.
+    const foot = moundRadius - FOOT_INSET
+    let maxX = 0
+    let maxZ = 0
+    for (const s of m.segments) {
+      maxX = Math.max(maxX, s.x0, s.x1)
+      maxZ = Math.max(maxZ, Math.abs(s.z0), Math.abs(s.z1))
+    }
+    const reach = moundRadius + 1
+    for (let x = 0.5; x <= maxX + reach; x += RING_STEP) {
+      for (let z = -(maxZ + reach); z <= maxZ + reach; z += RING_STEP) {
+        if (Math.abs(caveSdf(m, x, z) - foot) <= RING_BAND) push(x, z)
+      }
+    }
+  }
   return out
 }
+
+/** How far in from the mound's rim its foot collision stands, metres, the
+ *  spacing of the sample grid the ring is read from, and half the width of
+ *  the band of the outline it takes points from (a little over the grid step,
+ *  so no gap opens along a diagonal). */
+const FOOT_INSET = 0.4
+const RING_STEP = 0.35
+const RING_BAND = 0.22
+
+/** How far past each doorway jamb the rock face (and its collision) runs,
+ *  metres — `mineTerrain.ts`'s mound tapers to nothing inside this. */
+export const FACE_HALF_EXTRA = 5.5
 
 /** Where the diamond quest item sits: near the far end of the one leaf
  *  marked `isDiamondChamber` (`buildMineGraph`), off to one side rather than
@@ -361,169 +609,10 @@ export function diamondSpotInMine(m: Mine): { x: number; y: number; z: number } 
   const dirZ = dz / length
   const perpX = -dirZ
   const perpZ = dirX
-  const along = length * 0.85
-  const across = chamber.width * 0.28
+  const along = length * 0.8
+  const across = chamber.width * 0.22
   const lx = chamber.x0 + dirX * along + perpX * across
   const lz = chamber.z0 + dirZ * along + perpZ * across
   const { x, z } = localToWorld(m, lx, lz)
-  return { x, y: m.y + chamber.y1, z }
-}
-
-/** How much a wall/floor/ceiling vertex can wander off its ideal position,
- *  metres — small enough to stay well inside WALL_CIRCLE_RADIUS's own
- *  margin from the collision circles (see `mineObstacles`), so the rock can
- *  never visibly poke through where the player is told they can walk. */
-const ROCK_JITTER = 0.06
-
-/** One deterministic jitter stream for the cave's own rock texture — always
- *  the same regardless of how many forks the graph happened to grow this
- *  world, so changing BRANCH_COUNT_RANGE's own roll never changes how
- *  jittery the rock looks. Re-created fresh each call so buildMineMesh stays
- *  a pure function of `m`. */
-function jitterStream(m: Mine): () => number {
-  return mulberry32((Math.round(m.x * 131) ^ Math.round(m.z * 733) ^ 0x2545f491) >>> 0)
-}
-
-/** A quad (two triangles) as a small standalone BufferGeometry, its four
- *  corners individually jittered by `rng` along all three axes — used for
- *  every floor/ceiling/wall panel below so the cave reads as rough rock
- *  rather than flawless drywall. */
-function jitteredQuad(
-  rng: () => number,
-  corners: [THREE.Vector3, THREE.Vector3, THREE.Vector3, THREE.Vector3],
-): THREE.BufferGeometry {
-  const jittered = corners.map((c) => {
-    const j = (): number => (rng() * 2 - 1) * ROCK_JITTER
-    return new THREE.Vector3(c.x + j(), c.y + j(), c.z + j())
-  })
-  const geom = new THREE.BufferGeometry()
-  const positions = new Float32Array([
-    jittered[0].x, jittered[0].y, jittered[0].z,
-    jittered[1].x, jittered[1].y, jittered[1].z,
-    jittered[2].x, jittered[2].y, jittered[2].z,
-    jittered[0].x, jittered[0].y, jittered[0].z,
-    jittered[2].x, jittered[2].y, jittered[2].z,
-    jittered[3].x, jittered[3].y, jittered[3].z,
-  ])
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-  geom.computeVertexNormals()
-  return geom
-}
-
-/** Floor, ceiling, two side walls (and a back wall on a leaf) for one
- *  segment, each panel following that segment's own start/end height —
- *  where the real slope and turns of the cave graph actually come from,
- *  rather than an axis-aligned box. */
-function buildSegmentMeshes(seg: MineSegment, rng: () => number, mat: THREE.Material): THREE.Mesh[] {
-  const dx = seg.x1 - seg.x0
-  const dz = seg.z1 - seg.z0
-  const length = Math.hypot(dx, dz) || 1
-  const dirX = dx / length
-  const dirZ = dz / length
-  const perpX = -dirZ
-  const perpZ = dirX
-  const half = seg.width / 2
-
-  const startL = new THREE.Vector3(seg.x0 + perpX * half, seg.y0, seg.z0 + perpZ * half)
-  const startR = new THREE.Vector3(seg.x0 - perpX * half, seg.y0, seg.z0 - perpZ * half)
-  const endL = new THREE.Vector3(seg.x1 + perpX * half, seg.y1, seg.z1 + perpZ * half)
-  const endR = new THREE.Vector3(seg.x1 - perpX * half, seg.y1, seg.z1 - perpZ * half)
-  const startLTop = startL.clone().setY(seg.y0 + TUNNEL_HEIGHT)
-  const startRTop = startR.clone().setY(seg.y0 + TUNNEL_HEIGHT)
-  const endLTop = endL.clone().setY(seg.y1 + TUNNEL_HEIGHT)
-  const endRTop = endR.clone().setY(seg.y1 + TUNNEL_HEIGHT)
-
-  const meshes: THREE.Mesh[] = [
-    new THREE.Mesh(jitteredQuad(rng, [startR, startL, endL, endR]), mat), // floor
-    new THREE.Mesh(jitteredQuad(rng, [startLTop, startRTop, endRTop, endLTop]), mat), // ceiling
-    new THREE.Mesh(jitteredQuad(rng, [startL, startLTop, endLTop, endL]), mat), // left wall
-    new THREE.Mesh(jitteredQuad(rng, [startRTop, startR, endR, endRTop]), mat), // right wall
-  ]
-
-  if (seg.isLeaf) {
-    meshes.push(new THREE.Mesh(jitteredQuad(rng, [endR, endL, endLTop, endRTop]), mat)) // back wall
-  }
-
-  for (const mesh of meshes) mesh.receiveShadow = true
-  return meshes
-}
-
-/** The entrance mouth's own decorative ring — an irregular fan of triangles
- *  standing in the opening at the very start of the root segment, read as a
- *  jagged hole in the hillside rather than a rectangular doorway. Visual
- *  only: the entrance carries no collision of its own, same as before this
- *  change. */
-function buildEntranceDecoration(root: MineSegment, rng: () => number, mat: THREE.Material): THREE.Mesh {
-  const half = root.width / 2
-  const points = 8
-  const positions: number[] = []
-  const centerY = root.y0 + TUNNEL_HEIGHT / 2
-  const ring: THREE.Vector3[] = []
-  for (let i = 0; i < points; i++) {
-    const t = (i / points) * Math.PI * 2
-    const rx = Math.cos(t) * half * 1.3
-    const ry = Math.sin(t) * (TUNNEL_HEIGHT / 2 + half * 0.3)
-    const wobble = 1 + (rng() * 2 - 1) * 0.35
-    ring.push(new THREE.Vector3(root.x0, centerY + ry * wobble, root.z0 + rx * wobble))
-  }
-  for (let i = 0; i < points; i++) {
-    const a = ring[i]
-    const b = ring[(i + 1) % points]
-    positions.push(root.x0, centerY, root.z0, a.x, a.y, a.z, b.x, b.y, b.z)
-  }
-  const geom = new THREE.BufferGeometry()
-  geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
-  geom.computeVertexNormals()
-  return new THREE.Mesh(geom, mat)
-}
-
-/**
- * The cave's own geometry — every segment in `m.segments` gets a floor,
- * ceiling, two side walls, and (if it's a dead end or the diamond chamber) a
- * back wall, each panel a jittered quad (see `jitteredQuad`) for a rough,
- * asymmetric rock read rather than flawless boxes. The entrance gets its own
- * jagged decorative ring. One lantern near the diamond chamber, kept
- * deliberately dim — see its own doc comment below. Built in the group's own
- * local space and rotated as one piece by `m.heading`, same convention
- * `localToWorld` above works out by hand for collision, so the mesh and the
- * collision can never disagree.
- */
-export function buildMineMesh(m: Mine): THREE.Group {
-  const group = new THREE.Group()
-  group.name = 'mine'
-  group.position.set(m.x, m.y, m.z)
-  group.rotation.y = -m.heading
-
-  const rockMat = new THREE.MeshStandardMaterial({ color: 0x5b564e, roughness: 1, flatShading: true })
-  const rng = jitterStream(m)
-
-  for (const seg of m.segments) {
-    for (const mesh of buildSegmentMeshes(seg, rng, rockMat)) group.add(mesh)
-  }
-  const root = m.segments.find((s) => s.parentId === null)!
-  group.add(buildEntranceDecoration(root, rng, rockMat))
-
-  const chamber = m.segments.find((s) => s.isDiamondChamber)!
-  const chamberDx = chamber.x1 - chamber.x0
-  const chamberDz = chamber.z1 - chamber.z0
-  const chamberLen = Math.hypot(chamberDx, chamberDz) || 1
-  // A lantern near the diamond chamber, not the mouth, but deliberately dim
-  // — a mine without the lamp quest owned has to read as genuinely dark
-  // regardless of time of day (see
-  // docs/superpowers/specs/2026-09-13-quest-items-design.md), so this is
-  // barely more than a glint on the rock. What actually lights the interior
-  // once the player has reason to see is the lamp quest's own PointLight on
-  // the player (game/scene.ts's `updatePlayerLamp`), not this.
-  const lantern = new THREE.PointLight(0xffb15c, 0.5, 4)
-  lantern.position.set(
-    chamber.x0 + (chamberDx / chamberLen) * chamberLen * 0.6,
-    chamber.y1 + TUNNEL_HEIGHT * 0.6,
-    chamber.z0 + (chamberDz / chamberLen) * chamberLen * 0.6,
-  )
-  lantern.castShadow = true
-  lantern.shadow.mapSize.set(256, 256)
-  lantern.shadow.bias = -0.002
-  group.add(lantern)
-
-  return group
+  return { x, y: m.y, z }
 }

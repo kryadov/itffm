@@ -228,10 +228,131 @@ const PAINTING_Z = DEPTH / 2 - WALL_THICKNESS - 0.02
  *  on the table itself. */
 const ROD_X = -(WIDTH / 2 - WALL_THICKNESS - 0.05)
 const ROD_Z = TABLE_Z - TABLE_SIZE / 2 - 0.35
-/** Outside the front wall, clear of the doorway — a bike parked by the door
- *  the way one actually would be, not blocking it. */
-const BIKE_X = DOOR_WIDTH / 2 + 0.55
-const BIKE_Z = -(DEPTH / 2 + 0.32)
+/** The four outer walls the bicycle can be left against. */
+export type ShelterWall = 'front' | 'back' | 'left' | 'right'
+export const SHELTER_WALLS: ShelterWall[] = ['front', 'back', 'left', 'right']
+
+/** Where the bicycle was left: which wall, and how far along it from the
+ *  wall's middle, metres (see `wallFrame` for which way is positive). */
+export interface BikeSpot {
+  wall: ShelterWall
+  along: number
+}
+
+/** The side wall — the bike is over 1.6 m long with its wheels and the front
+ *  wall has room for only 1.25 m of it beside the door, so this is the spot a
+ *  bike gets before the player has chosen one (and for a save from before
+ *  they could). */
+export const DEFAULT_BIKE_SPOT: BikeSpot = { wall: 'right', along: 0 }
+
+/** Half the parked bike's overall length, wheels included (`buildBikeModel`
+ *  measures 1.69 m). */
+const BIKE_HALF_LENGTH = 0.85
+/** How far off the wall's face the bike's centre plane stands. */
+const BIKE_WALL_GAP = 0.32
+/** Clear air kept between the bike and the doorway's own edge. */
+const BIKE_DOOR_CLEARANCE = 0.15
+/** Leaned a few degrees toward the wall, not standing perfectly upright — an
+ *  unridden bike propped on a wall always sits a little off true. */
+const BIKE_LEAN = Math.PI * 0.05
+/** Half the distance between the parked bike's two wheel contacts. */
+const BIKE_HALF_WHEELBASE = 0.5
+/** How far to either side of a wheel's own plane the ground is checked. */
+const BIKE_WHEEL_HALF_WIDTH = 0.08
+/** The steepest slope, radians, the parked bike will tilt to follow. */
+const BIKE_MAX_PITCH = 0.5
+
+/** One wall in the hut's own local frame: its outward normal `n` and the
+ *  direction `t` that `BikeSpot.along` counts in (`t` = `n` turned a quarter
+ *  turn, so it runs the same rotational way round the hut for every wall),
+ *  and half the wall's length. */
+function wallFrame(wall: ShelterWall): { nx: number; nz: number; tx: number; tz: number; halfLength: number } {
+  const [nx, nz] = wall === 'front' ? [0, -1] : wall === 'back' ? [0, 1] : wall === 'left' ? [-1, 0] : [1, 0]
+  const halfLength = wall === 'front' || wall === 'back' ? WIDTH / 2 : DEPTH / 2
+  return { nx, nz, tx: -nz, tz: nx, halfLength }
+}
+
+/** `along`, made a place the bike can actually stand: kept along the wall's own
+ *  length, and — on the front wall — off the doorway, on whichever side the
+ *  player was on (the bike then overhangs the wall's end, which reads fine:
+ *  it is leaning at a corner). */
+function usableAlong(wall: ShelterWall, along: number): number {
+  if (wall === 'front') {
+    return (along < 0 ? -1 : 1) * (DOOR_WIDTH / 2 + BIKE_DOOR_CLEARANCE + BIKE_HALF_LENGTH)
+  }
+  const limit = wallFrame(wall).halfLength - BIKE_HALF_LENGTH
+  return Math.max(-limit, Math.min(limit, along))
+}
+
+/** Where a bike left at `spot` stands, in the hut's local space: its centre,
+ *  and the yaw that lays its length along the wall with its side toward it. */
+export function bikeSpotLocal(spot: BikeSpot): { x: number; z: number; yaw: number } {
+  const f = wallFrame(spot.wall)
+  const along = usableAlong(spot.wall, spot.along)
+  const out = (f.nx !== 0 ? WIDTH : DEPTH) / 2 + BIKE_WALL_GAP
+  return {
+    x: f.nx * out + f.tx * along,
+    z: f.nz * out + f.tz * along,
+    yaw: Math.atan2(-f.nx, -f.nz),
+  }
+}
+
+/** The wall of the hut nearest `p`, the spot along it that is nearest, and
+ *  the point on the hut's outline that is — what "leave it against the wall I
+ *  am standing at" needs: which wall, where on it, and how far the player is
+ *  (`point`, for the usual delivery range check). */
+export function nearestBikeSpot(
+  s: Shelter, p: { x: number; z: number },
+): { spot: BikeSpot; point: { x: number; z: number } } {
+  const local = new THREE.Vector3(p.x - s.x, 0, p.z - s.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), -s.rotationY)
+  const hw = WIDTH / 2
+  const hd = DEPTH / 2
+  // How far past each wall's own plane the player is (negative: inside it).
+  const past: Record<ShelterWall, number> = {
+    front: -local.z - hd, back: local.z - hd, left: -local.x - hw, right: local.x - hw,
+  }
+  const wall = SHELTER_WALLS.reduce((best, w) => (past[w] > past[best] ? w : best))
+  const f = wallFrame(wall)
+  let cx = Math.max(-hw, Math.min(hw, local.x))
+  let cz = Math.max(-hd, Math.min(hd, local.z))
+  if (cx === local.x && cz === local.z) {
+    // Inside the hut: the nearest point on the outline is on that wall.
+    if (f.nx !== 0) cx = f.nx * hw
+    else cz = f.nz * hd
+  }
+  return { spot: { wall, along: cx * f.tx + cz * f.tz }, point: toWorld(s, cx, cz) }
+}
+
+/**
+ * The height and pitch a bike standing at `local` (the hut's own space) with
+ * `yaw` needs so both wheels meet the real ground beneath them. The hut is
+ * built at one ground sample (`Shelter.y`, its centre) with a foundation skirt
+ * to swallow the local bump; anything parked OUTSIDE it, on the slope, has no
+ * such skirt, and at local y = 0 the bike stood half-sunk on a hillside (a
+ * live report, 2026-09-19).
+ */
+function groundContact(
+  s: Shelter, ground: ElevationProvider, local: { x: number; z: number }, yaw: number,
+): { y: number; pitch: number } {
+  // Along the bike's own +x axis, and across it (its +z), turned by its yaw and
+  // then by the hut's. A wheel has width and the bike leans, so on a slope
+  // ACROSS the bike the tyre's uphill edge is what would sink: take the higher
+  // of the two sides.
+  const heightAt = (along: number, across: number): number => {
+    const w = toWorld(
+      s,
+      local.x + Math.cos(yaw) * along + Math.sin(yaw) * across,
+      local.z - Math.sin(yaw) * along + Math.cos(yaw) * across,
+    )
+    return ground.heightAt(w.x, w.z) - s.y
+  }
+  const wheelHeight = (along: number): number =>
+    Math.max(heightAt(along, -BIKE_WHEEL_HALF_WIDTH), heightAt(along, BIKE_WHEEL_HALF_WIDTH))
+  const front = wheelHeight(BIKE_HALF_WHEELBASE)
+  const rear = wheelHeight(-BIKE_HALF_WHEELBASE)
+  const pitch = Math.atan2(front - rear, 2 * BIKE_HALF_WHEELBASE)
+  return { y: (front + rear) / 2, pitch: Math.max(-BIKE_MAX_PITCH, Math.min(BIKE_MAX_PITCH, pitch)) }
+}
 
 /** The bed and table a player can actually bump into — the painting (flat
  *  against the wall) and the cup (a few centimetres, on the table) need
@@ -272,8 +393,9 @@ export interface ShelterFx {
   setDiamondPlaced(on: boolean): void
   /** Shows/hides the fishing rod, leaned against the wall by the table. */
   setRodPlaced(on: boolean): void
-  /** Shows/hides the bicycle, parked outside against the front wall. */
-  setBikePlaced(on: boolean): void
+  /** Shows/hides the bicycle, parked outside against a wall — the one in
+   *  `spot` (`DEFAULT_BIKE_SPOT` when none is given). */
+  setBikePlaced(on: boolean, spot?: BikeSpot): void
 }
 
 /**
@@ -285,7 +407,7 @@ export interface ShelterFx {
  * chimney with its own wisp of smoke, and a window glow that only makes
  * sense now that the wood has a day and a night (world/daynight.ts, v0.16.0).
  */
-export function buildShelterMesh(s: Shelter): ShelterFx {
+export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): ShelterFx {
   const group = new THREE.Group()
   group.name = 'shelter'
 
@@ -482,18 +604,31 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
   rod.visible = false
   group.add(rod)
 
-  // The bicycle — parked outside by the door, not ridden or mounted (see
+  // The bicycle — left outside against a wall, not ridden or mounted (see
   // docs/superpowers/specs/2026-09-13-quest-items-design.md's own decision
   // on the bike being a passive stat). Same model the wood's own pickup mesh
-  // uses (`world/questItemModels.ts`).
+  // uses (`world/questItemModels.ts`). `parkedBike` is where it stands and which
+  // way it faces along the wall; the model inside it leans and pitches in its
+  // own frame.
+  const parkedBike = new THREE.Group()
+  parkedBike.name = 'bike'
   const bike = buildBikeModel()
-  bike.name = 'bike'
-  // Leaned a few degrees, not standing perfectly upright — an unridden bike
-  // propped on its own kickstand always sits a little off true.
-  bike.rotation.x = Math.PI * 0.05
-  bike.position.set(BIKE_X, 0, BIKE_Z)
-  bike.visible = false
-  group.add(bike)
+  parkedBike.add(bike)
+  const placeBike = (spot: BikeSpot): void => {
+    const at = bikeSpotLocal(spot)
+    parkedBike.position.set(at.x, 0, at.z)
+    parkedBike.rotation.y = at.yaw
+    bike.rotation.x = BIKE_LEAN // its own side is toward the wall (see bikeSpotLocal)
+    bike.rotation.z = 0
+    if (ground) {
+      const contact = groundContact(s, ground, at, at.yaw)
+      parkedBike.position.y = contact.y
+      bike.rotation.z = contact.pitch
+    }
+  }
+  placeBike(DEFAULT_BIKE_SPOT)
+  parkedBike.visible = false
+  group.add(parkedBike)
 
   // A small painted scene on the back wall — the whole project draws without
   // pictures (see CLAUDE.md's Conventions), so this is a handful of flat
@@ -800,8 +935,9 @@ export function buildShelterMesh(s: Shelter): ShelterFx {
     setRodPlaced: (on: boolean) => {
       rod.visible = on
     },
-    setBikePlaced: (on: boolean) => {
-      bike.visible = on
+    setBikePlaced: (on: boolean, spot?: BikeSpot) => {
+      if (on) placeBike(spot ?? DEFAULT_BIKE_SPOT)
+      parkedBike.visible = on
     },
   }
 }

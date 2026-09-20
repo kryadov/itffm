@@ -3,6 +3,7 @@ import type { TimeMode } from '../world/daynight'
 import type { Weather } from '../world/weather'
 import type { Quest } from '../quest/state'
 import type { QuestItemId } from '../quest/types'
+import { SHELTER_WALLS, type BikeSpot } from '../world/shelter'
 
 export interface Find {
   speciesId: string
@@ -75,6 +76,22 @@ export interface SaveData {
    *  field is simply superseded, not migrated, since the feature is one
    *  release old and dropping it costs nobody a real quest in progress. */
   quests?: Partial<Record<QuestItemId, Quest>>
+  /** Which wall of the hut the delivered bicycle was left against, and where
+   *  along it — the player picks it by where they stand when they hand it
+   *  over. Absent until then (and for a save from before the choice existed):
+   *  `world/shelter.ts`'s `DEFAULT_BIKE_SPOT` applies. Read it through
+   *  `readBikeSpot`, never raw: it comes back from storage untrusted. */
+  bikeSpot?: BikeSpot
+}
+
+/** `spot` if it is a real bike spot, else undefined — a value read back from
+ *  storage can be anything (an edited save, an older shape). */
+export function readBikeSpot(spot: unknown): BikeSpot | undefined {
+  if (typeof spot !== 'object' || spot === null) return undefined
+  const { wall, along } = spot as Record<string, unknown>
+  if (typeof wall !== 'string' || !(SHELTER_WALLS as string[]).includes(wall)) return undefined
+  if (typeof along !== 'number' || !Number.isFinite(along)) return undefined
+  return { wall: wall as BikeSpot['wall'], along }
 }
 
 export function defaultPrefs(): Prefs {

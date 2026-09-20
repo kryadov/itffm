@@ -11,6 +11,9 @@ import {
   FOUNDATION_DEPTH,
   DEPTH,
   DOOR_WIDTH,
+  nearestBikeSpot,
+  bikeSpotLocal,
+  type ShelterWall,
 } from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import { stepPlayer, type PlayerState } from '../../src/game/player'
@@ -77,6 +80,136 @@ describe('shelterObstacle', () => {
 
 describe('buildShelterMesh', () => {
   const s = { x: 4, z: -2, y: 0, rotationY: 0.5 }
+
+  describe('the parked bicycle', () => {
+    // A live report (2026-09-19): on a hillside the bike stood half in the
+    // ground beside the door, its wheel touching the doorway's edge.
+    const wheelsOf = (bike: THREE.Object3D) => {
+      const wheels: THREE.Object3D[] = []
+      bike.traverse((o) => {
+        if (o.name === 'wheel') wheels.push(o)
+      })
+      return wheels
+    }
+    const WALLS: ShelterWall[] = ['front', 'back', 'left', 'right']
+
+    it.each([
+      ['flat', () => 0],
+      ['a slope along the wall', (x: number, z: number) => 0.25 * x - 0.1 * z],
+      ['a steep slope', (x: number, z: number) => -0.4 * x + 0.3 * z],
+    ])('stands on the real ground under both wheels on %s, at every wall', (_label, h) => {
+      const ground = { heightAt: h }
+      const shelter = { x: 4, z: -2, y: h(4, -2), rotationY: 0.5 }
+      for (const wall of WALLS) {
+        const { group, setBikePlaced } = buildShelterMesh(shelter, ground)
+        setBikePlaced(true, { wall, along: 0 })
+        group.updateMatrixWorld(true)
+        const wheels = wheelsOf(group.getObjectByName('bike')!)
+        expect(wheels).toHaveLength(2)
+        for (const wheel of wheels) {
+          const at = wheel.getWorldPosition(new THREE.Vector3())
+          const bottom = new THREE.Box3().setFromObject(wheel).min.y
+          // Neither sunk into the terrain nor floating above it.
+          expect(bottom).toBeGreaterThan(ground.heightAt(at.x, at.z) - 0.1)
+          expect(bottom).toBeLessThan(ground.heightAt(at.x, at.z) + 0.15)
+        }
+      }
+    })
+
+    it('is hidden until placed, and shown once it is', () => {
+      const { group, setBikePlaced } = buildShelterMesh(s)
+      const bike = group.getObjectByName('bike')!
+      expect(bike.visible).toBe(false)
+      setBikePlaced(true)
+      expect(bike.visible).toBe(true)
+      setBikePlaced(false)
+      expect(bike.visible).toBe(false)
+    })
+
+    it.each(WALLS)('stands clear of the hut, along the %s wall, never inside it', (wall) => {
+      const { group, setBikePlaced } = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+      for (const along of [-5, -1, 0, 1, 5]) {
+        setBikePlaced(true, { wall, along })
+        group.updateMatrixWorld(true)
+        const bike = new THREE.Box3().setFromObject(group.getObjectByName('bike')!)
+        // Outside the walls' own footprint (3.6 x 3.1), with a hair of slack for the lean.
+        const insideX = bike.max.x > -1.7 && bike.min.x < 1.7
+        const insideZ = bike.max.z > -1.45 && bike.min.z < 1.45
+        expect(insideX && insideZ).toBe(false)
+      }
+    })
+
+    it('stops short of the doorway when left by the door, on either side', () => {
+      const { group, setBikePlaced } = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+      for (const along of [-0.3, 0, 0.3, 1.2, -1.2]) {
+        setBikePlaced(true, { wall: 'front', along })
+        group.updateMatrixWorld(true)
+        const bike = new THREE.Box3().setFromObject(group.getObjectByName('bike')!)
+        // Nothing of it within the doorway's width, plus a hand's breadth.
+        expect(bike.max.x < -(DOOR_WIDTH / 2 + 0.1) || bike.min.x > DOOR_WIDTH / 2 + 0.1).toBe(true)
+      }
+    })
+
+    it('lies along whichever wall it is left against', () => {
+      const { group, setBikePlaced } = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+      const size = (wall: ShelterWall) => {
+        setBikePlaced(true, { wall, along: 0 })
+        group.updateMatrixWorld(true)
+        return new THREE.Box3().setFromObject(group.getObjectByName('bike')!).getSize(new THREE.Vector3())
+      }
+      // Front/back walls run along x; left/right walls along z.
+      for (const wall of ['front', 'back'] as const) expect(size(wall).x).toBeGreaterThan(size(wall).z)
+      for (const wall of ['left', 'right'] as const) expect(size(wall).z).toBeGreaterThan(size(wall).x)
+    })
+  })
+
+  describe('nearestBikeSpot', () => {
+    const hut = { x: 10, z: -4, y: 0, rotationY: 0.9 }
+    // A point a given distance out from a wall's middle, in the hut's own frame.
+    const outside = (lx: number, lz: number) => {
+      const v = new THREE.Vector3(lx, 0, lz).applyAxisAngle(new THREE.Vector3(0, 1, 0), hut.rotationY)
+      return { x: hut.x + v.x, z: hut.z + v.z }
+    }
+
+    it.each([
+      ['front', 0.4, -3.0],
+      ['back', -0.4, 3.0],
+      ['left', -3.1, 0.2],
+      ['right', 3.1, -0.2],
+    ] as const)('picks the %s wall for someone standing out from it', (wall, lx, lz) => {
+      expect(nearestBikeSpot(hut, outside(lx, lz)).spot.wall).toBe(wall)
+    })
+
+    it('reports how far the player is from the hut, in metres', () => {
+      const p = outside(0.3, -1.55 - 1.2) // 1.2 m off the front wall
+      const { point } = nearestBikeSpot(hut, p)
+      expect(Math.hypot(p.x - point.x, p.z - point.z)).toBeCloseTo(1.2, 5)
+    })
+
+    it('leaves the bike where the player stood along the wall', () => {
+      const a = nearestBikeSpot(hut, outside(3.0, 0.5)).spot // right wall
+      const b = nearestBikeSpot(hut, outside(3.0, -0.5)).spot
+      expect(a.wall).toBe('right')
+      expect(b.wall).toBe('right')
+      expect(a.along).toBeGreaterThan(b.along)
+    })
+
+    it('still picks a wall for someone standing inside the hut', () => {
+      const { spot, point } = nearestBikeSpot(hut, outside(0, 1.0))
+      expect(['front', 'back', 'left', 'right']).toContain(spot.wall)
+      expect(Number.isFinite(point.x) && Number.isFinite(point.z)).toBe(true)
+    })
+  })
+
+  describe('bikeSpotLocal', () => {
+    it('is deterministic and finite for every wall', () => {
+      for (const wall of ['front', 'back', 'left', 'right'] as const) {
+        const a = bikeSpotLocal({ wall, along: 0.4 })
+        expect(bikeSpotLocal({ wall, along: 0.4 })).toEqual(a)
+        expect(Number.isFinite(a.x + a.z + a.yaw)).toBe(true)
+      }
+    })
+  })
 
   it('places the group at the shelter position', () => {
     const { group } = buildShelterMesh(s)
@@ -393,12 +526,15 @@ describe('buildShelterMesh — quest trophies', () => {
     expect(diamond?.parent).toBe(table)
   })
 
-  it('parks the bike outside the hut, clear of the doorway', () => {
-    const { group } = buildShelterMesh(s)
+  it('parks the bike outside the hut by default, not in front of the door', () => {
+    const { group, setBikePlaced } = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+    setBikePlaced(true)
+    group.updateMatrixWorld(true)
     const bike = group.getObjectByName('bike')!
-    // Outside the DEPTH/2 front wall (z < -DEPTH/2), and off to the side of
-    // the door rather than centred on it.
-    expect(bike.position.z).toBeLessThan(-DEPTH / 2)
-    expect(Math.abs(bike.position.x)).toBeGreaterThan(DOOR_WIDTH / 2)
+    // Outside the hut's own footprint (DEPTH deep, so |z| > DEPTH/2, or off its
+    // side), and never centred on the doorway.
+    expect(Math.abs(bike.position.z) > DEPTH / 2 || Math.abs(bike.position.x) > 1.8).toBe(true)
+    const box = new THREE.Box3().setFromObject(bike)
+    expect(box.max.z < -DEPTH / 2 ? box.min.x > DOOR_WIDTH / 2 || box.max.x < -DOOR_WIDTH / 2 : true).toBe(true)
   })
 })
