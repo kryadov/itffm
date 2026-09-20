@@ -12,7 +12,8 @@ import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import {
-  stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, bikeSpeedFactor, type PlayerState, type Obstacle,
+  stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, bikeSpeedFactor, ridingSpeedFactor, type PlayerState,
+  type Obstacle,
 } from './game/player'
 import { distanceToNearestPath, HALF_WIDTH as PATH_HALF_WIDTH } from './world/paths'
 import { chooseStartPose } from './game/startPose'
@@ -29,6 +30,7 @@ import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
 import { yieldToPaint } from './util/yield'
 import { createBikeView } from './game/bikeView'
+import { easeToward } from './game/bikeSteer'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
@@ -47,7 +49,9 @@ import { chopScrub } from './quest/scrub'
 import { lampIsOn } from './quest/lamp'
 import { buildScrubMesh } from './world/scrub'
 import { jitterDiamondGeometry, DIAMOND_GEM_SEED } from './world/diamondGem'
-import { buildAxeModel, buildLampModel, buildRodModel, buildBikeModel } from './world/questItemModels'
+import {
+  buildAxeModel, buildLampModel, buildBikeModel, buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH,
+} from './world/questItemModels'
 
 declare global {
   // boot-check waits on __READY: it is set only if the module ran to the end.
@@ -297,6 +301,12 @@ async function main(): Promise<void> {
   // you are carrying it home — see game/bikeView.ts. Gone the moment it is left
   // against the hut, and never there before it is picked up.
   const bikeView = createBikeView(forest.scene)
+  // Carrying the bicycle IS riding it: the handlebar is in your view, so you
+  // go faster, the camera stops swaying like a walk, and no footsteps sound
+  // (a live report, 2026-09-20: it looked like a bike and moved like a walk).
+  const isRiding = (): boolean => quests.bike.state === 'carrying'
+  // 1 walking, 0 riding — eased, so mounting and dismounting do not snap.
+  let bobScale = 1
   // Whatever `save` holds right now — likely the real loaded save by this
   // point, same trade-off `setLang` above already accepts: a real user's
   // place-picker interaction takes far longer than the IndexedDB round trip.
@@ -462,13 +472,18 @@ async function main(): Promise<void> {
       case 'lamp':
         obj = buildLampModel().group
         break
-      case 'rod':
+      case 'rod': {
         // Laid flat, not standing 1.5m straight up out of the grass — there's
-        // no wall to lean it on out here, unlike the shelter's own trophy.
-        obj = buildRodModel()
-        obj.rotation.z = Math.PI / 2
-        obj.position.y = 0.02
+        // no wall to lean it on out here, unlike the shelter's own trophy. Its
+        // own chunkier, lifted model (not the wall trophy's thin pole, which
+        // vanished under a trail), pitched along the real slope. Its height is
+        // relative to `pos.y`, which is added below with everything else.
+        obj = buildRodPickupModel()
+        const lay = layFlatOnGround(pos.x, pos.z, ROD_PICKUP_HALF_LENGTH, (x, z) => forest.ground.heightAt(x, z))
+        obj.rotation.z = lay.pitch
+        obj.position.y = lay.y - pos.y
         break
+      }
       case 'bike':
         obj = buildBikeModel()
         break
@@ -730,7 +745,7 @@ async function main(): Promise<void> {
     const species = aimed ? speciesById(aimed.userData.placement.speciesId) : undefined
     if (species) {
       nearDoor = false
-      hud.setTarget(speciesName(species))
+      hud.setTarget(speciesName(species), canPick(species, quests.rod.state === 'done') ? undefined : t('needRod'))
       return
     }
     // No mushroom in the crosshair — check for a quest item within pickup
@@ -781,8 +796,13 @@ async function main(): Promise<void> {
     const species = speciesById(placement.speciesId)
     if (!species) return
     // The rod's own gate: a fish is visible and aimable before the rod quest
-    // is delivered, but pressing E on one does nothing until then.
-    if (!canPick(species, quests.rod.state === 'done')) return
+    // is delivered, but cannot be taken until then — and says so, rather than
+    // leaving `E` to do nothing (a live report, 2026-09-20: "E does not work
+    // on the roach").
+    if (!canPick(species, quests.rod.state === 'done')) {
+      toast(t('needRodToast'))
+      return
+    }
 
     openInspect(
       species,
@@ -1082,8 +1102,12 @@ async function main(): Promise<void> {
     if (!modalOpen()) {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
-      const bike = bikeSpeedFactor(
-        quests.bike.state === 'done', distanceToNearestPath(player, source.paths ?? []), PATH_HALF_WIDTH,
+      const pathDistance = distanceToNearestPath(player, source.paths ?? [])
+      // The delivered bike's passive path bonus and riding the carried one
+      // never stack: whichever is better applies.
+      const bike = Math.max(
+        bikeSpeedFactor(quests.bike.state === 'done', pathDistance, PATH_HALF_WIDTH),
+        ridingSpeedFactor(isRiding(), pathDistance, PATH_HALF_WIDTH),
       )
       const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * bike
       const input = touch.active ? touch.read(dt) : controls.read(dt)
@@ -1100,7 +1124,7 @@ async function main(): Promise<void> {
       // footstep() — see FOOTSTEP_PARAMS.water) rather than the recorded
       // walk/run clip below: the recording was never meant to stand in for
       // that one.
-      if (crossedFootstep(prevBobPhase, player.bobPhase)) {
+      if (!isRiding() && crossedFootstep(prevBobPhase, player.bobPhase)) {
         const nearWater = (source.water ?? []).some(
           (ring) => distanceToRing(player.x, player.z, ring) < WATER_FOOTSTEP_RADIUS,
         )
@@ -1131,7 +1155,8 @@ async function main(): Promise<void> {
       }
     }
 
-    const bob = cameraBob(player)
+    bobScale = easeToward(bobScale, isRiding() ? 0 : 1, dt, 8)
+    const bob = cameraBob(player, bobScale)
     camera.position.set(
       player.x + Math.cos(player.yaw) * bob.dx,
       combinedGround.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand + bob.dy,
@@ -1188,7 +1213,7 @@ async function main(): Promise<void> {
     }
     updateAim()
     updateDebugOverlay()
-    bikeView.setVisible(quests.bike.state === 'carrying')
+    bikeView.setVisible(isRiding())
     bikeView.update(dt, player.yaw, camera)
     renderer.render(forest.scene, camera)
     bikeView.render(renderer, camera)

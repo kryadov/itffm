@@ -57,11 +57,17 @@ export function buildFish(m: FishMorphology, seed: number, age: number): THREE.G
 
   const finMat = new THREE.MeshStandardMaterial({ color: m.finColor, roughness: 0.7, side: THREE.DoubleSide })
 
+  // A flat fan on the tapered end (+x, see the body above). The cone stands on
+  // its base with its apex up; turned a quarter about z its local x becomes the
+  // fin's height, its local y the fin's length along the fish (apex toward the
+  // body) and its local z the thickness across the fish — which must be thin.
+  // (It was 1, a metre, and the tail sat on the blunt end: a live report,
+  // 2026-09-20, a roach with huge red spikes.)
   const tail = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 3), finMat)
   tail.name = 'tail'
   tail.rotation.z = Math.PI / 2
-  tail.scale.set(height * 0.65, width * 1.1, 1)
-  tail.position.x = -length * 0.55
+  tail.scale.set(height * 0.65, length * 0.16, 0.01)
+  tail.position.x = length * 0.55
   group.add(tail)
 
   const dorsal = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 3), finMat)

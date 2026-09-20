@@ -1,4 +1,4 @@
-import { steerTarget, smoothSteer, MAX_STEER } from '../../src/game/bikeSteer'
+import { steerTarget, smoothSteer, easeToward, MAX_STEER } from '../../src/game/bikeSteer'
 
 describe('steerTarget', () => {
   it('is straight when not turning', () => {
@@ -42,5 +42,30 @@ describe('smoothSteer', () => {
     let fine = 0
     for (let i = 0; i < 100; i++) fine = smoothSteer(fine, 0.5, 0.01)
     expect(coarse).toBeCloseTo(fine, 6)
+  })
+})
+
+describe('easeToward', () => {
+  it('moves toward the target without overshooting, and settles on it', () => {
+    let v = 1
+    for (let i = 0; i < 300; i++) {
+      const next = easeToward(v, 0, 1 / 60, 8)
+      expect(next).toBeLessThanOrEqual(v)
+      expect(next).toBeGreaterThanOrEqual(0)
+      v = next
+    }
+    expect(v).toBeLessThan(1e-6)
+  })
+
+  it('takes about the same wall-clock time at any frame rate', () => {
+    let coarse = 1
+    for (let i = 0; i < 6; i++) coarse = easeToward(coarse, 0, 0.1, 8)
+    let fine = 1
+    for (let i = 0; i < 60; i++) fine = easeToward(fine, 0, 0.01, 8)
+    expect(coarse).toBeCloseTo(fine, 6)
+  })
+
+  it('a faster rate arrives sooner', () => {
+    expect(easeToward(1, 0, 0.1, 20)).toBeLessThan(easeToward(1, 0, 0.1, 5))
   })
 })

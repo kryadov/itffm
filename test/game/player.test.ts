@@ -4,6 +4,7 @@ import {
   cameraBob,
   biomeSpeedFactor,
   bikeSpeedFactor,
+  ridingSpeedFactor,
   type PlayerState,
   type PlayerInput,
 } from '../../src/game/player'
@@ -294,5 +295,41 @@ describe('stepPlayer', () => {
       s = stepPlayer(s, { ...idle, forward: -1, dt: 1 }, flat, [stump])
       expect(s.stand).toBe(0)
     })
+  })
+})
+
+describe('ridingSpeedFactor', () => {
+  // A live report (2026-09-20): with the bicycle in your hands the view showed
+  // its handlebar, but you moved at walking pace.
+  it('is neutral when not riding, wherever you are', () => {
+    expect(ridingSpeedFactor(false, 0, 0.6)).toBe(1)
+    expect(ridingSpeedFactor(false, 50, 0.6)).toBe(1)
+  })
+
+  it('is faster on a path than off it, and faster than walking either way', () => {
+    const onPath = ridingSpeedFactor(true, 0.3, 0.6)
+    const offPath = ridingSpeedFactor(true, 5, 0.6)
+    expect(offPath).toBeGreaterThan(1)
+    expect(onPath).toBeGreaterThan(offPath)
+  })
+
+  it('treats the path edge as on the path, the same rule as the parked bike', () => {
+    expect(ridingSpeedFactor(true, 0.6, 0.6)).toBe(ridingSpeedFactor(true, 0, 0.6))
+    expect(ridingSpeedFactor(true, 0.6, 0.6)).toBe(bikeSpeedFactor(true, 0.6, 0.6))
+  })
+})
+
+describe('cameraBob scale', () => {
+  const s = { x: 0, z: 0, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0, bobPhase: 1.3 }
+
+  it('is the full walking bob by default', () => {
+    expect(cameraBob(s, 1)).toEqual(cameraBob(s))
+  })
+
+  it('is no bob at all at scale 0, and in between it is in proportion', () => {
+    const full = cameraBob(s)
+    expect(cameraBob(s, 0)).toEqual({ dy: 0, dx: 0 })
+    expect(cameraBob(s, 0.5).dy).toBeCloseTo(full.dy * 0.5, 10)
+    expect(cameraBob(s, 0.5).dx).toBeCloseTo(full.dx * 0.5, 10)
   })
 })

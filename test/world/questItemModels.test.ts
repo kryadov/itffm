@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import {
   buildAxeModel, buildLampModel, buildRodModel, buildBikeModel, buildBikeCockpitModel,
+  buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH,
 } from '../../src/world/questItemModels'
 
 function meshCount(o: THREE.Object3D): number {
@@ -111,5 +112,70 @@ describe('buildBikeCockpitModel', () => {
       return new THREE.Vector3(0, 0, 1).applyQuaternion(bar.getWorldQuaternion(new THREE.Quaternion())).x
     }
     expect(swing(0.4) * swing(-0.4)).toBeLessThan(0)
+  })
+})
+
+describe('buildRodPickupModel', () => {
+  // A live report (2026-09-20): the rod lying in the wood was invisible while
+  // its label showed. It was a 1-3 cm pole 2 cm off the ground, and a trail
+  // ribbon (3 cm above the ground) buried nearly all of it.
+  const box = () => new THREE.Box3().setFromObject(buildRodPickupModel())
+
+  it('lies flat along x, as long as a rod', () => {
+    const size = box().getSize(new THREE.Vector3())
+    expect(size.x).toBeGreaterThan(1.4)
+    expect(size.x).toBeLessThan(1.8)
+    expect(size.z).toBeLessThan(0.25)
+    expect(size.y).toBeLessThan(0.25)
+  })
+
+  it('is centred on its own origin along its length', () => {
+    const b = box()
+    expect((b.min.x + b.max.x) / 2).toBeCloseTo(0, 1)
+    expect(-b.min.x).toBeCloseTo(ROD_PICKUP_HALF_LENGTH, 1)
+  })
+
+  it('clears a trail ribbon lying 3 cm above the ground, all along its length', () => {
+    expect(box().min.y).toBeGreaterThanOrEqual(0.035)
+  })
+
+  it('stands proud of that ribbon by enough to read from a few metres', () => {
+    const b = box()
+    expect(b.max.y - 0.03).toBeGreaterThanOrEqual(0.06)
+  })
+
+  it('has a distinct reel and a handle, not one plain pole', () => {
+    const group = buildRodPickupModel()
+    let meshes = 0
+    group.traverse((o) => { if (o instanceof THREE.Mesh) meshes++ })
+    expect(meshes).toBeGreaterThanOrEqual(3)
+    expect(group.getObjectByName('reel')).toBeDefined()
+  })
+})
+
+describe('layFlatOnGround', () => {
+  const HL = 0.75
+  it('sits on flat ground at its height, level', () => {
+    expect(layFlatOnGround(5, 5, HL, () => 2)).toEqual({ y: 2, pitch: 0 })
+  })
+
+  it('tilts to follow a slope along x, through the ground under both ends', () => {
+    const c = layFlatOnGround(0, 0, HL, (x) => 0.2 * x)
+    expect(c.pitch).toBeCloseTo(Math.atan(0.2), 6)
+    expect(c.y).toBeCloseTo(0, 6)
+  })
+
+  it('does not tilt for a slope across it (along z)', () => {
+    expect(layFlatOnGround(0, 0, HL, (_x, z) => 0.3 * z).pitch).toBe(0)
+  })
+
+  it('rides up over a bump in the middle instead of sinking into it', () => {
+    const bump = (x: number) => (Math.abs(x) < 0.1 ? 0.2 : 0)
+    expect(layFlatOnGround(0, 0, HL, bump).y).toBeCloseTo(0.2, 6)
+  })
+
+  it('is deterministic', () => {
+    const h = (x: number, z: number) => Math.sin(x) + Math.cos(z)
+    expect(layFlatOnGround(3, 4, HL, h)).toEqual(layFlatOnGround(3, 4, HL, h))
   })
 })

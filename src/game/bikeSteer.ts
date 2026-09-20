@@ -21,8 +21,14 @@ export function steerTarget(yawRate: number): number {
   return MAX_STEER * Math.tanh((yawRate * STEER_PER_YAW_RATE) / MAX_STEER)
 }
 
-/** One frame of easing `current` toward `target`. Frame-rate independent: the
- *  same wall-clock time gives the same result at any `dt`. */
+/** One frame of easing `current` toward `target` at `rate` per second.
+ *  Frame-rate independent: the same wall-clock time gives the same result at
+ *  any `dt`. */
+export function easeToward(current: number, target: number, dt: number, rate: number): number {
+  return current + (target - current) * (1 - Math.exp(-rate * dt))
+}
+
+/** One frame of the handlebar following its target angle. */
 export function smoothSteer(current: number, target: number, dt: number): number {
-  return current + (target - current) * (1 - Math.exp(-STEER_RESPONSE * dt))
+  return easeToward(current, target, dt, STEER_RESPONSE)
 }

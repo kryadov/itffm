@@ -123,6 +123,22 @@ export function bikeSpeedFactor(owned: boolean, distanceToPath: number, pathHalf
   return owned && distanceToPath <= pathHalfWidth ? BIKE_SPEED : 1
 }
 
+/** What riding gets you off a path — a bicycle still beats walking on the
+ *  forest floor, just not by as much as on a trail (`BIKE_SPEED`). A
+ *  gameplay-feel number like the two above. */
+const BIKE_OFF_PATH_SPEED = 1.3
+
+/**
+ * Speed multiplier while riding — the bicycle in your hands, not parked at the
+ * hut (`bikeSpeedFactor` above is the delivered bike's passive path bonus).
+ * Faster than walking everywhere, and fastest on a mapped path, by the same
+ * "within a path's own half-width" rule. 1 (no effect) when not riding.
+ */
+export function ridingSpeedFactor(riding: boolean, distanceToPath: number, pathHalfWidth: number): number {
+  if (!riding) return 1
+  return distanceToPath <= pathHalfWidth ? BIKE_SPEED : BIKE_OFF_PATH_SPEED
+}
+
 /** Eye height above the ground, accounting for the crouch. */
 export function eyeHeight(s: PlayerState): number {
   return STAND_EYE + (CROUCH_EYE - STAND_EYE) * s.crouch
@@ -133,11 +149,14 @@ export function eyeHeight(s: PlayerState): number {
  * (always upward — a footstep raises the head, it never lowers it below eye
  * height) twice per stride, and a gentler side-to-side sway once per stride,
  * the way a real gait's weight shift alternates left-right.
+ *
+ * @param scale 1 for the full walking bob, 0 for none (riding: a bicycle does
+ *   not step), anything between for the ease from one to the other.
  */
-export function cameraBob(s: PlayerState): { dy: number; dx: number } {
+export function cameraBob(s: PlayerState, scale = 1): { dy: number; dx: number } {
   return {
-    dy: Math.abs(Math.sin(s.bobPhase)) * BOB_VERTICAL,
-    dx: Math.cos(s.bobPhase / 2) * BOB_HORIZONTAL,
+    dy: Math.abs(Math.sin(s.bobPhase)) * BOB_VERTICAL * scale,
+    dx: Math.cos(s.bobPhase / 2) * BOB_HORIZONTAL * scale,
   }
 }
 

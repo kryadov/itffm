@@ -133,12 +133,19 @@ clustering in whichever one the dice happened to favour:
 - **Lamp** — a warm light that follows you once owned, on automatically
   after dark or inside the mine, with a manual `L` override on top.
 - **Fishing rod** — unlocks catching fish, a real collectible kind spawned
-  near water; a rod trophy leans by the hut's own table once delivered.
+  near water; a rod trophy leans by the hut's own table once delivered. Out in
+  the wood it lies flat as a chunky pole with a pale handle and a reel, raised
+  clear of a trail so it can be seen. Until it is delivered, a fish in your
+  crosshair says it needs a fishing rod, and `E` on it says so too, instead of
+  quietly doing nothing.
 - **Bicycle** — moves you faster while on a mapped path or track. While you
-  carry it, its handlebar and front wheel show low in your view and turn as you
-  turn; you leave it against whichever wall of the hut you are standing at when
-  you press `E` (any of the four — not only by the door), and it stays there,
-  standing on the real ground, off the doorway, and gone from your view.
+  carry it you are riding it: faster everywhere (fastest on a path), the view
+  stops swaying like a walk and there are no footsteps, and its handlebar and
+  front wheel show low in your view and turn as you turn; you leave it against
+  whichever wall of the hut you are standing at when you press `E` (any of the
+  four — not only by the door), and it stays there, standing on the real
+  ground, off the doorway, and gone from your view. The path bonus stays once
+  it is home.
 - **Diamond** — found at the end of the mine's own branching cave, not near
   the hut like the other four; you have to actually search the forks to find
   it. A many-faceted, asymmetric cut, not a plain gem, and it visibly

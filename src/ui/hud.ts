@@ -38,7 +38,10 @@ export function createHud(
   onSettings: () => void,
   touch: TouchButtons,
 ): {
-  setTarget(name: string | null): void
+  /** `locked`, when given, replaces the usual "— E": what is in the crosshair
+   *  cannot be taken yet, and this says why (so the hint never promises a key
+   *  that does nothing). */
+  setTarget(name: string | null, locked?: string): void
   setBasket(n: number, cap: number): void
   /** The fetch quest's own small always-on readout — null hides it entirely
    *  (a completed or not-yet-started quest has no HUD footprint at all, per
@@ -73,8 +76,8 @@ export function createHud(
   tallyBtn.addEventListener('click', touch.onTally)
 
   return {
-    setTarget(name) {
-      if (name) hint.textContent = `${name} — E`
+    setTarget(name, locked) {
+      if (name) hint.textContent = `${name} — ${locked ?? 'E'}`
       hint.style.opacity = name ? '1' : '0'
     },
     setBasket(n, cap) {

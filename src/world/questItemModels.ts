@@ -255,3 +255,67 @@ export function buildBikeCockpitModel(): { group: THREE.Group; steer: (angle: nu
     },
   }
 }
+
+/** Half the length of the rod lying in the wood. */
+export const ROD_PICKUP_HALF_LENGTH = 0.75
+
+/**
+ * The fishing rod as it lies out in the wood, waiting to be picked up: flat
+ * along x (butt toward -x), centred on its own origin, its underside clear of
+ * the ground by more than a trail ribbon's 3 cm. The realistic pole
+ * (`buildRodModel`, 1-3 cm thick, standing against the hut's wall) vanished on
+ * the ground: buried under a trail, lost in the grass. This one is chunkier, has
+ * a pale cork handle and a reel, and rides high enough to be seen from a few
+ * metres away — a live report, 2026-09-20: the rod's label showed, the rod did
+ * not.
+ */
+export function buildRodPickupModel(): THREE.Group {
+  const group = new THREE.Group()
+  group.name = 'rodPickupModel'
+  const AXIS_Y = 0.075 // pole axis height; the butt (radius 0.032) bottoms out at 0.043
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x8a6634, roughness: 0.7 })
+  const corkMat = new THREE.MeshStandardMaterial({ color: 0xe0c07a, roughness: 0.9 })
+  const reelMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.4, metalness: 0.5 })
+  const half = ROD_PICKUP_HALF_LENGTH
+
+  // A cylinder built standing up, then laid along x: its own +y becomes +x.
+  const along = (radiusTip: number, radiusButt: number, length: number, x: number, mat: THREE.Material): THREE.Mesh => {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(radiusTip, radiusButt, length, 10), mat)
+    m.rotation.z = -Math.PI / 2 // +y -> +x, so the tip (top) points toward +x
+    m.position.set(x, AXIS_Y, 0)
+    return m
+  }
+  // The pole: thin tip at +x, thick butt at -x.
+  group.add(along(0.014, 0.03, 1.5, 0, poleMat))
+  // A pale cork handle over the butt end.
+  const handle = along(0.032, 0.036, 0.3, -half + 0.15, corkMat)
+  handle.name = 'handle'
+  group.add(handle)
+  // The reel, on the side of the pole just past the handle.
+  // Raised a little off the pole's axis so its underside (0.04) clears a trail too.
+  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.05, 14), reelMat)
+  reel.name = 'reel'
+  reel.rotation.x = Math.PI / 2
+  reel.position.set(-half + 0.42, AXIS_Y + 0.012, 0.05)
+  group.add(reel)
+  return group
+}
+
+/**
+ * Height and pitch that lay something `2 * halfLength` long, along the world x
+ * axis and centred on (x, z), on the real ground: pitched along the slope
+ * between the ground under its two ends, and raised over a bump in the middle
+ * rather than sunk into it. `y` is the height of the object's centre. A slope
+ * across it (along z) does not tilt it — it lies flat across a hillside.
+ */
+export function layFlatOnGround(
+  x: number, z: number, halfLength: number, heightAt: (x: number, z: number) => number,
+): { y: number; pitch: number } {
+  const back = heightAt(x - halfLength, z)
+  const front = heightAt(x + halfLength, z)
+  const middle = heightAt(x, z)
+  return {
+    y: Math.max((back + front) / 2, middle),
+    pitch: Math.atan2(front - back, 2 * halfLength),
+  }
+}
