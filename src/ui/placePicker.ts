@@ -28,6 +28,8 @@ export function openPlacePicker(
    *  main.ts's own note on that race by loadSave's call site). */
   getPrefs: () => Prefs,
   onPrefsChange: (prefs: Prefs) => void,
+  /** Given, the picker's settings offer to reset the quests too. */
+  onResetQuests?: () => void,
 ): void {
   const overlay = document.createElement('div')
   overlay.id = 'place-picker'
@@ -80,7 +82,7 @@ export function openPlacePicker(
     setLang(lang)
     onLangChange(lang)
     overlay.remove()
-    openPlacePicker(onPick, onLangChange, getPrefs, onPrefsChange)
+    openPlacePicker(onPick, onLangChange, getPrefs, onPrefsChange, onResetQuests)
   }
   overlay.querySelector('#place-lang-ru')!.addEventListener('click', () => switchLang('ru'))
   overlay.querySelector('#place-lang-en')!.addEventListener('click', () => switchLang('en'))
@@ -95,6 +97,7 @@ export function openPlacePicker(
         switchLang(lang)
       },
       onPrefsChange,
+      onResetQuests,
     })
   })
 

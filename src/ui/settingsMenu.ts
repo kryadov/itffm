@@ -19,6 +19,10 @@ const WEATHER_KEY: Record<Weather, 'weatherClear' | 'weatherRain' | 'weatherSnow
 export interface SettingsCallbacks {
   onLangChange: (lang: Lang) => void
   onPrefsChange: (prefs: Prefs) => void
+  /** Offered only when given: a "reset the quests" row, behind a confirmation.
+   *  Called once, after the player has confirmed. Persisting the reset (and, in
+   *  a running game, restarting the walk) is the caller's. */
+  onResetQuests?: () => void
 }
 
 const SLIDER_STYLE = 'width:100%'
@@ -256,6 +260,64 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   toggle('minimapQuestHints', 'settingsMinimapHints')
   // Off by default — most players read "mouse up" as "look up".
   toggle('invertMouseY', 'settingsInvertY')
+
+  // Destructive, so never one click: "Reset…" swaps for a question and a pair
+  // of buttons, and a Cancel puts it back exactly as it was.
+  if (cb.onResetQuests) {
+    const onResetQuests = cb.onResetQuests
+    const row = document.createElement('div')
+    row.id = 'settings-quests'
+    row.style.cssText = 'display:flex;flex-direction:column;gap:10px'
+    const head = document.createElement('div')
+    head.style.cssText = LABEL_STYLE
+    const headLabel = document.createElement('span')
+    label(headLabel, 'settingsQuests')
+    const resetBtn = document.createElement('button')
+    resetBtn.id = 'settings-quests-reset'
+    label(resetBtn, 'settingsQuestsReset')
+    resetBtn.style.cssText = btnStyle(false)
+    head.append(headLabel, resetBtn)
+
+    const confirmBox = document.createElement('div')
+    confirmBox.id = 'settings-quests-confirm'
+    confirmBox.style.cssText = 'display:none;flex-direction:column;gap:10px'
+    const question = document.createElement('p')
+    question.style.cssText = 'margin:0;font-size:13px;line-height:1.45;max-width:340px'
+    label(question, 'settingsQuestsConfirm')
+    const answers = document.createElement('div')
+    answers.style.cssText = 'display:flex;gap:8px'
+    const yesBtn = document.createElement('button')
+    yesBtn.id = 'settings-quests-yes'
+    label(yesBtn, 'settingsQuestsYes')
+    yesBtn.style.cssText = btnStyle(true)
+    const noBtn = document.createElement('button')
+    noBtn.id = 'settings-quests-no'
+    label(noBtn, 'settingsQuestsNo')
+    noBtn.style.cssText = btnStyle(false)
+    answers.append(yesBtn, noBtn)
+    confirmBox.append(question, answers)
+
+    const done = document.createElement('p')
+    done.id = 'settings-quests-done'
+    done.style.cssText = 'display:none;margin:0;font-size:13px;color:#7ec46b'
+    label(done, 'settingsQuestsDone')
+
+    resetBtn.addEventListener('click', () => {
+      resetBtn.style.display = 'none'
+      confirmBox.style.display = 'flex'
+    })
+    noBtn.addEventListener('click', () => {
+      confirmBox.style.display = 'none'
+      resetBtn.style.display = ''
+    })
+    yesBtn.addEventListener('click', () => {
+      confirmBox.style.display = 'none'
+      done.style.display = 'block'
+      onResetQuests()
+    })
+    row.append(head, confirmBox, done)
+    panel.appendChild(row)
+  }
 
   document.getElementById('ui')!.appendChild(overlay)
 

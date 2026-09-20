@@ -132,6 +132,18 @@ export function emptySave(): SaveData {
   return { discovered: [], finds: [], lang: 'en', prefs: defaultPrefs(), calendarStart: Date.now() }
 }
 
+/**
+ * The save with every quest forgotten — the five items go back to pending at
+ * their (deterministic) spots on the next load, exactly as in a brand-new
+ * game, and the bicycle's chosen wall is dropped with them. Nothing that is
+ * not a quest is touched: finds, the encyclopedia, language, settings and the
+ * calendar all stay. Returns a new object and leaves the old one untouched.
+ */
+export function resetQuests(save: SaveData): SaveData {
+  const { quests: _quests, bikeSpot: _bikeSpot, ...rest } = save
+  return rest
+}
+
 /** Applies a find. Returns a new object and leaves the old one untouched. */
 export function applyFind(save: SaveData, find: Find): SaveData {
   return {

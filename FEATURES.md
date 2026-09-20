@@ -163,6 +163,11 @@ whether it's still out there, in your hands, or already home.
 - **Weather** — clear, rain, snow, fog.
 - **Minimap** on/off, plus a separate **quest items on the map** on/off,
   and **invert look** on/off.
+- **Reset quests** — behind a confirmation, from the pause menu or the start
+  screen: all five items go back into the wood at their usual spots, the
+  hut's trophies and the bicycle's wall are forgotten, and the walk restarts
+  from the start screen. Found mushrooms, the encyclopedia, notes, language,
+  settings and the calendar stay.
 
 ---
 

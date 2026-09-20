@@ -1,5 +1,5 @@
 import {
-  emptySave, applyFind, setFindNote, mergeSave, defaultPrefs, readBikeSpot, type Find, type SaveData,
+  emptySave, applyFind, setFindNote, mergeSave, defaultPrefs, readBikeSpot, resetQuests, type Find, type SaveData,
 } from '../../src/save/store'
 
 const find = (id: string, at = 1000): Find => ({ speciesId: id, x: 1, z: 2, at })
@@ -137,5 +137,57 @@ describe('bikeSpot', () => {
     ['a non-finite offset', { wall: 'left', along: Infinity }],
   ])('rejects %s read back from storage', (_label, raw) => {
     expect(readBikeSpot(raw)).toBeUndefined()
+  })
+})
+
+describe('resetQuests', () => {
+  const played = (): SaveData => ({
+    ...applyFind(emptySave(), find('boletus-edulis')),
+    lang: 'ru',
+    calendarStart: 12345,
+    prefs: { ...defaultPrefs(), minimap: true, mouseSensitivity: 1.7 },
+    quests: {
+      axe: { position: { x: 1, y: 0, z: 2 }, state: 'done' },
+      bike: { position: { x: 3, y: 0, z: 4 }, state: 'carrying' },
+      diamond: { position: { x: 5, y: 0, z: 6 }, state: 'done' },
+    },
+    bikeSpot: { wall: 'left', along: 0.4 },
+  })
+
+  it('forgets every quest and where the bicycle was left, so the next load starts them fresh', () => {
+    const reset = resetQuests(played())
+    expect(reset.quests).toBeUndefined()
+    expect(reset.bikeSpot).toBeUndefined()
+    expect('quests' in reset).toBe(false)
+    expect('bikeSpot' in reset).toBe(false)
+  })
+
+  it('leaves everything that is not a quest exactly as it was', () => {
+    const before = played()
+    const reset = resetQuests(before)
+    expect(reset.discovered).toEqual(before.discovered)
+    expect(reset.finds).toEqual(before.finds)
+    expect(reset.lang).toBe('ru')
+    expect(reset.calendarStart).toBe(12345)
+    expect(reset.prefs).toEqual(before.prefs)
+  })
+
+  it('returns a new object and leaves the old save untouched', () => {
+    const before = played()
+    const reset = resetQuests(before)
+    expect(reset).not.toBe(before)
+    expect(before.quests?.axe?.state).toBe('done')
+    expect(before.bikeSpot).toEqual({ wall: 'left', along: 0.4 })
+  })
+
+  it('is a harmless no-op on a save that never had quests, and idempotent', () => {
+    const fresh = emptySave()
+    expect(resetQuests(fresh)).toEqual(fresh)
+    const once = resetQuests(played())
+    expect(resetQuests(once)).toEqual(once)
+  })
+
+  it('survives a round trip through mergeSave: a reset save still loads with no quests', () => {
+    expect(mergeSave(resetQuests(played())).quests).toBeUndefined()
   })
 })

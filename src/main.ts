@@ -36,7 +36,9 @@ import { gameDaysElapsed, realMonthAt, DAYS_PER_MONTH } from './world/calendar'
 import { speciesById, loadSpecies } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
-import { emptySave, loadSave, persistSave, applyFind, setFindNote, readBikeSpot, type SaveData } from './save/store'
+import {
+  emptySave, loadSave, persistSave, applyFind, setFindNote, readBikeSpot, resetQuests, type SaveData,
+} from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { tryPickUp, tryDeliver } from './quest/state'
@@ -185,7 +187,7 @@ async function main(): Promise<void> {
   // one cost is the place picker itself possibly rendering once in the
   // default language before a saved preference arrives.
   let save: SaveData = emptySave()
-  void loadSave().then((loaded) => {
+  const saveLoaded = loadSave().then((loaded) => {
     save = loaded
     setLang(save.lang)
   })
@@ -203,6 +205,14 @@ async function main(): Promise<void> {
           (prefs) => {
             save = { ...save, prefs }
             void persistSave(save)
+          },
+          // Quests can be reset from the picker's own settings too — after the
+          // save has actually loaded, or the load would put them straight back.
+          () => {
+            void saveLoaded.then(() => {
+              save = resetQuests(save)
+              void persistSave(save)
+            })
           },
         ),
       )
@@ -825,6 +835,14 @@ async function main(): Promise<void> {
         forest.setWeather(prefs.weather)
         minimap.setVisible(prefs.minimap)
         void persistSave(save)
+      },
+      // The wood is already built around the old quests (items lying out, the
+      // hatchet's cleared thickets, trophies on the hut), so a reset is saved
+      // and the page reloaded back to the start — the same restart "change
+      // location" does, and the next load sites every item fresh.
+      onResetQuests: () => {
+        save = resetQuests(save)
+        void persistSave(save).then(() => location.reload())
       },
     })
   }
