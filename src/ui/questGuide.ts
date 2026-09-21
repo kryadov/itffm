@@ -63,6 +63,15 @@ export function openQuestGuide(quests: Quests): void {
   intro.textContent = t('questGuideIntro')
   panel.appendChild(intro)
 
+  // How a quadcopter flight starts and ends — the same text as the H help screen.
+  const droneTitle = document.createElement('h3')
+  droneTitle.style.cssText = 'margin:2px 0 -6px;font-size:15px'
+  droneTitle.textContent = t('droneHowToTitle')
+  const droneText = document.createElement('p')
+  droneText.style.cssText = 'margin:0;line-height:1.6;font-size:13px;opacity:.85'
+  droneText.textContent = t('droneHowTo')
+  panel.append(droneTitle, droneText)
+
   const list = document.createElement('div')
   list.style.cssText = 'display:flex;flex-direction:column;gap:10px'
   for (const id of ITEM_ORDER) {

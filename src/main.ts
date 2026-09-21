@@ -38,8 +38,15 @@ import { speciesById, loadSpecies } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
 import { DOOR_INTERACT_RADIUS } from './world/shelter'
 import {
-  emptySave, loadSave, persistSave, applyFind, setFindNote, readBikeSpot, resetQuests, type SaveData,
+  emptySave, loadSave, persistSave, applyFind, setFindNote, readBikeSpot, readDrone, resetQuests,
+  type SaveData, type DroneOrder,
 } from './save/store'
+import {
+  launchDrone, stepDrone, treeObstacles, droneReadout, DRONE, type DroneState, type DroneObstacle,
+} from './game/drone'
+import { buildPilotFigure, buildPilotBeacon } from './world/pilotFigure'
+import { createDroneHud } from './ui/droneHud'
+import { stationOccupies } from './world/railway'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { interact } from './quest/state'
@@ -426,6 +433,19 @@ async function main(): Promise<void> {
     toast(t('questPromptDiamond'))
   }
 
+  // The quadcopter the diamond earns (save.drone): handed to the train, then a
+  // crate left at the other end of the line, then in your hands.
+  let droneOrder: DroneOrder | undefined = readDrone(save.drone)
+  // The diamond used to be delivered to the hut and sat on the table; it goes to
+  // the train now. A save that already "delivered" it has nothing to show for it
+  // and no quadcopter, so the diamond is put back in the player's pocket.
+  if (quests.diamond.state === 'done' && !droneOrder) {
+    quests.diamond = { ...quests.diamond, state: 'carrying' }
+    save = { ...save, quests }
+    void persistSave(save)
+    toast(t('questTookDiamondBack'))
+  }
+
   // Every quest item's own thicket-detour scrub — a `let`, not a `const`,
   // because the hatchet (`tryChopScrub` below) replaces this with a shorter
   // array (via `chopScrub`, a pure function) the moment the axe quest is
@@ -459,6 +479,19 @@ async function main(): Promise<void> {
   let player: PlayerState = {
     x: startPose.x, z: startPose.z, yaw: 0, pitch: 0, crouch: 0, vy: 0, hop: 0, airborne: false, stand: 0,
     bobPhase: 0,
+  }
+  // Dev only, and only under ?debug (the F3 panel's own switch): tp=x,z puts the
+  // player at a world point, and train=N runs the train N seconds ahead before
+  // the walk begins, so a test can stand at a platform with the train in instead
+  // of waiting minutes of game time for it. (CLAUDE.md, Commands.)
+  {
+    const q = new URLSearchParams(location.search)
+    if (q.has('debug')) {
+      const tp = q.get('tp')?.split(',').map(Number)
+      if (tp && tp.length === 2 && tp.every(Number.isFinite)) player = { ...player, x: tp[0], z: tp[1] }
+      const ahead = Number(q.get('train'))
+      if (Number.isFinite(ahead) && ahead > 0) for (let i = 0; i < Math.min(ahead, 6000); i++) forest.updateTrain(1)
+    }
   }
   let aimed: THREE.Object3D | null = null
   // Whether the player is close enough to the shelter's own doorway for `E`
@@ -533,7 +566,6 @@ async function main(): Promise<void> {
   // since their own abilities (choppable scrub, the carried light) are
   // already the visible proof they're owned.
   const TROPHY_SETTER: Partial<Record<QuestItemId, (on: boolean) => void>> = {
-    diamond: forest.setDiamondPlaced,
     rod: forest.setRodPlaced,
     bike: forest.setBikePlaced,
   }
@@ -543,6 +575,29 @@ async function main(): Promise<void> {
       if (id === 'bike') forest.setBikePlaced(true, readBikeSpot(save.bikeSpot))
       else TROPHY_SETTER[id]?.(true)
     }
+  }
+  // Where the quadcopter is in its story: the crate on its platform, or the
+  // empty box on the hut's table.
+  if (droneOrder?.stage === 'crate') forest.setDroneCrate(droneOrder.crateEnd)
+  if (droneOrder?.stage === 'owned') forest.setDroneBoxPlaced(true)
+
+  /**
+   * Where the diamond is handed in: the car of a train standing at a platform
+   * nearest the player, or null when no train stands at one.
+   */
+  function trainHandIn(): { x: number; z: number } | null {
+    const stopped = forest.trainStopped()
+    if (!stopped) return null
+    let best = stopped.cars[0]
+    let bestD = Infinity
+    for (const c of stopped.cars) {
+      const d = Math.hypot(c.x - player.x, c.z - player.z)
+      if (d < bestD) {
+        bestD = d
+        best = c
+      }
+    }
+    return best
   }
 
   /**
@@ -576,7 +631,7 @@ async function main(): Promise<void> {
       const bikeDrop = id === 'bike' ? forest.bikeSpotNear(player) : null
       quests[id] = interact(
         quests[id], player,
-        { deliverAt: bikeDrop?.point ?? forest.shelterDoor, takeFrom: takeSpot(id) },
+        { deliverAt: id === 'diamond' ? trainHandIn() : bikeDrop?.point ?? forest.shelterDoor, takeFrom: takeSpot(id) },
         DOOR_INTERACT_RADIUS,
       )
       const now = quests[id].state
@@ -591,7 +646,12 @@ async function main(): Promise<void> {
       }
       if (now === 'done') {
         toast(t(QUEST_COMPLETE_KEY[id]))
-        if (id === 'bike' && bikeDrop) {
+        if (id === 'diamond') {
+          // Handed to the conductor: the crate is left at the OTHER end of the line.
+          const stopped = forest.trainStopped()
+          droneOrder = { stage: 'ordered', crateEnd: stopped && stopped.end === 1 ? 0 : 1 }
+          save = { ...save, drone: droneOrder }
+        } else if (id === 'bike' && bikeDrop) {
           save = { ...save, bikeSpot: bikeDrop.spot }
           forest.setBikePlaced(true, bikeDrop.spot)
         } else {
@@ -599,10 +659,135 @@ async function main(): Promise<void> {
         }
       }
     }
+    if (!changed && quests.diamond.state === 'carrying' && !trainHandIn() && stationOccupies(forest.stations, player.x, player.z, 5)) {
+      // Standing at a platform with the diamond, but no train is in: say so.
+      toast(t('diamondWaitTrain'))
+      return true
+    }
     if (!changed) return false
     save = { ...save, quests }
     void persistSave(save)
     return true
+  }
+
+  /** `E` at the crate the train left on the platform: the quadcopter is yours. */
+  function tryDroneCrate(): boolean {
+    if (droneOrder?.stage !== 'crate') return false
+    const c = forest.crateSpot(droneOrder.crateEnd)
+    if (Math.hypot(player.x - c.x, player.z - c.z) > DOOR_INTERACT_RADIUS) return false
+    droneOrder = { ...droneOrder, stage: 'owned' }
+    save = { ...save, drone: droneOrder }
+    void persistSave(save)
+    forest.setDroneCrate(null)
+    forest.setDroneBoxPlaced(true)
+    toast(t('droneOwned'))
+    return true
+  }
+
+  // ---------------------------------------------------------------------
+  // The quadcopter. R launches it and the camera becomes ITS camera; the player
+  // stays where they stood, drawn as a little person with the controller.
+  const droneHud = createDroneHud(ui)
+  const pilotFigure = buildPilotFigure()
+  const pilotBeacon = buildPilotBeacon()
+  const FLIGHT_FOV = 84
+  const walkingFov = camera.fov
+  let droneBattery = 1
+  let flight: DroneState | null = null
+  let returnRequested = false
+  // Where the wood's trees stand for it to bump into: the home plot's once, the
+  // streamed chunks' trunks near it now and then (their heights are not known,
+  // so those are tall enough to clear only from above the canopy).
+  let droneStatic: DroneObstacle[] | null = null
+  let droneNear: DroneObstacle[] = []
+  let droneNearAge = 0
+  // Where the wood is being kept alive: the player's own spot, or the drone's
+  // while it flies (streaming, culling and the animals follow the camera).
+  let focusX = 0
+  let focusZ = 0
+
+  function droneObstacles(f: DroneState): DroneObstacle[] {
+    if (!droneStatic) {
+      droneStatic = treeObstacles(forest.trees)
+      const g = combinedGround.heightAt(forest.shelter.x, forest.shelter.z)
+      droneStatic.push({ x: forest.shelter.x, z: forest.shelter.z, radius: 2.7, y0: g - 1, y1: g + 4 }) // the hut
+    }
+    if (worldStream && ++droneNearAge >= 20) {
+      droneNearAge = 0
+      droneNear = worldStream
+        .obstacles()
+        .filter((o) => Math.hypot(o.x - f.x, o.z - f.z) < 40)
+        .map((o) => {
+          const h = worldStream.heightAt(o.x, o.z)
+          return { x: o.x, z: o.z, radius: o.radius, y0: h - 1, y1: h + 26 }
+        })
+    }
+    return droneNear.length > 0 ? [...droneStatic, ...droneNear] : droneStatic
+  }
+
+  function launchFlight(): void {
+    if (droneOrder?.stage !== 'owned' || flight || modalOpen() || player.airborne) return
+    if (forest.playerInsideMine(player.x, player.z) || forest.insideHut(player.x, player.z)) {
+      toast(t('droneNoIndoors'))
+      return
+    }
+    if (droneBattery < 0.1) {
+      toast(t('droneCharging'))
+      return
+    }
+    flight = { ...launchDrone({ x: player.x, z: player.z, yaw: player.yaw }, combinedGround, droneBattery), pitch: player.pitch }
+    pilotFigure.group.position.set(player.x, combinedGround.heightAt(player.x, player.z), player.z)
+    pilotFigure.group.rotation.y = player.yaw
+    pilotBeacon.position.copy(pilotFigure.group.position)
+    forest.scene.add(pilotFigure.group, pilotBeacon)
+    camera.fov = FLIGHT_FOV
+    camera.updateProjectionMatrix()
+    droneHud.show(true)
+    const cross = document.getElementById('crosshair')
+    if (cross) cross.style.display = 'none'
+    hud.setTarget(null)
+  }
+
+  function endFlight(): void {
+    if (!flight) return
+    droneBattery = flight.battery
+    flight = null
+    returnRequested = false
+    forest.scene.remove(pilotFigure.group, pilotBeacon)
+    camera.fov = walkingFov
+    camera.updateProjectionMatrix()
+    droneHud.show(false)
+    const cross = document.getElementById('crosshair')
+    if (cross) cross.style.display = ''
+    audio.droneHum(0, 0)
+  }
+
+  /** One frame of flight: the pilot's input to the drone, the world kept alive around it. */
+  function stepFlight(dt: number): void {
+    if (!flight) return
+    if (!modalOpen()) {
+      const input = touch.active ? touch.read(dt) : controls.read(dt)
+      const lift = Math.max(-1, Math.min(1, (input.lift ?? 0) - (input.crouching || input.sprinting ? 1 : 0)))
+      const env = { ground: combinedGround, obstacles: droneObstacles(flight), pilot: { x: player.x, z: player.z } }
+      flight = stepDrone(
+        flight,
+        { forward: input.forward, strafe: input.strafe, lift, dYaw: input.dYaw, dPitch: input.dPitch, returnHome: returnRequested },
+        env,
+        dt,
+      )
+      returnRequested = false
+      if (flight.landed) {
+        endFlight()
+        return
+      }
+      droneHud.update(droneReadout(flight, env), flight.returning)
+    }
+    worldStream?.update(flight.x, flight.z)
+    pilotFigure.update(dt, new THREE.Vector3(flight.x, flight.y, flight.z))
+    // The marker pole is for finding home from far off and above the trees; right
+    // beside the pilot it only fills the view, and the person is there to see.
+    pilotBeacon.visible = Math.hypot(flight.x - player.x, flight.z - player.z) > 12
+    audio.droneHum(1, Math.hypot(flight.vx, flight.vz) / DRONE.maxSpeed)
   }
 
   /**
@@ -763,14 +948,14 @@ async function main(): Promise<void> {
   function cullDistantMushrooms(): void {
     const limit = save.prefs.drawDistance * save.prefs.drawDistance
     for (const m of mushroomCandidates()) {
-      const dx = m.position.x - player.x
-      const dz = m.position.z - player.z
+      const dx = m.position.x - focusX
+      const dz = m.position.z - focusZ
       m.visible = dx * dx + dz * dz < limit
     }
   }
 
   function updateAim(): void {
-    if (modalOpen()) {
+    if (flight || modalOpen()) {
       aimed = null
       nearDoor = false
       hud.setTarget(null)
@@ -796,6 +981,22 @@ async function main(): Promise<void> {
       nearDoor = false
       hud.setTarget(t(QUEST_ITEM_NAME_KEY[id]))
       return
+    }
+    if (droneOrder?.stage === 'crate') {
+      const c = forest.crateSpot(droneOrder.crateEnd)
+      if (Math.hypot(player.x - c.x, player.z - c.z) < DOOR_INTERACT_RADIUS) {
+        nearDoor = false
+        hud.setTarget(t('droneCrateName'))
+        return
+      }
+    }
+    if (quests.diamond.state === 'carrying') {
+      const car = trainHandIn()
+      if (car && Math.hypot(player.x - car.x, player.z - car.z) < DOOR_INTERACT_RADIUS) {
+        nearDoor = false
+        hud.setTarget(t('conductor'))
+        return
+      }
     }
     // Nothing else nearby — a mushroom never spawns inside the hut, so this
     // and an aimed mushroom are not really in tension in practice.
@@ -945,6 +1146,8 @@ async function main(): Promise<void> {
       `<div style="max-width:480px;padding:34px">
          <h1 style="margin:0 0 18px;font-size:22px">${t('helpTitle')}</h1>
          <p style="line-height:1.7;margin:0">${t('controls')}</p>
+         <h2 style="margin:22px 0 8px;font-size:17px">${t('droneHowToTitle')}</h2>
+         <p style="line-height:1.6;margin:0;font-size:14px;opacity:.9">${t('droneHowTo')}</p>
          <p style="opacity:.5;font-size:14px;margin-top:26px">${t('helpClose')}</p>
        </div>`,
       ['Escape', 'KeyH'],
@@ -1079,9 +1282,17 @@ async function main(): Promise<void> {
 
   addEventListener('keydown', (e) => {
     if (modalOpen()) return
-    if (e.code === 'KeyE') {
+    if (e.code === 'KeyR') {
+      // R launches the quadcopter, and brings it home while it flies.
+      if (flight) {
+        if (!flight.returning) returnRequested = true
+      } else launchFlight()
+    }
+    if (e.code === 'KeyE' && !flight) {
       if (tryQuestInteract()) {
         // handled: picked up or delivered a quest item
+      } else if (tryDroneCrate()) {
+        // handled: took the quadcopter from its crate
       } else if (tryChopScrub()) {
         // handled: chopped down a scrub object
       } else if (nearDoor) forest.toggleShelterDoor()
@@ -1135,8 +1346,14 @@ async function main(): Promise<void> {
     const dt = Math.min(0.05, (now - last) / 1000)
     last = now
 
+    // The wood is kept alive around the camera: the player, or the drone in flight.
+    focusX = flight ? flight.x : player.x
+    focusZ = flight ? flight.z : player.z
+    if (flight) stepFlight(dt)
+    else droneBattery = Math.min(1, droneBattery + dt / 60) // charging on the ground
+
     // While an overlay is up the player stands still: the mouse/thumb belongs to it.
-    if (!modalOpen()) {
+    if (!flight && !modalOpen()) {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
       const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * ridingSpeedFactor(isRiding())
@@ -1181,23 +1398,30 @@ async function main(): Promise<void> {
         // A tap that missed every mushroom still tries the quest item/scrub/
         // door — touch has no separate `E` to reach any of those otherwise.
         if (target) examineTarget(target)
-        else if (!tryQuestInteract() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
+        else if (!tryQuestInteract() && !tryDroneCrate() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
       }
     }
 
     bobScale = easeToward(bobScale, isRiding() ? 0 : 1, dt, 8)
     const bob = cameraBob(player, bobScale)
-    camera.position.set(
-      player.x + Math.cos(player.yaw) * bob.dx,
-      combinedGround.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand + bob.dy,
-      player.z - Math.sin(player.yaw) * bob.dx,
-    )
-    camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
-    compass.update(player.yaw)
+    if (flight) {
+      // The view from the quadcopter.
+      camera.position.set(flight.x, flight.y, flight.z)
+      camera.rotation.set(flight.pitch, flight.yaw, flight.roll, 'YXZ')
+    } else {
+      camera.position.set(
+        player.x + Math.cos(player.yaw) * bob.dx,
+        combinedGround.heightAt(player.x, player.z) + eyeHeight(player) + player.hop + player.stand + bob.dy,
+        player.z - Math.sin(player.yaw) * bob.dx,
+      )
+      camera.rotation.set(player.pitch, player.yaw, 0, 'YXZ')
+    }
+    const viewYaw = flight ? flight.yaw : player.yaw
+    compass.update(viewYaw)
     updateQuestHud()
     if (save.prefs.minimap) {
       minimap.setMarkers(buildMinimapMarkers(landmarks, quests, save.prefs.minimapQuestHints, QUEST_MARKER_COLOR))
-      minimap.update({ x: player.x, z: player.z, heading: headingFromYaw(player.yaw) })
+      minimap.update({ x: focusX, z: focusZ, heading: headingFromYaw(viewYaw) })
     }
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1
     const clockT = timeFor(save.prefs.timeMode, cycleT)
@@ -1225,9 +1449,9 @@ async function main(): Promise<void> {
     forest.updateWeather(camera.position, dt)
     forest.updateShelter(dt)
     forest.updateCampfire(dt)
-    forest.updateBirds(dt, player.x, player.z)
-    forest.updateCritters(dt, player.x, player.z)
-    worldStream?.updateCritters(dt, player.x, player.z)
+    forest.updateBirds(dt, focusX, focusZ)
+    forest.updateCritters(dt, focusX, focusZ)
+    worldStream?.updateCritters(dt, focusX, focusZ)
     forest.updateInsects(dt)
     forest.updateTrain(dt)
     forest.updateWater(dt)
@@ -1238,12 +1462,23 @@ async function main(): Promise<void> {
     worldStream?.updateLod(camera)
     if (++scatterCullFrame >= SCATTER_CULL_INTERVAL_FRAMES) {
       scatterCullFrame = 0
-      forest.updateScatterCulling(player.x, player.z, SCATTER_CULL_RADIUS)
-      worldStream?.updateScatterCulling(player.x, player.z, SCATTER_CULL_RADIUS)
+      forest.updateScatterCulling(focusX, focusZ, SCATTER_CULL_RADIUS)
+      worldStream?.updateScatterCulling(focusX, focusZ, SCATTER_CULL_RADIUS)
+    }
+    // The train has arrived at the crate's end of the line: it leaves the crate.
+    if (droneOrder?.stage === 'ordered') {
+      const stopped = forest.trainStopped()
+      if (stopped && stopped.end === droneOrder.crateEnd) {
+        droneOrder = { ...droneOrder, stage: 'crate' }
+        save = { ...save, drone: droneOrder }
+        void persistSave(save)
+        forest.setDroneCrate(droneOrder.crateEnd)
+        toast(t('droneCrateArrived'))
+      }
     }
     updateAim()
     updateDebugOverlay()
-    bikeView.setVisible(isRiding())
+    bikeView.setVisible(isRiding() && !flight)
     bikeView.update(dt, player.yaw, camera)
     renderer.render(forest.scene, camera)
     bikeView.render(renderer, camera)

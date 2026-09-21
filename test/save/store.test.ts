@@ -1,5 +1,5 @@
 import {
-  emptySave, applyFind, setFindNote, mergeSave, defaultPrefs, readBikeSpot, resetQuests, type Find, type SaveData,
+  emptySave, applyFind, setFindNote, mergeSave, defaultPrefs, readBikeSpot, readDrone, resetQuests, type Find, type SaveData,
 } from '../../src/save/store'
 
 const find = (id: string, at = 1000): Find => ({ speciesId: id, x: 1, z: 2, at })
@@ -189,5 +189,38 @@ describe('resetQuests', () => {
 
   it('survives a round trip through mergeSave: a reset save still loads with no quests', () => {
     expect(mergeSave(resetQuests(played())).quests).toBeUndefined()
+  })
+})
+
+describe('the quadcopter order', () => {
+  it.each([
+    [{ stage: 'ordered', crateEnd: 0 }],
+    [{ stage: 'crate', crateEnd: 1 }],
+    [{ stage: 'owned', crateEnd: 1 }],
+  ] as const)('reads back a good one: %o', (raw) => {
+    expect(readDrone(raw)).toEqual(raw)
+  })
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['a string', 'owned'],
+    ['an unknown stage', { stage: 'flying', crateEnd: 0 }],
+    ['a bad end', { stage: 'crate', crateEnd: 2 }],
+    ['a missing end', { stage: 'crate' }],
+  ])('rejects %s read back from storage', (_label, raw) => {
+    expect(readDrone(raw)).toBeUndefined()
+  })
+
+  it('is forgotten with the quests: a reset takes the quadcopter back too', () => {
+    const played: SaveData = { ...emptySave(), drone: { stage: 'owned', crateEnd: 1 } }
+    const reset = resetQuests(played)
+    expect(reset.drone).toBeUndefined()
+    expect('drone' in reset).toBe(false)
+    expect(played.drone).toEqual({ stage: 'owned', crateEnd: 1 }) // the original is untouched
+  })
+
+  it('survives a round trip through mergeSave', () => {
+    expect(readDrone(mergeSave({ drone: { stage: 'crate', crateEnd: 0 } }).drone)).toEqual({ stage: 'crate', crateEnd: 0 })
   })
 })

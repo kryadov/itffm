@@ -130,6 +130,13 @@ export class AudioEngine {
   // clip stands in for a walk.
   private runBuffer: AudioBuffer | null = null
 
+  // The quadcopter's rotors: two slightly detuned saws through a low-pass, built
+  // once on first use and left running, only their gain and pitch move — the
+  // same "never tear the graph down" choice as the water ambience.
+  private droneGain: GainNode | null = null
+  private droneOscs: OscillatorNode[] = []
+  private droneFilter: BiquadFilterNode | null = null
+
   /** Create/resume the AudioContext. Call from a click/keydown handler —
    *  browsers refuse to start audio before one. */
   resume(): void {
@@ -495,6 +502,44 @@ export class AudioEngine {
    * toward silence, never tears them down — cheaper than rebuilding the
    * graph every time the player wanders in and out of range.
    */
+  /**
+   * The quadcopter's hum: `level` 0 (silent, not flying) to 1 (flying), `speed`
+   * 0..1 of its top speed, which raises the pitch a little. Call every frame
+   * while it may be flying; 0 fades it out.
+   */
+  droneHum(level: number, speed: number): void {
+    if (!this.ctx || !this.sfxGain) return
+    const t = this.ctx.currentTime
+    if (level <= 0) {
+      if (this.droneGain) this.droneGain.gain.setTargetAtTime(0, t, 0.2)
+      return
+    }
+    if (!this.droneGain) {
+      const gain = this.ctx.createGain()
+      gain.gain.value = 0
+      const filter = this.ctx.createBiquadFilter()
+      filter.type = 'lowpass'
+      filter.frequency.value = 900
+      filter.connect(gain)
+      gain.connect(this.sfxGain)
+      for (const detune of [-6, 6]) {
+        const osc = this.ctx.createOscillator()
+        osc.type = 'sawtooth'
+        osc.frequency.value = 120
+        osc.detune.value = detune
+        osc.connect(filter)
+        osc.start()
+        this.droneOscs.push(osc)
+      }
+      this.droneGain = gain
+      this.droneFilter = filter
+    }
+    const s = Math.max(0, Math.min(1, speed))
+    for (const osc of this.droneOscs) osc.frequency.setTargetAtTime(115 + s * 45, t, 0.2)
+    this.droneFilter?.frequency.setTargetAtTime(700 + s * 700, t, 0.2)
+    this.droneGain.gain.setTargetAtTime(0.05 * Math.min(1, level), t, 0.2)
+  }
+
   updateWaterAmbience(gain: number, kind: WaterAmbienceKind | null): void {
     if (!this.ctx || !this.sfxGain) return
     if (!kind || gain <= 0) {

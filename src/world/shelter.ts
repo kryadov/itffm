@@ -405,11 +405,12 @@ export interface ShelterFx {
   /** Swings the door and flips `doorObstacle`'s own radius so the player can
    *  actually walk through once it is open. */
   toggleDoor(): void
-  /** Shows/hides the diamond quest item's trophy, resting on the table —
+  /** Shows/hides the empty box the quadcopter came in, resting on the table —
    *  built once (below) and only toggled, the same "always built, visibility
    *  flips" approach the door's own leaf already uses, rather than adding
-   *  and removing a mesh from the scene graph on delivery. */
-  setDiamondPlaced(on: boolean): void
+   *  and removing a mesh from the scene graph. (The diamond used to sit
+   *  there; it goes to the train now.) */
+  setDroneBoxPlaced(on: boolean): void
   /** Shows/hides the fishing rod, leaned against the wall by the table. */
   setRodPlaced(on: boolean): void
   /** Shows/hides the bicycle, parked outside against a wall — the one in
@@ -589,21 +590,24 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
   lamp.position.set(-0.14, 0, 0.1)
   table.add(lamp)
 
-  // The diamond quest's own trophy — opposite corner from the cup and clear
-  // of the lamp, so it reads as set down there rather than colliding with
-  // either. Hidden until the quest delivers it (setDiamondPlaced, below);
-  // built once regardless, the same "always built, toggled" choice the
-  // door's own leaf already made.
-  const diamond = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.045),
-    new THREE.MeshStandardMaterial({
-      color: 0xdff6ff, roughness: 0.05, metalness: 0.1, emissive: 0x9fd8e0, emissiveIntensity: 0.15,
-    }),
+  // The empty box the quadcopter came in — opposite corner from the cup and
+  // clear of the lamp, so it reads as set down there rather than colliding with
+  // either. Hidden until the drone is in your hands (setDroneBoxPlaced, below);
+  // built once regardless, the same "always built, toggled" choice the door's
+  // own leaf already made.
+  const droneBox = new THREE.Group()
+  droneBox.name = 'droneBox'
+  const boxBody = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.08, 0.12), new THREE.MeshStandardMaterial({ color: 0xb08a5a, roughness: 1 }),
   )
-  diamond.name = 'diamond'
-  diamond.position.set(0.14, tableHeight + 0.02 + 0.045, 0.09)
-  diamond.visible = false
-  table.add(diamond)
+  const boxTape = new THREE.Mesh(
+    new THREE.BoxGeometry(0.03, 0.004, 0.121), new THREE.MeshStandardMaterial({ color: 0xd8c08a, roughness: 0.9 }),
+  )
+  boxTape.position.y = 0.041
+  droneBox.add(boxBody, boxTape)
+  droneBox.position.set(0.14, tableHeight + 0.02 + 0.04, 0.09)
+  droneBox.visible = false
+  table.add(droneBox)
 
   table.position.set(TABLE_X, 0, TABLE_Z)
   group.add(table)
@@ -948,8 +952,8 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
       // that reads as already open.
       doorObstacleObj.radius = doorOpen ? 0 : DOOR_CLOSED_RADIUS
     },
-    setDiamondPlaced: (on: boolean) => {
-      diamond.visible = on
+    setDroneBoxPlaced: (on: boolean) => {
+      droneBox.visible = on
     },
     setRodPlaced: (on: boolean) => {
       rod.visible = on

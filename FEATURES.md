@@ -34,11 +34,12 @@ have to start the game just to change either.
 | Keys | Action |
 |---|---|
 | `W` `A` `S` `D` | Walk |
-| `Shift` | Crouch — to look under a cap |
-| `Space` | Jump |
+| `Shift` | Crouch — to look under a cap (in the quadcopter: down) |
+| `Space` | Jump (in the quadcopter: up) |
 | `E` | Examine a find, pick up/deliver a quest item, chop scrub (once the hatchet is owned), open/close the hut's door |
 | `F` | Flashlight |
 | `L` | Toggle the carried lamp on/off, once owned (layered on top of its own automatic day/night/mine rule) |
+| `R` | Launch the quadcopter, once you have it; while it flies, bring it home |
 | `Tab` | Encyclopedia |
 | `Q` | Sort the basket |
 | `M` | Settings |
@@ -157,10 +158,42 @@ clustering in whichever one the dice happened to favour:
 - **Diamond** — found at the end of the mine's own branching cave, not near
   the hut like the other four; you have to actually search the forks to find
   it. A many-faceted, asymmetric cut, not a plain gem, and it visibly
-  brightens as you approach it with a lit lamp. Unlike the other four it
-  unlocks nothing: it's a trophy that ends up on the hut's table once
-  delivered. A returning save from before the diamond existed gets its own
-  one-time prompt pointing at the mine.
+  brightens as you approach it with a lit lamp. It is not for the hut: you
+  give it to the **conductor** — `E` beside a car of the train while it stands
+  at a platform (with no train in, `E` at a platform says to wait) — and it
+  earns you the **quadcopter**. A returning save whose diamond already sat on
+  the table gets it back in its pocket, to hand over. The empty drone box
+  ends up on the hut's table once the quadcopter is yours.
+
+### The quadcopter
+
+Once the diamond is with the conductor, the train pulls out, and the next time
+it stands at the **other** end of the line it leaves a wooden crate on the
+platform, by the shelter; `E` at the crate makes the quadcopter yours.
+
+`R` launches it, and the view is **from the quadcopter** — the screen shows its
+own camera, a crosshair, and at the bottom its height above the ground, its
+distance from you, the battery, the radio signal and an arrow to where home is.
+You, meanwhile, stand where you launched it, drawn as a little person with a
+cap and the controller in your hands, turning to watch it and looking up at
+it; a tall orange pole with a flag stands over you, showing above the trees, so
+you can find your way back when the canopy hides you.
+
+- **Flying:** `W` `A` `S` `D` fly the way the camera looks, the mouse turns and
+  tilts it, `Space` climbs and `Shift` descends. It eases into its speed and
+  leans into a sideways move.
+- **Limits:** it cannot get further than 150 m from you (the signal fades from
+  100 m), climbs no higher than 40 m above the ground beneath it, and its
+  battery lasts two minutes — it recharges while you are on foot, in about a
+  minute. Trunks are solid, foliage is soft: it weaves between the trunks and
+  through the crowns.
+- **Home:** `R` again, or an empty battery, sends it home by itself — up over
+  the trees, across, and down to you.
+- **Where:** in the open only, not inside the hut or the mine. Anything that
+  opens a menu pauses it.
+- The wood keeps loading around the quadcopter, not around you, and the
+  minimap follows it.
+- Not yet on touch screens (there is no stick for climbing).
 
 A **"Rules & Quests" screen**, in the pause menu, lists the basket/
 encyclopedia loop above plus all five items, what each one unlocks, and

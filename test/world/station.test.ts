@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { placeRailLine, createTrain, stationsFor, stationOccupies, RAIL_GAUGE } from '../../src/world/railway'
-import { buildStationMesh, STATION_PLATFORM_HEIGHT, STATION_PLATFORM_WIDTH } from '../../src/world/station'
+import { buildStationMesh, stationCrateSpot, STATION_PLATFORM_HEIGHT, STATION_PLATFORM_WIDTH } from '../../src/world/station'
+import { buildDroneCrate } from '../../src/world/droneCrate'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
@@ -139,5 +140,40 @@ describe('buildStationMesh', () => {
     const { group, dispose } = buildStationMesh(line, stations, bumpy)
     expect(() => dispose()).not.toThrow()
     expect(group).toBeDefined()
+  })
+})
+
+describe('the crate the train leaves on a platform', () => {
+  const line = placeRailLine(bumpy, 90, 5)
+  const stations = stationsFor(line)
+
+  it('has a spot on each platform: on the slab, at its top, clear of the shelter', () => {
+    const { obstacles } = buildStationMesh(line, stations, bumpy)
+    for (const [i, s] of stations.entries()) {
+      const c = stationCrateSpot(line, s)
+      expect(c.x).toBeGreaterThan(s.x0 + 0.5)
+      expect(c.x).toBeLessThan(s.x1 - 0.5)
+      const across = (c.z - s.z) * s.side
+      expect(across).toBeGreaterThan(RAIL_GAUGE / 2 + 0.3)
+      expect(across).toBeLessThan(RAIL_GAUGE / 2 + 0.3 + STATION_PLATFORM_WIDTH + 0.3)
+      expect(c.y).toBeGreaterThan(bumpy.heightAt(c.x, s.z))
+      // not inside the roof's posts or the bench
+      for (const o of obstacles) {
+        if (Math.abs(o.x - (s.x0 + s.x1) / 2) < 6) expect(Math.hypot(o.x - c.x, o.z - c.z)).toBeGreaterThan(o.radius + 0.4)
+      }
+      void i
+    }
+  })
+
+  it('is a wooden crate a person could lift, standing on the ground', () => {
+    const crate = buildDroneCrate()
+    const box = new THREE.Box3().setFromObject(crate)
+    const size = box.getSize(new THREE.Vector3())
+    expect(box.min.y).toBeCloseTo(0, 2)
+    expect(size.x).toBeGreaterThan(0.4)
+    expect(size.x).toBeLessThan(1.2)
+    expect(size.y).toBeGreaterThan(0.25)
+    expect(size.y).toBeLessThan(0.8)
+    expect(crate.name).toBe('droneCrate')
   })
 })

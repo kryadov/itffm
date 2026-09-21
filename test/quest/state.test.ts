@@ -99,3 +99,16 @@ describe('interact', () => {
     }
   })
 })
+
+describe('interact with nowhere to hand an item in (the diamond, when no train stands at the platform)', () => {
+  const at = { x: 0.2, z: 0.2 }
+  it('does not deliver when there is no delivery point', () => {
+    const q: Quest = { position: pos, state: 'carrying' }
+    expect(interact(q, at, { deliverAt: null, takeFrom: null }, 2)).toEqual(q)
+  })
+
+  it('still picks a pending one up', () => {
+    const q: Quest = { position: { x: 0.1, y: 0, z: 0.1 }, state: 'pending' }
+    expect(interact(q, at, { deliverAt: null, takeFrom: null }, 2).state).toBe('carrying')
+  })
+})

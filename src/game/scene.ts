@@ -34,7 +34,8 @@ import {
   placeRailLine, buildRailMesh, createTrain, stationsFor, stationOccupies, RAIL_SEED_OFFSET,
   type RailLine, type Train, type Station,
 } from '../world/railway'
-import { buildStationMesh } from '../world/station'
+import { buildStationMesh, stationCrateSpot } from '../world/station'
+import { buildDroneCrate } from '../world/droneCrate'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
 import { gameMonth, daysSinceRain } from '../world/calendar'
@@ -143,6 +144,14 @@ export interface Forest {
   stations: Station[]
   /** The railway's line, for the minimap. */
   railPoints: { x: number; z: number }[]
+  /** While the train stands at a station: which end (0 west, 1 east) and where
+   *  each car is, world x and z; otherwise null. */
+  trainStopped: () => { end: 0 | 1; cars: { x: number; z: number }[] } | null
+  /** Puts the quadcopter's crate on the platform at that end of the line, or
+   *  takes it away (null). */
+  setDroneCrate: (end: 0 | 1 | null) => void
+  /** Where the crate stands at each end, world metres. */
+  crateSpot: (end: 0 | 1) => { x: number; y: number; z: number }
   /** Where the hut's own doorway is, in world space — main.ts checks the
    *  player's plain distance to this to decide whether `E` should open/close
    *  the door instead of examining a mushroom. */
@@ -179,10 +188,10 @@ export interface Forest {
    *  player's position — call every frame with whatever `quest/lamp.ts`'s
    *  `lampIsOn` decided this frame. */
   updatePlayerLamp: (on: boolean, pos: THREE.Vector3) => void
-  /** Shows/hides each delivered quest item's own trophy at the shelter —
-   *  the diamond on the table, the rod leaned by it, the bike parked
+  /** Shows/hides what a delivered quest item leaves at the shelter — the
+   *  empty drone box on the table, the rod leaned by it, the bike parked
    *  outside — see world/shelter.ts's own setters. */
-  setDiamondPlaced: (on: boolean) => void
+  setDroneBoxPlaced: (on: boolean) => void
   setRodPlaced: (on: boolean) => void
   setBikePlaced: (on: boolean, spot?: BikeSpot) => void
   /** Which wall of the hut is nearest `p`, where along it, and the point on
@@ -388,6 +397,12 @@ export function createForest(
   const stations = stationsFor(railLine)
   stationFx = buildStationMesh(railLine, stations, source.ground)
   scene.add(stationFx.group)
+  // The crate the train leaves for whoever handed over the diamond: one mesh,
+  // put on whichever platform it was left at (`setDroneCrate`).
+  const droneCrate = buildDroneCrate()
+  droneCrate.visible = false
+  scene.add(droneCrate)
+  const crateSpots = stations.map((s) => stationCrateSpot(railLine, s))
   const updateTrain = (dt: number): void => train.update(dt)
   const water = buildWaterMeshes(source.water ?? [], source.ground)
   scene.add(water.group)
@@ -668,10 +683,16 @@ export function createForest(
     campfire: { x: campfire.x, z: campfire.z },
     mine: { x: mine.x, z: mine.z },
     stations, railPoints: railLine.points.map((p) => ({ x: p.x, z: p.z })),
+    trainStopped: () => train.stopped(),
+    setDroneCrate: (end: 0 | 1 | null) => {
+      droneCrate.visible = end !== null
+      if (end !== null) droneCrate.position.set(crateSpots[end].x, crateSpots[end].y, crateSpots[end].z)
+    },
+    crateSpot: (end: 0 | 1) => crateSpots[end],
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
-    setDiamondPlaced: (on: boolean) => shelterFx!.setDiamondPlaced(on),
+    setDroneBoxPlaced: (on: boolean) => shelterFx!.setDroneBoxPlaced(on),
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
     setBikePlaced: (on: boolean, spot?: BikeSpot) => shelterFx!.setBikePlaced(on, spot),
     bikeSpotNear: (p: { x: number; z: number }) => nearestBikeSpot(shelter, p),

@@ -148,3 +148,13 @@ export function buildStationMesh(
   }
   return { group, setNight, obstacles, dispose }
 }
+
+/**
+ * Where the crate the train leaves stands on a station's platform: beyond the
+ * shelter's roof and its bench, on the slab, at its top. In world metres.
+ */
+export function stationCrateSpot(line: RailLine, s: Station): { x: number; y: number; z: number } {
+  const x = (s.x0 + s.x1) / 2 + 3.6
+  const z = s.z + s.side * (STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH / 2)
+  return { x, y: railHeightAt(line, x) + STATION_PLATFORM_HEIGHT, z }
+}

@@ -69,17 +69,21 @@ export function tryTake(
  * standing at the hut, taking the rod and putting it straight back down again
  * in the same press would look like nothing happened.
  *
- * @param spots where a carried item is handed in, and (null for an item that
+ * @param spots where a carried item is handed in (null when it cannot be just
+ *   now), and (null for an item that
  *   cannot be taken back — the hatchet, the lamp, the diamond) where a delivered
  *   one waits
  */
 export function interact(
   quest: Quest,
   playerPos: { x: number; z: number },
-  spots: { deliverAt: { x: number; z: number }; takeFrom: { x: number; z: number } | null },
+  spots: { deliverAt: { x: number; z: number } | null; takeFrom: { x: number; z: number } | null },
   range: number,
 ): Quest {
   if (quest.state === 'pending') return tryPickUp(quest, playerPos, range)
-  if (quest.state === 'carrying') return tryDeliver(quest, playerPos, spots.deliverAt, range)
+  if (quest.state === 'carrying') {
+    // Nowhere to hand it in right now (the diamond, with no train at the platform).
+    return spots.deliverAt ? tryDeliver(quest, playerPos, spots.deliverAt, range) : quest
+  }
   return spots.takeFrom ? tryTake(quest, playerPos, spots.takeFrom, range) : quest
 }

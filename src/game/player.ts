@@ -41,6 +41,9 @@ export interface PlayerInput {
   sprinting: boolean
   /** Edge-triggered: true only on the frame the jump key was pressed. */
   jumping: boolean
+  /** 1 while the jump key is HELD, else 0 — how the quadcopter climbs. Absent
+   *  from a touch input, which has no such key. */
+  lift?: number
   dt: number
 }
 

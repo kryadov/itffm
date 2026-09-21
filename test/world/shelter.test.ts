@@ -502,32 +502,32 @@ describe('buildShelterMesh — furniture', () => {
 describe('buildShelterMesh — quest trophies', () => {
   const s = { x: 0, z: 0, y: 0, rotationY: 0 }
 
-  it('builds the diamond, rod and bike hidden by default', () => {
+  it('builds the drone box, rod and bike hidden by default', () => {
     const { group } = buildShelterMesh(s)
-    expect(group.getObjectByName('diamond')?.visible).toBe(false)
+    expect(group.getObjectByName('droneBox')?.visible).toBe(false)
     expect(group.getObjectByName('rod')?.visible).toBe(false)
     expect(group.getObjectByName('bike')?.visible).toBe(false)
   })
 
   it('shows and hides each one independently of the others', () => {
-    const { group, setDiamondPlaced, setRodPlaced, setBikePlaced } = buildShelterMesh(s)
-    setDiamondPlaced(true)
-    expect(group.getObjectByName('diamond')?.visible).toBe(true)
+    const { group, setDroneBoxPlaced, setRodPlaced, setBikePlaced } = buildShelterMesh(s)
+    setDroneBoxPlaced(true)
+    expect(group.getObjectByName('droneBox')?.visible).toBe(true)
     expect(group.getObjectByName('rod')?.visible).toBe(false)
     expect(group.getObjectByName('bike')?.visible).toBe(false)
     setRodPlaced(true)
     setBikePlaced(true)
     expect(group.getObjectByName('rod')?.visible).toBe(true)
     expect(group.getObjectByName('bike')?.visible).toBe(true)
-    setDiamondPlaced(false)
-    expect(group.getObjectByName('diamond')?.visible).toBe(false)
+    setDroneBoxPlaced(false)
+    expect(group.getObjectByName('droneBox')?.visible).toBe(false)
   })
 
-  it('puts the diamond on the table, not loose in the room', () => {
+  it('puts the empty drone box on the table, not loose in the room, and nothing else of the old diamond', () => {
     const { group } = buildShelterMesh(s)
     const table = group.getObjectByName('table')
-    const diamond = group.getObjectByName('diamond')
-    expect(diamond?.parent).toBe(table)
+    expect(group.getObjectByName('droneBox')?.parent).toBe(table)
+    expect(group.getObjectByName('diamond')).toBeUndefined() // the diamond goes to the train now
   })
 
   it('parks the bike outside the hut by default, not in front of the door', () => {

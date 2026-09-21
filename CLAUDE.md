@@ -60,6 +60,12 @@ morphology and scan the sheet for the kind of thing tests have missed before —
 chimeric proportions, a sideways stipe, a shape that reads as broken rather
 than just a different species.
 
+The game's URL with ?debug (or F3) shows the debug panel: player and camera
+position, what is nearest. Under it, &tp=x,z puts the player at a world point and
+&train=N runs the train N seconds ahead before the walk starts, so a test driving
+the built game in headless Chrome (which renders about one frame a second) can
+stand at a platform with the train in instead of waiting minutes of game time.
+
 ## Architecture
 
 The species data is the single source of truth, and it has three consumers:

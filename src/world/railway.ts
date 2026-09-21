@@ -172,6 +172,9 @@ export interface Train {
    *  wagon's windows glow, the same day/night rule the shelter's own
    *  windows and lamp already follow (`world/shelter.ts`'s `setNight`). */
   setNight(t: number): void
+  /** While the train stands at a station: which end (0 the west end of the
+   *  line, 1 the east) and where each car is, world x and z; otherwise null. */
+  stopped(): { end: 0 | 1; cars: { x: number; z: number }[] } | null
   dispose(): void
 }
 
@@ -447,6 +450,9 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
   // arrives, counted down instead of advancing t, so the train actually
   // waits there rather than bouncing straight back.
   let stationWait = 0
+  // Which end it is standing at, set the moment it arrives and cleared as it
+  // pulls away (see `stopped()`).
+  let stopEnd: 0 | 1 | null = null
 
   return {
     update(dt) {
@@ -456,12 +462,22 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
         const before = t
         ;({ t, dir } = stepTrainT(t, dir, dt, TRAIN_SPEED, length))
         const arrived = t !== before && (t === 0 || t === 1)
-        if (arrived) stationWait = randRange(rng, STATION_DWELL_RANGE)
-        else if (t !== before) formation = dir
+        if (arrived) {
+          stationWait = randRange(rng, STATION_DWELL_RANGE)
+          stopEnd = t === 0 ? 0 : 1
+        }
+        else if (t !== before) {
+          formation = dir
+          stopEnd = null // it has pulled away
+        }
       }
       pose()
       elapsed += dt
       loco.updateSmoke(elapsed)
+    },
+    stopped() {
+      if (stopEnd === null) return null
+      return { end: stopEnd, cars: cars.map((c) => ({ x: c.position.x, z: c.position.z })) }
     },
     setNight(nt) {
       loco.setNight(nt)

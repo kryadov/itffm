@@ -82,6 +82,28 @@ export interface SaveData {
    *  `world/shelter.ts`'s `DEFAULT_BIKE_SPOT` applies. Read it through
    *  `readBikeSpot`, never raw: it comes back from storage untrusted. */
   bikeSpot?: BikeSpot
+  /** The quadcopter the diamond earns: handed to the train, then a crate left
+   *  at the other end of the line, then in your hands. Absent until the diamond
+   *  is handed in. Read it through `readDrone`, never raw. */
+  drone?: DroneOrder
+}
+
+export type DroneStage = 'ordered' | 'crate' | 'owned'
+
+export interface DroneOrder {
+  stage: DroneStage
+  /** The end of the line the crate is (or was) left at: 0 west, 1 east. */
+  crateEnd: 0 | 1
+}
+
+/** `raw` if it is a real drone order, else undefined — a value read back from
+ *  storage can be anything (an edited save, an older shape). */
+export function readDrone(raw: unknown): DroneOrder | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const { stage, crateEnd } = raw as Record<string, unknown>
+  if (stage !== 'ordered' && stage !== 'crate' && stage !== 'owned') return undefined
+  if (crateEnd !== 0 && crateEnd !== 1) return undefined
+  return { stage, crateEnd }
 }
 
 /** `spot` if it is a real bike spot, else undefined — a value read back from
@@ -140,7 +162,7 @@ export function emptySave(): SaveData {
  * calendar all stay. Returns a new object and leaves the old one untouched.
  */
 export function resetQuests(save: SaveData): SaveData {
-  const { quests: _quests, bikeSpot: _bikeSpot, ...rest } = save
+  const { quests: _quests, bikeSpot: _bikeSpot, drone: _drone, ...rest } = save
   return rest
 }
 

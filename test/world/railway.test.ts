@@ -334,4 +334,42 @@ describe('createTrain', () => {
     train.dispose()
     expect(scene.getObjectByName('train')).toBeUndefined()
   })
+
+  describe('stopped()', () => {
+    it('is null while the train is moving and says which end it is standing at during its dwell', () => {
+      const { scene, train } = build(3)
+      const cars = scene.getObjectByName('train')!.children
+      const seenEnds = new Set<number>()
+      let sawMoving = false
+      let prev = cars.map((c) => c.position.x)
+      for (let i = 0; i < 1400; i++) {
+        train.update(1)
+        const now = cars.map((c) => c.position.x)
+        const standing = now.every((x, k) => x === prev[k])
+        prev = now
+        const st = train.stopped()
+        if (standing) {
+          expect(st, 'standing but stopped() is null').not.toBeNull()
+          seenEnds.add(st!.end)
+          // ...and it reports the cars exactly where they are
+          expect(st!.cars.map((c) => c.x)).toEqual(now)
+          expect(st!.cars.every((c) => Number.isFinite(c.z))).toBe(true)
+        } else if (st === null) sawMoving = true
+      }
+      expect([...seenEnds].sort()).toEqual([0, 1])
+      expect(sawMoving).toBe(true)
+    })
+
+    it('reports the west end as 0 and the east end as 1', () => {
+      const { scene, train } = build(9)
+      const line = placeRailLine(flat, 90, 9)
+      const mid = (line.points[0].x + line.points[line.points.length - 1].x) / 2
+      const head = scene.getObjectByName('train')!.children[0]
+      for (let i = 0; i < 1400; i++) {
+        train.update(1)
+        const st = train.stopped()
+        if (st) expect(st.end).toBe(head.position.x < mid ? 0 : 1)
+      }
+    })
+  })
 })

@@ -70,6 +70,7 @@ export function createControls(
         crouching: keys.has('ControlLeft'),
         sprinting: keys.has('ShiftLeft'),
         jumping: jumpPending,
+        lift: keys.has('Space') ? 1 : 0,
         dt,
       }
       dYaw = 0
