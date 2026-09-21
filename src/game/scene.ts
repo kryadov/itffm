@@ -30,7 +30,11 @@ import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } 
 import { placeMine, mineObstacles, diamondSpotInMine, type Mine } from '../world/mine'
 import { createMineTerrain } from '../world/mineTerrain'
 import { buildMineMesh, setMineLighting, clearScatterOnMine } from '../world/mineMesh'
-import { placeRailLine, buildRailMesh, createTrain, RAIL_SEED_OFFSET, type RailLine, type Train } from '../world/railway'
+import {
+  placeRailLine, buildRailMesh, createTrain, stationsFor, stationOccupies, RAIL_SEED_OFFSET,
+  type RailLine, type Train, type Station,
+} from '../world/railway'
+import { buildStationMesh } from '../world/station'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
 import { gameMonth, daysSinceRain } from '../world/calendar'
@@ -134,6 +138,11 @@ export interface Forest {
    *  `campfire` above, for ui/minimap.ts's markers (see the 2026-09-15
    *  addendum). */
   mine: { x: number; z: number }
+  /** The railway's two stops (a platform each) — fixed geography like the
+   *  shelter and the mine, for the minimap. */
+  stations: Station[]
+  /** The railway's line, for the minimap. */
+  railPoints: { x: number; z: number }[]
   /** Where the hut's own doorway is, in world space — main.ts checks the
    *  player's plain distance to this to decide whether `E` should open/close
    *  the door instead of examining a mushroom. */
@@ -296,6 +305,7 @@ export function createForest(
   // once at noon before that, when there is nothing to light anyway.
   let shelterFx: ShelterFx | null = null
   let trainFx: Train | null = null
+  let stationFx: ReturnType<typeof buildStationMesh> | null = null
   // The mine's own group, set once it is built below — updateDayNight (defined
   // first) feeds it how much daylight spills in at the mouth.
   let mineGroup: THREE.Group | null = null
@@ -321,6 +331,7 @@ export function createForest(
     sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow)
     shelterFx?.setNight(night)
     trainFx?.setNight(night)
+    stationFx?.setNight(night)
     if (mineGroup) setMineLighting(mineGroup, { day: 1 - night })
   }
   updateDayNight(0.5, new THREE.Vector3()) // noon by default: the wood's original fixed look
@@ -373,6 +384,10 @@ export function createForest(
   scene.add(buildRailMesh(railLine))
   const train = createTrain(scene, railLine, seed + 30)
   trainFx = train
+  // A platform and a shelter at each end of the line, where the train dwells.
+  const stations = stationsFor(railLine)
+  stationFx = buildStationMesh(railLine, stations, source.ground)
+  scene.add(stationFx.group)
   const updateTrain = (dt: number): void => train.update(dt)
   const water = buildWaterMeshes(source.water ?? [], source.ground)
   scene.add(water.group)
@@ -509,16 +524,20 @@ export function createForest(
   // under the mound): the meshes go (world/mineMesh.ts), and so do their
   // collision circles and their trees. Nothing is left behind as an invisible
   // obstacle, and nothing keeps its own collision without its mesh.
+  // The stations' platforms are kept clear the same way (a shelter and a bench
+  // stand there): "reserved" is either.
+  const reserved = (x: number, z: number, margin = 0): boolean =>
+    mineTerrain.occupies(x, z, margin) || stationOccupies(stations, x, z, margin)
   for (const child of scene.children) {
-    if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) clearScatterOnMine(child, (x, z) => mineTerrain.occupies(x, z))
+    if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) clearScatterOnMine(child, (x, z) => reserved(x, z))
   }
   for (let i = extraObstacles.length - 1; i >= 0; i--) {
-    if (!waterCircles.includes(extraObstacles[i]) && mineTerrain.occupies(extraObstacles[i].x, extraObstacles[i].z)) {
+    if (!waterCircles.includes(extraObstacles[i]) && reserved(extraObstacles[i].x, extraObstacles[i].z)) {
       extraObstacles.splice(i, 1)
     }
   }
-  const woodTrees = source.trees.filter((tr) => !mineTerrain.occupies(tr.x, tr.z, tr.radius))
-  extraObstacles.push(...mineObstacles(mine, mineTerrain.deckRadius))
+  const woodTrees = source.trees.filter((tr) => !reserved(tr.x, tr.z, tr.radius))
+  extraObstacles.push(...mineObstacles(mine, mineTerrain.deckRadius), ...stationFx.obstacles)
   // Whether the player is in the tunnels is a state of the walk in (through the
   // doorway) and out again, not a function of where they stand — the hill
   // above a tunnel is over the same x/z. This is called every frame with the
@@ -588,7 +607,7 @@ export function createForest(
     dragonflies?.update(dt)
   }
 
-  const onFree = (p: { x: number; z: number }): boolean => !mineTerrain.occupies(p.x, p.z)
+  const onFree = (p: { x: number; z: number }): boolean => !reserved(p.x, p.z)
   const deadwoodPoints = logs.flatMap((l) => logSpawnPoints(l)).filter(onFree)
   const mossPoints = boulders.flatMap((b) => mossSpawnPoints(b)).filter(onFree)
   const siteCount = Math.round(DEFAULT_SITE_COUNT * (halfSize / DEFAULT_HALF_SIZE) ** 2)
@@ -599,8 +618,8 @@ export function createForest(
   const month = gameMonth(gameDays)
   const allSpecies = loadSpecies()
   const spawnCtx = { month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays) }
-  // Nothing grows on the mine's rock mound or its levelled doorstep.
-  const placements = spawnMushrooms(allSpecies, sites, spawnCtx).filter((p) => !mineTerrain.occupies(p.x, p.z))
+  // Nothing grows on the mine's rock mound or its levelled doorstep, or on a platform.
+  const placements = spawnMushrooms(allSpecies, sites, spawnCtx).filter((p) => !reserved(p.x, p.z))
   // Fish are not sites on the land at all: they swim in the wood's own water.
   placements.push(...spawnFish(allSpecies, source.water ?? [], source.ground, spawnCtx))
 
@@ -648,6 +667,7 @@ export function createForest(
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     campfire: { x: campfire.x, z: campfire.z },
     mine: { x: mine.x, z: mine.z },
+    stations, railPoints: railLine.points.map((p) => ({ x: p.x, z: p.z })),
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,

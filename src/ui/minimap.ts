@@ -58,7 +58,9 @@ export function markerScreenPos(
 }
 
 export interface Minimap {
-  setWorld(paths: Vec2[][], water: Vec2[][], halfSize: number): void
+  /** `rails`: the railway's own lines (each a polyline), drawn as dashed
+   *  sleepers under the trails — omitted where the wood has none. */
+  setWorld(paths: Vec2[][], water: Vec2[][], halfSize: number, rails?: Vec2[][]): void
   setMarkers(markers: MinimapMarker[]): void
   update(player: { x: number; z: number; heading: number }): void
   setVisible(v: boolean): void
@@ -105,7 +107,7 @@ export function createMinimap(root: HTMLElement): Minimap {
   }
 
   const api: Minimap = {
-    setWorld(paths, water, halfSize) {
+    setWorld(paths, water, halfSize, rails = []) {
       radiusM = halfSize
       const dim = Math.max(1, Math.round(2 * halfSize * OS_SCALE))
       const os = document.createElement('canvas')
@@ -120,6 +122,25 @@ export function createMinimap(root: HTMLElement): Minimap {
         trace(g, wp)
         g.closePath()
         g.fill()
+      }
+
+      // The railway: a dark line with a paler dashed one over it — sleepers.
+      g.lineJoin = 'round'
+      for (const rail of rails) {
+        if (rail.length < 2) continue
+        g.strokeStyle = 'rgba(40,36,32,.9)'
+        g.lineWidth = 2.4
+        g.setLineDash([])
+        g.beginPath()
+        trace(g, rail)
+        g.stroke()
+        g.strokeStyle = 'rgba(200,190,175,.9)'
+        g.lineWidth = 1.2
+        g.setLineDash([2.5, 2.5])
+        g.beginPath()
+        trace(g, rail)
+        g.stroke()
+        g.setLineDash([])
       }
 
       g.strokeStyle = 'rgba(215,200,170,.8)'

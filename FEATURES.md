@@ -97,7 +97,11 @@ today, each with real field marks, edibility and season.
   after dark, all of them riding on wheels set on the rails — shuttling back
   and forth along its own line, stopping for a minute or two at each end like
   a real train at a station rather than bouncing straight back. The whole train
-  stays on the track, wagons apart, at either end.
+  stays on the track, wagons apart, at either end. Each end is a **station**:
+  a low platform along the whole stopped train, with a yellow edge line, a roofed
+  shelter on posts, a bench and a lamp that lights after dark. The platform is
+  a step you simply walk onto; the shelter's posts and the bench are solid, and
+  nothing grows there.
 - **Weather** (clear, rain, snow, fog) and a **day/night cycle** with a real
   sun and moon, changeable in settings or left on a self-running cycle.
 - A **self-running accelerated calendar**: the game clock runs faster than
@@ -109,8 +113,9 @@ today, each with real field marks, edibility and season.
   bees around a wild hive, dragonflies over the water.
 - Streams, ponds, waterfalls and springs, each animated, not a flat panel.
 - A **minimap** (opt-in in settings) and a scrolling **compass**. Once the
-  minimap is on, it always marks the hut, the mine and the campfire — never a
-  single mushroom. A second, separate opt-in also marks the four hidden
+  minimap is on, it always marks the hut, the mine, the campfire and the
+  railway's two stops, and draws the railway line itself — never a single
+  mushroom. A second, separate opt-in also marks the four hidden
   quest items while they're still out there, for anyone who wants the hint
   instead of the search.
 

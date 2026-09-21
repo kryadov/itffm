@@ -104,8 +104,8 @@ export function stepTrainT(
   return { t: nt, dir: ndir }
 }
 
-const RAIL_GAUGE = 0.7 // narrow-gauge, forest-logging scale — not a mainline
-const RAIL_HEIGHT = 0.08
+export const RAIL_GAUGE = 0.7 // narrow-gauge, forest-logging scale — not a mainline
+export const RAIL_HEIGHT = 0.08
 const SLEEPER_SPACING = 1.4
 const SLEEPER_LENGTH = 1.1
 const SLEEPER_WIDTH = 0.22
@@ -478,4 +478,68 @@ export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): T
       })
     },
   }
+}
+
+/** A platform beside the track, at one of the line's two ends — where the
+ *  train dwells. `x0..x1` is the platform's length along the line, `z` the
+ *  track's own z, `side` which side of the track the platform lies on (+1 /
+ *  -1 in z). */
+export interface Station {
+  x0: number
+  x1: number
+  z: number
+  side: 1 | -1
+}
+
+/** Length of track the whole train occupies, front car's centre to the last's. */
+const TRAIN_LENGTH = (CAR_COUNT - 1) * (CAR_LENGTH + CAR_GAP)
+/** How far a platform reaches past the train's own front and back. */
+const STATION_OVERHANG = 1.2
+/** From the track's centre line to the platform's near edge: the car's side (0.5)
+ *  and a small gap, and clear of the sleepers' ends (0.55). */
+export const STATION_PLATFORM_GAP = 0.7
+export const STATION_PLATFORM_WIDTH = 2.2
+/** How far the platform's top stands above the rail line's own ground profile:
+ *  a step up, a little above the rail heads (`RAIL_HEIGHT`). */
+export const STATION_PLATFORM_HEIGHT = 0.13
+/** How far the ground beside the track is kept clear of trees and scatter,
+ *  measured across the line on the side away from the platform. */
+const STATION_CLEAR_TRACKSIDE = 1.8
+
+/**
+ * The line's two stops, one at each end: the platform lies exactly along the
+ * whole train as it stands during its dwell (`createTrain`: the head kept a
+ * train's length clear of the line's ends, the locomotive leading toward the
+ * end it arrived at), with a little to spare at each end. On the side of the
+ * track that faces the middle of the wood, where a player is.
+ *
+ * Pure and derived from the line alone, so the mesh, the clearing of trees
+ * and the minimap all agree on where a stop is without carrying it around.
+ */
+export function stationsFor(line: RailLine): Station[] {
+  const pts = line.points
+  const xa = pts[0].x
+  const xb = pts[pts.length - 1].x
+  const z = pts[0].z
+  const side: 1 | -1 = z > 0 ? -1 : 1
+  const half = CAR_LENGTH / 2
+  return [
+    // arrived heading toward xa: cars at xa + TL, xa + 2 TL ... behind the locomotive
+    { x0: xa + TRAIN_LENGTH - half - STATION_OVERHANG, x1: xa + 2 * TRAIN_LENGTH + half + STATION_OVERHANG, z, side },
+    // arrived heading toward xb: cars at xb - TL, xb - 2 TL
+    { x0: xb - 2 * TRAIN_LENGTH - half - STATION_OVERHANG, x1: xb - TRAIN_LENGTH + half + STATION_OVERHANG, z, side },
+  ]
+}
+
+/**
+ * Whether (x, z) lies on a station: along its length, from just clear of the
+ * track on the far side to the platform's far edge, widened by `margin` on
+ * every side. What trees, scatter and mushrooms are kept off.
+ */
+export function stationOccupies(stations: Station[], x: number, z: number, margin = 0): boolean {
+  return stations.some((s) => {
+    if (x < s.x0 - margin || x > s.x1 + margin) return false
+    const across = (z - s.z) * s.side // >0 on the platform's side of the track
+    return across >= -STATION_CLEAR_TRACKSIDE - margin && across <= STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH + margin
+  })
 }

@@ -1,4 +1,5 @@
 import { regionalMix, placeOsmTrees } from '../../src/world/osmTrees'
+import { stationsFor, stationOccupies } from '../../src/world/railway'
 import { isClearing } from '../../src/world/clearings'
 import type { WorldData } from '../../src/geo/types'
 import type { ElevationProvider } from '../../src/terrain/provider'
@@ -158,5 +159,21 @@ describe('placeOsmTrees', () => {
     const railLine = { points: [{ x: -60, z: 20, y: 0 }, { x: 60, z: 20, y: 0 }] }
     const trees = placeOsmTrees(world, flat, 55, 3, 60, railLine)
     for (const t of trees) expect(Math.abs(t.z - 20)).toBeGreaterThanOrEqual(1.8)
+  })
+
+  it("keeps the platforms at the line's two ends clear too, with room to walk round them", () => {
+    // A live request (2026-09-21): the line's stops now have platforms and a shelter.
+    const pts = [-60, -30, 0, 30, 60].map((x) => ({ x, z: 20, y: 0 }))
+    const railLine = { points: pts }
+    const stations = stationsFor(railLine)
+    let checked = 0
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const trees = placeOsmTrees(world, flat, 55, seed, 60, railLine)
+      for (const t of trees) {
+        expect(stationOccupies(stations, t.x, t.z, 1.0)).toBe(false)
+        checked++
+      }
+    }
+    expect(checked).toBeGreaterThan(0)
   })
 })

@@ -117,7 +117,7 @@ const QUEST_SEED_OFFSET = 31
 /** Fixed landmark colors — shelter keeps the minimap's original amber
  *  unchanged, mine and campfire get their own so the three are never
  *  confused for each other or for a quest-item hint. */
-const LANDMARK_COLOR = { shelter: '#d8a04a', mine: '#6f7f8f', campfire: '#e2564a' }
+const LANDMARK_COLOR = { shelter: '#d8a04a', mine: '#6f7f8f', campfire: '#e2564a', station: '#b0653a' }
 /** Which i18n key names each item's own completion message — see
  *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike/Diamond. */
 const QUEST_COMPLETE_KEY: Record<
@@ -362,7 +362,7 @@ async function main(): Promise<void> {
   hud.setBasket(0, BASKET_CAPACITY)
   const compass = createCompass(ui)
   const minimap = createMinimap(ui)
-  minimap.setWorld(source.paths ?? [], source.water ?? [], halfSize)
+  minimap.setWorld(source.paths ?? [], source.water ?? [], halfSize, [forest.railPoints])
   minimap.setVisible(save.prefs.minimap)
   // Fixed geography, sited once at load — same three points every session,
   // unlike the quest items' own positions below.
@@ -370,6 +370,11 @@ async function main(): Promise<void> {
     { position: forest.shelter, color: LANDMARK_COLOR.shelter },
     { position: forest.mine, color: LANDMARK_COLOR.mine },
     { position: forest.campfire, color: LANDMARK_COLOR.campfire },
+    // Each station: the middle of its platform.
+    ...forest.stations.map((s) => ({
+      position: { x: (s.x0 + s.x1) / 2, z: s.z + s.side * 1.8 },
+      color: LANDMARK_COLOR.station,
+    })),
   ]
 
   // Classified once at load — `classifyWater` is pure per-ring geometry, not

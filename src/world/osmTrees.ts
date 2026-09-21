@@ -6,6 +6,7 @@ import { LOOK, type Tree } from './trees'
 import type { WorldData, LeafType, WoodArea } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
 import { TREE_GENERA, type TreeGenus } from '../species/schema'
+import { stationsFor, stationOccupies } from './railway'
 
 /** Spacing of the candidate lattice inside a wood, metres. */
 const GRID = 4.5
@@ -27,6 +28,8 @@ const PATH_CLEARANCE = 1.8
  *  (SLEEPER_LENGTH there is 1.1m, so a half-width of 0.55m) with the same
  *  "room to actually walk it" margin PATH_CLEARANCE uses. */
 const RAIL_CLEARANCE = 1.8
+/** Trees stay this far back from a station (platform and shelter), metres. */
+const STATION_TREE_MARGIN = 1.5
 
 /**
  * Which genera grow at this latitude.
@@ -99,9 +102,13 @@ export function placeOsmTrees(
   const cell = MIN_GAP
   const grid = new Map<string, Tree[]>()
 
+  // The line's two stops have a platform and a shelter beside the track: keep the
+  // trees back from those, with room to walk round them.
+  const stations = railLine ? stationsFor({ points: railLine.points.map((p) => ({ ...p, y: 0 })) }) : []
   const nearPath = (x: number, z: number): boolean =>
     world.paths.some((p) => distanceToPolyline(x, z, p.points) < PATH_CLEARANCE) ||
-    (railLine !== undefined && distanceToPolyline(x, z, railLine.points) < RAIL_CLEARANCE)
+    (railLine !== undefined && distanceToPolyline(x, z, railLine.points) < RAIL_CLEARANCE) ||
+    stationOccupies(stations, x, z, STATION_TREE_MARGIN)
 
   const tooClose = (x: number, z: number): boolean => {
     const gx = Math.floor(x / cell)
