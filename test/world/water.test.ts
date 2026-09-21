@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import {
-  waterLevel, buildWaterMeshes, classifyWater, findWaterfall, placeSprings, buildSpringMeshes, waterObstacles,
+  waterLevel, buildWaterMeshes, classifyWater, findWaterfall, placeSprings, buildSpringMeshes, waterObstacles, wetTest,
 } from '../../src/world/water'
 import { mulberry32 } from '../../src/util/rng'
 import type { ElevationProvider } from '../../src/terrain/provider'
@@ -140,5 +140,21 @@ describe('buildSpringMeshes', () => {
     const fx = buildSpringMeshes(springs, flat)
     expect(fx.group.children).toHaveLength(springs.length)
     expect(() => fx.update(1.2)).not.toThrow()
+  })
+})
+
+describe('wetTest', () => {
+  it('is true in a pond and a margin round it, and beside a stream, and false elsewhere', () => {
+    const wet = wetTest([pond, stream], 1.5)
+    expect(wet(0, 0)).toBe(true)
+    expect(wet(6, 0)).toBe(true) // on the bank, inside the margin
+    expect(wet(20, 30)).toBe(false)
+    expect(wet(0, 0.5 + stream[1].z)).toBe(true)
+    expect(wet(-15, 8)).toBe(false)
+    expect(wet(-15, 0.8)).toBe(true) // beside the stream
+  })
+
+  it('is never true with no water at all', () => {
+    expect(wetTest([])(0, 0)).toBe(false)
   })
 })

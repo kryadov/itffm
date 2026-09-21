@@ -65,6 +65,10 @@ position, what is nearest. Under it, &tp=x,z puts the player at a world point an
 &train=N runs the train N seconds ahead before the walk starts, so a test driving
 the built game in headless Chrome (which renders about one frame a second) can
 stand at a platform with the train in instead of waiting minutes of game time.
+&tp=station0 (or station1, or portal0/portal1) stands on that platform, facing the
+track, and &trainAt=0|1 runs the train until it stands there; with &back=metres
+and &along=metres to step off the platform for a view of the whole train, and
+&yaw=degrees to turn. `window.__trainAt(end)` does the same on demand.
 
 ## Architecture
 

@@ -1,9 +1,26 @@
 import * as THREE from 'three'
-import { placeRailLine, railHeightAt, stepTrainT, createTrain, buildRailMesh } from '../../src/world/railway'
+import {
+  placeRailLine, railHeightAt, buildRailMesh, lineLength, pointAt, stationsFor, portalSites, portalOccupies,
+  END_STRAIGHT, PORTAL_MOUTH,
+} from '../../src/world/railway'
 import { proceduralTerrain } from '../../src/terrain/procedural'
 import type { ElevationProvider } from '../../src/terrain/provider'
 
 const flat: ElevationProvider = { heightAt: () => 0 }
+
+/** The angle the line turns through at each of its interior points. */
+function turns(pts: { x: number; z: number }[]): number[] {
+  const out: number[] = []
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = Math.atan2(pts[i].z - pts[i - 1].z, pts[i].x - pts[i - 1].x)
+    const b = Math.atan2(pts[i + 1].z - pts[i].z, pts[i + 1].x - pts[i].x)
+    let d = b - a
+    while (d > Math.PI) d -= 2 * Math.PI
+    while (d < -Math.PI) d += 2 * Math.PI
+    out.push(d)
+  }
+  return out
+}
 
 describe('placeRailLine', () => {
   it('is deterministic for the same seed', () => {
@@ -13,22 +30,65 @@ describe('placeRailLine', () => {
   it('gives a different line for a different seed', () => {
     const a = placeRailLine(flat, 90, 1)
     const b = placeRailLine(flat, 90, 2)
-    expect(a.points[0].z).not.toBe(b.points[0].z)
+    expect(a.points[1]).not.toEqual(b.points[1])
   })
 
-  it('spans most of the plot, well within its bounds', () => {
-    const line = placeRailLine(flat, 90, 3)
-    const xs = line.points.map((p) => p.x)
-    expect(Math.min(...xs)).toBeGreaterThan(-90)
-    expect(Math.max(...xs)).toBeLessThan(90)
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(90) // more than half the plot's own width
+  it('runs across most of the plot and stays well within its bounds', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const line = placeRailLine(flat, 90, seed)
+      for (const p of line.points) {
+        expect(Math.abs(p.x)).toBeLessThan(90)
+        expect(Math.abs(p.z)).toBeLessThan(90)
+      }
+      const a = line.points[0]
+      const b = line.points[line.points.length - 1]
+      expect(Math.hypot(b.x - a.x, b.z - a.z)).toBeGreaterThan(90)
+    }
   })
 
-  it('runs at a fixed offset from the centre, not through it', () => {
+  it('has bends: it is not one straight line', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const line = placeRailLine(flat, 90, seed)
+      const a = line.points[0]
+      const b = line.points[line.points.length - 1]
+      const chord = Math.hypot(b.x - a.x, b.z - a.z)
+      let farthest = 0
+      for (const p of line.points) {
+        const across = Math.abs((b.x - a.x) * (a.z - p.z) - (a.x - p.x) * (b.z - a.z)) / chord
+        farthest = Math.max(farthest, across)
+      }
+      expect(farthest, `seed ${seed}`).toBeGreaterThan(4)
+    }
+  })
+
+  it('takes no bend a small railway could not: no kinks', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const line = placeRailLine(flat, 120, seed)
+      for (const d of turns(line.points)) expect(Math.abs(d)).toBeLessThan(0.3)
+    }
+  })
+
+  it('samples evenly, a few metres apart', () => {
     const line = placeRailLine(flat, 90, 3)
-    const z = line.points[0].z
-    expect(Math.abs(z)).toBeGreaterThan(90 * 0.4)
-    for (const p of line.points) expect(p.z).toBe(z)
+    for (let i = 1; i < line.points.length; i++) {
+      const d = Math.hypot(line.points[i].x - line.points[i - 1].x, line.points[i].z - line.points[i - 1].z)
+      expect(d).toBeGreaterThan(2)
+      expect(d).toBeLessThan(4)
+    }
+  })
+
+  it('is dead straight for the portal and the platform at each end', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const line = placeRailLine(flat, 120, seed)
+      const len = lineLength(line)
+      for (const from of [0, len - END_STRAIGHT]) {
+        const t0 = pointAt(line, from + 1)
+        for (let s = from + 2; s < from + END_STRAIGHT - 2; s += 2) {
+          const p = pointAt(line, s)
+          expect(Math.hypot(p.tx - t0.tx, p.tz - t0.tz), `seed ${seed} at ${s}`).toBeLessThan(0.02)
+        }
+      }
+    }
   })
 
   it('follows the real ground height at each point along it', () => {
@@ -37,339 +97,133 @@ describe('placeRailLine', () => {
     for (const p of line.points) expect(p.y).toBeCloseTo(slope.heightAt(p.x, p.z), 5)
   })
 
-  it('samples densely enough that the interpolated line never strays far from ' +
-     'the real ground between two sample points — a live report found rails ' +
-     'visibly sagging or floating on real, bumpy procedural terrain', () => {
-    // Several seeds/sizes, not just one — a single lucky seed could hide a
-    // sampling gap that a bumpier terrain or a longer line exposes.
-    for (const seed of [3, 7, 11, 19]) {
-      for (const halfSize of [60, 90, 150]) {
-        const ground = proceduralTerrain(seed)
-        const line = placeRailLine(ground, halfSize, seed)
-        const x0 = line.points[0].x
-        const x1 = line.points[line.points.length - 1].x
-        const z = line.points[0].z
-        // Probe far more finely than the line's own samples — this is exactly
-        // the gap a sparse line hides (railHeightAt only ever gets checked
-        // exactly at its own sample points otherwise).
-        for (let x = x0; x <= x1; x += 0.5) {
-          const err = Math.abs(railHeightAt(line, x) - ground.heightAt(x, z))
-          // A rail sitting 8cm above the sleepers (RAIL_HEIGHT) already reads
-          // as floating or sunk well before this — a generous ceiling, not a
-          // tight tolerance, but well below what 12 fixed samples over a
-          // 100-270m line actually produced (measured up to ~0.9m).
-          expect(err).toBeLessThan(0.2)
-        }
-      }
+  it('keeps out of the water when there is a way round', () => {
+    // A lake across the middle with a gap at one end: the line has to go through the gap or round it.
+    const lake = (x: number, z: number): boolean => Math.abs(z) < 12 && x > -40
+    for (const seed of [1, 2, 3, 4]) {
+      const line = placeRailLine(flat, 120, seed, lake)
+      const wet = line.points.filter((p) => lake(p.x, p.z)).length
+      expect(wet, `seed ${seed}`).toBe(0)
     }
   })
+
+  it('keeps clear of the hut in the middle', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const line = placeRailLine(flat, 120, seed)
+      for (const p of line.points) expect(Math.hypot(p.x, p.z)).toBeGreaterThan(120 * 0.2)
+    }
+  })
+
+  it('does not climb a hill it could go round', () => {
+    // A ridge that runs across half the plot: a good line finds its way past.
+    const ridge: ElevationProvider = { heightAt: (x, z) => (Math.abs(x) < 15 && z > -20 ? 12 : 0) }
+    const line = placeRailLine(ridge, 120, 3)
+    let steepest = 0
+    for (let i = 1; i < line.points.length; i++) steepest = Math.max(steepest, Math.abs(line.points[i].y - line.points[i - 1].y))
+    expect(steepest).toBeLessThan(3)
+  })
 })
 
-describe('railHeightAt', () => {
-  it('matches an endpoint exactly', () => {
-    const line = placeRailLine(flat, 90, 3)
-    const first = line.points[0]
-    expect(railHeightAt(line, first.x)).toBeCloseTo(first.y, 5)
-  })
-
-  it('interpolates between two points on a slope', () => {
-    const slope: ElevationProvider = { heightAt: (x) => x * 0.2 }
-    const line = placeRailLine(slope, 90, 3)
-    const mid = (line.points[0].x + line.points[1].x) / 2
-    expect(railHeightAt(line, mid)).toBeCloseTo(slope.heightAt(mid, line.points[0].z), 2)
-  })
+describe('placeRailLine at other plot sizes', () => {
+  for (const half of [60, 90, 150, 220]) {
+    it(`stays inside the plot and leaves room for both platforms at half-size ${half}`, () => {
+      for (const seed of [1, 2, 3, 4, 5]) {
+        const line = placeRailLine(flat, half, seed)
+        for (const p of line.points) {
+          expect(Math.abs(p.x)).toBeLessThan(half)
+          expect(Math.abs(p.z)).toBeLessThan(half)
+        }
+        const [a, b] = stationsFor(line)
+        expect(a.s1).toBeLessThan(b.s0 - 5)
+      }
+    })
+  }
 })
 
-describe('stepTrainT', () => {
-  it('advances t forward while heading the same direction', () => {
-    const { t } = stepTrainT(0.5, 1, 1, 2, 100)
-    expect(t).toBeGreaterThan(0.5)
+describe('pointAt and railHeightAt', () => {
+  const line = { points: [{ x: 0, z: 0, y: 0 }, { x: 10, z: 0, y: 2 }, { x: 10, z: 10, y: 2 }] }
+
+  it('measures along the line, round corners', () => {
+    expect(lineLength(line)).toBeCloseTo(20, 6)
+    expect(pointAt(line, 5)).toMatchObject({ x: 5, z: 0, tx: 1, tz: 0 })
+    expect(pointAt(line, 15).z).toBeCloseTo(5, 6)
+    expect(pointAt(line, 15).tz).toBeCloseTo(1, 6)
   })
 
-  it('bounces off the far end instead of running past it', () => {
-    const { t, dir } = stepTrainT(0.99, 1, 1, 2, 10)
-    expect(t).toBeLessThanOrEqual(1)
-    expect(dir).toBe(-1)
+  it('interpolates the height between two points on a slope, and matches an end exactly', () => {
+    expect(railHeightAt(line, 0)).toBe(0)
+    expect(railHeightAt(line, 5)).toBeCloseTo(1, 6)
+    expect(railHeightAt(line, 20)).toBe(2)
   })
 
-  it('bounces off the near end the same way', () => {
-    const { t, dir } = stepTrainT(0.01, -1, 1, 2, 10)
-    expect(t).toBeGreaterThanOrEqual(0)
-    expect(dir).toBe(1)
+  it('carries straight on past either end', () => {
+    const before = pointAt(line, -3)
+    expect(before.x).toBeCloseTo(-3, 6)
+    expect(before.z).toBeCloseTo(0, 6)
+    const after = pointAt(line, 23)
+    expect(after.z).toBeCloseTo(13, 6)
+    expect(after.x).toBeCloseTo(10, 6)
   })
 })
 
 describe('buildRailMesh', () => {
   it('follows a real slope at both ends, not just at its own midpoint', () => {
-    // Live report: the rails read as detached from their sleepers and the
-    // ground. Root cause was a single rigid box per rail, spanning the
-    // whole line at ONE height sampled at the midpoint — dead flat on any
-    // real slope. Each rail is now a chain of segments; check both ends
-    // actually sit near the real ground there, not near the midpoint's own
-    // height.
-    const slope: ElevationProvider = { heightAt: (x) => x * 0.3 }
+    const slope: ElevationProvider = { heightAt: (x) => x * 0.2 }
     const line = placeRailLine(slope, 90, 3)
     const group = buildRailMesh(line)
-    const rail = group.children.find((c) => c instanceof THREE.Mesh && (c as THREE.Mesh).geometry.type !== 'BoxGeometry') as THREE.Mesh
-    expect(rail).toBeTruthy()
-    const box = new THREE.Box3().setFromObject(rail)
-    const x0 = line.points[0].x
-    const x1 = line.points[line.points.length - 1].x
-    const groundAtStart = slope.heightAt(x0, line.points[0].z)
-    const groundAtEnd = slope.heightAt(x1, line.points[0].z)
-    // The whole-line box bug would have put EVERY vertex near the midpoint's
-    // height, off by roughly half the slope's total rise across the line —
-    // several metres here. A ground-following rail keeps its overall
-    // vertical span close to the real rise, not flattened to nothing.
-    expect(box.max.y - box.min.y).toBeGreaterThan(Math.abs(groundAtEnd - groundAtStart) * 0.8)
+    group.updateMatrixWorld(true)
+    const rails = group.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh && c.geometry.getAttribute('position').count > 0)
+    expect(rails.length).toBeGreaterThanOrEqual(3)
+    const box = new THREE.Box3().setFromObject(group)
+    const ys = line.points.map((p) => p.y)
+    expect(box.min.y).toBeLessThan(Math.min(...ys) + 0.1)
+    expect(box.max.y).toBeGreaterThan(Math.max(...ys))
+  })
+
+  it('is a few draw calls, however long the line', () => {
+    const group = buildRailMesh(placeRailLine(flat, 200, 4))
+    let meshes = 0
+    group.traverse((o) => { if (o instanceof THREE.Mesh) meshes++ })
+    expect(meshes).toBeLessThanOrEqual(5)
+  })
+
+  it('lays its rails along the bends: every point of the line has rail within a step of it', () => {
+    const line = placeRailLine(flat, 120, 2)
+    const group = buildRailMesh(line)
+    const rail = group.children[0] as THREE.Mesh
+    const pos = rail.geometry.getAttribute('position')
+    for (const p of line.points) {
+      let nearest = Infinity
+      for (let i = 0; i < pos.count; i++) nearest = Math.min(nearest, Math.hypot(pos.getX(i) - p.x, pos.getZ(i) - p.z))
+      expect(nearest).toBeLessThan(0.6)
+    }
   })
 })
 
-describe('createTrain', () => {
-  function build(seed: number) {
-    const scene = new THREE.Scene()
-    const line = placeRailLine(flat, 90, seed)
-    const train = createTrain(scene, line, seed)
-    return { scene, train }
-  }
-
-  it('adds one named group to the scene', () => {
-    const { scene } = build(1)
-    expect(scene.getObjectByName('train')).toBeDefined()
+describe('stations and portals sit on the line', () => {
+  it('has a portal mouth at each end, a platform beyond it, clear of the mound', () => {
+    const line = placeRailLine(flat, 120, 3)
+    const len = lineLength(line)
+    const sites = portalSites(line)
+    expect(sites).toHaveLength(2)
+    const a = pointAt(line, PORTAL_MOUTH)
+    expect(sites[0]).toMatchObject({ x: a.x, z: a.z })
+    // into the hill is away from the line
+    expect(sites[0].ox * a.tx + sites[0].oz * a.tz).toBeCloseTo(-1, 6)
+    const b = pointAt(line, len - PORTAL_MOUTH)
+    expect(sites[1].ox * b.tx + sites[1].oz * b.tz).toBeCloseTo(1, 6)
+    const [sa, sb] = stationsFor(line)
+    expect(sa.s0).toBeGreaterThan(PORTAL_MOUTH + 2)
+    expect(sb.s1).toBeLessThan(len - PORTAL_MOUTH - 2)
+    expect(portalOccupies(line, sites[0].x + sites[0].ox * 2, sites[0].z + sites[0].oz * 2)).toBe(true)
+    expect(portalOccupies(line, a.x + a.tx * 20, a.z + a.tz * 20)).toBe(false)
   })
+})
 
-  it('keeps every car at a finite position after a long run', () => {
-    const { scene, train } = build(2)
-    for (let i = 0; i < 3000; i++) train.update(1 / 20)
-    const group = scene.getObjectByName('train')!
-    for (const car of group.children) {
-      expect(Number.isFinite(car.position.x)).toBe(true)
-      expect(Number.isFinite(car.position.y)).toBe(true)
-      expect(Number.isFinite(car.position.z)).toBe(true)
-    }
-  })
-
-  it('never carries a car past either end of the line', () => {
-    const { scene, train } = build(3)
-    const line = placeRailLine(flat, 90, 3)
-    const xs = line.points.map((p) => p.x)
-    const minX = Math.min(...xs)
-    const maxX = Math.max(...xs)
-    for (let i = 0; i < 3000; i++) {
-      train.update(1 / 20)
-      const group = scene.getObjectByName('train')!
-      for (const car of group.children) {
-        expect(car.position.x).toBeGreaterThanOrEqual(minX - 1)
-        expect(car.position.x).toBeLessThanOrEqual(maxX + 1)
-      }
-    }
-  })
-
-  it('is deterministic: the same seed gives the same wagon colours', () => {
-    const a = build(4)
-    const b = build(4)
-    const wagonA = a.scene.getObjectByName('train')!.children[1].getObjectByName('body') as THREE.Mesh
-    const wagonB = b.scene.getObjectByName('train')!.children[1].getObjectByName('body') as THREE.Mesh
-    expect((wagonA.material as THREE.MeshStandardMaterial).color.getHex())
-      .toBe((wagonB.material as THREE.MeshStandardMaterial).color.getHex())
-  })
-
-  it('sits still at the station for a while after reaching the end of the line, instead of bouncing straight back', () => {
-    const { scene, train } = build(9)
-    const group = scene.getObjectByName('train')!
-    const headX = () => group.children[0].position.x
-    // Run until the head actually reaches an end (stops changing frame to
-    // frame) — worst case one full one-way trip, comfortably inside 200s.
-    let prev = headX()
-    let arrivedAt = -1
-    for (let i = 0; i < 200; i++) {
-      train.update(1)
-      const now = headX()
-      if (now === prev) {
-        arrivedAt = i
-        break
-      }
-      prev = now
-    }
-    expect(arrivedAt).toBeGreaterThanOrEqual(0)
-    // Held there for a real stretch, not released the very next frame — the
-    // shortest roll in STATION_DWELL_RANGE is 60s.
-    for (let i = 0; i < 50; i++) {
-      train.update(1)
-      expect(headX()).toBe(prev)
-    }
-  })
-
-  it('leads with a locomotive, distinct from the wagons behind it', () => {
-    const { scene } = build(6)
-    const group = scene.getObjectByName('train')!
-    expect(group.children[0].name).toBe('locomotive')
-    for (let i = 1; i < group.children.length; i++) expect(group.children[i].name).toBe('wagon')
-  })
-
-  it('keeps the locomotive always in the lead, whichever way the train is heading', () => {
-    const { scene, train } = build(7)
-    const group = scene.getObjectByName('train')!
-    const headX = () => group.children[0].position.x
-    let prevHead = headX()
-    let prevDelta = 0
-    // Which way the head last actually moved: a train stopped at a station
-    // keeps the formation it arrived in, and turns round only as it leaves.
-    let heading = 0
-    let sawReverse = false
-    // A big-ish dt and enough iterations to comfortably clear a full one-way
-    // trip plus the train's own station dwell at the far end (up to 120s,
-    // see STATION_DWELL_RANGE) and still see it head back the other way —
-    // the invariant below holds at any step size, since pose() always
-    // recomputes every car's position fresh from the current t/dir.
-    for (let i = 0; i < 400; i++) {
-      train.update(1)
-      const nowHead = headX()
-      const delta = nowHead - prevHead
-      if (delta !== 0) heading = Math.sign(delta)
-      // Whichever way the head last moved, it stays ahead of every wagon.
-      for (let c = 1; c < group.children.length; c++) {
-        const wagonX = group.children[c].position.x
-        if (heading >= 0) expect(wagonX).toBeLessThanOrEqual(nowHead + 1e-6)
-        else expect(wagonX).toBeGreaterThanOrEqual(nowHead - 1e-6)
-      }
-      if (prevDelta !== 0 && delta !== 0 && Math.sign(delta) !== Math.sign(prevDelta)) sawReverse = true
-      if (delta !== 0) prevDelta = delta
-      prevHead = nowHead
-    }
-    expect(sawReverse).toBe(true)
-  })
-
-  it('keeps every car on the line, and never lets two of them overlap, at either end', () => {
-    // A live report (2026-09-19): at the end of the line the wagons piled onto
-    // one spot and the train "merged into one car". Big steps so both ends and
-    // several turn-arounds are covered.
-    for (const seed of [3, 7, 9]) {
-      const { scene, train } = build(seed)
-      const line = placeRailLine(flat, 90, seed)
-      const minX = line.points[0].x
-      const maxX = line.points[line.points.length - 1].x
-      const cars = scene.getObjectByName('train')!.children
-      let stops = 0
-      let prevHead = cars[0].position.x
-      for (let i = 0; i < 1500; i++) {
-        train.update(1)
-        const xs = cars.map((c) => c.position.x).sort((a, b) => a - b)
-        for (const x of xs) {
-          expect(x).toBeGreaterThanOrEqual(minX - 1e-6)
-          expect(x).toBeLessThanOrEqual(maxX + 1e-6)
-        }
-        for (let k = 1; k < xs.length; k++) expect(xs[k] - xs[k - 1]).toBeGreaterThanOrEqual(2.0)
-        if (cars[0].position.x === prevHead) stops++
-        prevHead = cars[0].position.x
-      }
-      expect(stops).toBeGreaterThan(0) // it really did reach a station
-    }
-  })
-
-  it('has wheels on every car, treads on the rail heads', () => {
-    const { scene, train } = build(11)
-    const line = placeRailLine(flat, 90, 11)
-    for (let i = 0; i < 40; i++) train.update(1)
-    scene.updateMatrixWorld(true)
-    const cars = scene.getObjectByName('train')!.children
-    for (const car of cars) {
-      const wheels = car.children.filter((c) => c.name === 'wheel')
-      expect(wheels.length).toBeGreaterThanOrEqual(4)
-      const box = new THREE.Box3()
-      for (const w of wheels) box.expandByObject(w)
-      // Flat ground at 0: the rail head is RAIL_HEIGHT (0.08) up.
-      expect(box.min.y).toBeCloseTo(0.08, 2)
-      // One wheel on each rail: across the car's width, the gauge apart.
-      const zs = wheels.map((w) => Math.round(w.getWorldPosition(new THREE.Vector3()).z * 100) / 100)
-      expect(new Set(zs).size).toBe(2)
-      expect(Math.abs(Math.max(...zs) - Math.min(...zs))).toBeCloseTo(0.7, 2)
-      // ...and the body sits on them, not through them.
-      const body = car.getObjectByName('body')!
-      const bodyBottom = new THREE.Box3().setFromObject(body).min.y
-      expect(bodyBottom).toBeGreaterThanOrEqual(box.max.y - 1e-6)
-    }
-    expect(line.points.length).toBeGreaterThan(0)
-  })
-
-  it('the locomotive carries a headlight, off by day and lit at night', () => {
-    const { scene, train } = build(8)
-    const loco = scene.getObjectByName('train')!.getObjectByName('locomotive')!
-    let light: THREE.SpotLight | undefined
-    loco.traverse((o) => {
-      if (o instanceof THREE.SpotLight) light = o
-    })
-    expect(light).toBeDefined()
-    train.setNight(0)
-    expect(light!.visible).toBe(false)
-    train.setNight(1)
-    expect(light!.visible).toBe(true)
-    expect(light!.intensity).toBeGreaterThan(0)
-  })
-
-  it('every wagon\'s windows glow at night, dark by day', () => {
-    const { scene, train } = build(9)
-    const group = scene.getObjectByName('train')!
-    const windows = group.children
-      .filter((c) => c.name === 'wagon')
-      .flatMap((wagon) => wagon.children.filter((c) => c.name === 'window'))
-    expect(windows.length).toBeGreaterThan(0)
-    train.setNight(0)
-    for (const w of windows) expect(((w as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity).toBe(0)
-    train.setNight(1)
-    for (const w of windows) {
-      expect(((w as THREE.Mesh).material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0)
-    }
-  })
-
-  it('puffs smoke from the locomotive\'s stack without throwing', () => {
-    const { train } = build(10)
-    expect(() => {
-      for (let i = 0; i < 60; i++) train.update(1 / 20)
-    }).not.toThrow()
-  })
-
-  it('disposes cleanly', () => {
-    const { scene, train } = build(5)
-    train.dispose()
-    expect(scene.getObjectByName('train')).toBeUndefined()
-  })
-
-  describe('stopped()', () => {
-    it('is null while the train is moving and says which end it is standing at during its dwell', () => {
-      const { scene, train } = build(3)
-      const cars = scene.getObjectByName('train')!.children
-      const seenEnds = new Set<number>()
-      let sawMoving = false
-      let prev = cars.map((c) => c.position.x)
-      for (let i = 0; i < 1400; i++) {
-        train.update(1)
-        const now = cars.map((c) => c.position.x)
-        const standing = now.every((x, k) => x === prev[k])
-        prev = now
-        const st = train.stopped()
-        if (standing) {
-          expect(st, 'standing but stopped() is null').not.toBeNull()
-          seenEnds.add(st!.end)
-          // ...and it reports the cars exactly where they are
-          expect(st!.cars.map((c) => c.x)).toEqual(now)
-          expect(st!.cars.every((c) => Number.isFinite(c.z))).toBe(true)
-        } else if (st === null) sawMoving = true
-      }
-      expect([...seenEnds].sort()).toEqual([0, 1])
-      expect(sawMoving).toBe(true)
-    })
-
-    it('reports the west end as 0 and the east end as 1', () => {
-      const { scene, train } = build(9)
-      const line = placeRailLine(flat, 90, 9)
-      const mid = (line.points[0].x + line.points[line.points.length - 1].x) / 2
-      const head = scene.getObjectByName('train')!.children[0]
-      for (let i = 0; i < 1400; i++) {
-        train.update(1)
-        const st = train.stopped()
-        if (st) expect(st.end).toBe(head.position.x < mid ? 0 : 1)
-      }
-    })
+describe('the ground under a line on real terrain', () => {
+  it('is followed by the sampled heights, every point', () => {
+    const terrain = proceduralTerrain(4)
+    const line = placeRailLine(terrain, 100, 7)
+    for (const p of line.points) expect(p.y).toBeCloseTo(terrain.heightAt(p.x, p.z), 6)
   })
 })

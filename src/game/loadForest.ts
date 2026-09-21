@@ -12,6 +12,7 @@ import { proceduralTerrain } from '../terrain/procedural'
 import { demoForest } from '../world/demoForest'
 import { placeOsmTrees } from '../world/osmTrees'
 import { placeRailLine, RAIL_SEED_OFFSET } from '../world/railway'
+import { wetTest } from '../world/water'
 import { buildBiomeMap } from '../world/biome'
 import { isClearing } from '../world/clearings'
 import { hashString } from '../util/rng'
@@ -117,7 +118,7 @@ function buildSource(
   // growing straight through the rails, `world/osmTrees.ts`'s
   // `RAIL_CLEARANCE`). Threaded through on `ForestSource` so `createForest`
   // reuses this one instead of placing a second, redundant line.
-  const railLine = placeRailLine(ground, halfSize, seed + RAIL_SEED_OFFSET)
+  const railLine = placeRailLine(ground, halfSize, seed + RAIL_SEED_OFFSET, wetTest(world.water))
   const trees = placeOsmTrees(world, ground, lat, treeSeed, halfSize, railLine)
   return {
     ground, trees, biomeAt, paths: world.paths.map((p) => p.points), water: world.water,

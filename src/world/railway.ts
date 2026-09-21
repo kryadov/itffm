@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { mulberry32, randRange } from '../util/rng'
+import { mulberry32 } from '../util/rng'
 import type { ElevationProvider } from '../terrain/provider'
 
 export interface RailPoint {
@@ -13,6 +13,12 @@ export interface RailLine {
   points: RailPoint[]
 }
 
+/** All the pure measuring below needs of a line is where it runs on the ground; a
+ *  height, when it has one, is used and otherwise taken as zero. */
+export interface PlanLine {
+  points: { x: number; z: number; y?: number }[]
+}
+
 /** The seed offset `game/scene.ts` uses for `placeRailLine`, exported so
  *  `game/loadForest.ts` can compute the very same line — the one that
  *  actually gets rendered and shuttled along — early enough to keep trees
@@ -20,88 +26,279 @@ export interface RailLine {
  *  two call sites carrying its own copy of the same magic number. */
 export const RAIL_SEED_OFFSET = 29
 
-/** How far apart ground-height samples sit along the line, metres — the same
- *  "dense enough to follow the ground, not cut a chord over it" reasoning
- *  `world/paths.ts`'s `RIBBON_STEP` uses (and `util/geometry.ts`'s
- *  `densify`), tightened a little further: a live report found a fixed
- *  12-sample line (regardless of length) visibly sagging into or floating
- *  above real, bumpy procedural terrain — a rail sitting 8cm above its own
- *  sleepers (RAIL_HEIGHT) shows a mismatch tenths-of-a-metre wide that a
- *  wider path ribbon can shrug off. */
-const RAIL_STEP = 3
-/** How far out along its own straight bearing the line reaches, as a
- *  fraction of halfSize either way — short of the true edge, the same
- *  "leave the plot's own boundary alone" margin the shelter search uses. */
-const SPAN_FRAC = 0.9
-/** How far from the centre line, as a fraction of halfSize, the track
- *  crosses the wood — clear of the hut/campfire clearing near the middle,
- *  never through it. */
-const OFFSET_MIN = 0.55
-const OFFSET_MAX = 0.8
+// ---- the train's own dimensions live here: the stations are sized from them ----
 
-/**
- * Sites a single straight rail line across the wood — a real, honest scope
- * cut from the "a rail line and a passing train" ask: a curving branch line
- * with points, sidings and level crossings is race-the-city's own city-scale
- * problem (see CLAUDE.md's donor-code note), not a wood's. One straight run,
- * offset from the middle so it never threads the hut's own clearing, still
- * reads as a real thing passing through rather than a toy loop.
- */
-export function placeRailLine(ground: ElevationProvider, halfSize: number, seed: number): RailLine {
-  const rng = mulberry32(seed)
-  const side = rng() < 0.5 ? -1 : 1
-  const z = side * halfSize * (OFFSET_MIN + rng() * (OFFSET_MAX - OFFSET_MIN))
-  const x0 = -halfSize * SPAN_FRAC
-  const x1 = halfSize * SPAN_FRAC
-  const segments = Math.max(1, Math.ceil((x1 - x0) / RAIL_STEP))
-  const points: RailPoint[] = []
-  for (let i = 0; i <= segments; i++) {
-    const x = x0 + (i / segments) * (x1 - x0)
-    points.push({ x, z, y: ground.heightAt(x, z) })
+/** The locomotive and every wagon behind it, metres. */
+export const LOCO_LENGTH = 2.7
+export const WAGON_LENGTH = 2.1
+export const CAR_GAP = 0.35
+/** The locomotive and five wagons. */
+export const TRAIN_CARS = 6
+/** From the locomotive's centre to its nose. */
+export const HEAD_TO_FRONT = LOCO_LENGTH / 2
+/** From the locomotive's centre to the centre of each car behind it. */
+export const CAR_OFFSETS: number[] = (() => {
+  const out = [0]
+  let at = LOCO_LENGTH / 2 + CAR_GAP + WAGON_LENGTH / 2
+  for (let i = 1; i < TRAIN_CARS; i++) {
+    out.push(at)
+    at += WAGON_LENGTH + CAR_GAP
   }
-  return { points }
+  return out
+})()
+/** From the locomotive's centre to the rear of the last wagon. */
+export const HEAD_TO_REAR = CAR_OFFSETS[TRAIN_CARS - 1] + WAGON_LENGTH / 2
+/** The whole train, nose to tail. */
+export const TRAIN_TOTAL = HEAD_TO_FRONT + HEAD_TO_REAR
+
+// ---- the line's layout, measured along it from either end ----
+
+/** Where the rails go into the hill: the portal's mouth stands this far from the
+ *  line's own end, so the last stretch of track is inside the mound. */
+export const PORTAL_MOUTH = 7
+/** From the mouth to where a platform begins. */
+const PLATFORM_APPROACH = 5
+/** How far a platform reaches past the train's nose and tail when it stands. */
+export const STATION_OVERHANG = 1.5
+export const PLATFORM_LENGTH = TRAIN_TOTAL + 2 * STATION_OVERHANG
+/** Straight track at each end: the portal, the platform, and a run-out past it. */
+export const END_STRAIGHT = PORTAL_MOUTH + PLATFORM_APPROACH + PLATFORM_LENGTH + 6
+
+/** How far apart ground-height samples sit along the line, metres — dense
+ *  enough to follow the ground, not cut a chord over it. */
+const RAIL_STEP = 3
+/** How far out toward the plot's edge the line reaches, as a fraction of halfSize. */
+const SPAN_FRAC = 0.9
+/** The tightest bend a candidate line may have, metres of radius: the track is a
+ *  chain of 3 m chords, and a tighter turn would show as kinks. */
+const MIN_RADIUS = 14
+const CANDIDATES = 90
+
+interface V2 {
+  x: number
+  z: number
 }
 
-/**
- * Ground height along the line at any x within its span — piecewise-linear
- * between whichever two sampled points bracket it, the same "enough points,
- * lerp between them" the line itself is built from. Shared by the mesh and
- * the train so a car's own wheels never float above or sink into the rails
- * it just rode over.
- */
-export function railHeightAt(line: RailLine, x: number): number {
-  const pts = line.points
-  if (x <= pts[0].x) return pts[0].y
-  if (x >= pts[pts.length - 1].x) return pts[pts.length - 1].y
-  for (let i = 1; i < pts.length; i++) {
-    if (x <= pts[i].x) {
-      const a = pts[i - 1]
-      const b = pts[i]
-      const t = (x - a.x) / (b.x - a.x)
-      return a.y + (b.y - a.y) * t
+function hermite(p0: V2, p1: V2, m0: V2, m1: V2, t: number): V2 {
+  const t2 = t * t
+  const t3 = t2 * t
+  const h00 = 2 * t3 - 3 * t2 + 1
+  const h10 = t3 - 2 * t2 + t
+  const h01 = -2 * t3 + 3 * t2
+  const h11 = t3 - t2
+  return {
+    x: h00 * p0.x + h10 * m0.x + h01 * p1.x + h11 * m1.x,
+    z: h00 * p0.z + h10 * m0.z + h01 * p1.z + h11 * m1.z,
+  }
+}
+
+/** One candidate centre line: straight at both ends, a smooth S-shaped run between. */
+function candidateLine(halfSize: number, rng: () => number): V2[] {
+  const lim = halfSize * SPAN_FRAC
+  const theta = rng() * Math.PI
+  const d = { x: Math.cos(theta), z: Math.sin(theta) }
+  const n = { x: -d.z, z: d.x }
+  const off = (rng() < 0.5 ? -1 : 1) * halfSize * (0.2 + rng() * 0.4)
+  const c = { x: n.x * off, z: n.z * off }
+  let reach = Infinity
+  for (const [cc, dd] of [[c.x, d.x], [c.z, d.z]] as const) {
+    if (Math.abs(dd) > 1e-6) reach = Math.min(reach, (lim - Math.abs(cc)) / Math.abs(dd))
+  }
+  reach = Math.max(reach, 10)
+  const a = { x: c.x - d.x * reach, z: c.z - d.z * reach }
+  const b = { x: c.x + d.x * reach, z: c.z + d.z * reach }
+  const chord = 2 * reach
+  const stub = Math.min(END_STRAIGHT, chord * 0.3)
+
+  const at = (u: number, w: number): V2 => ({
+    x: a.x + d.x * u + n.x * w,
+    z: a.z + d.z * u + n.z * w,
+  })
+  const middle = chord - 2 * stub
+  // Few, broad bends: a bend's sideways swing is limited by the room it has to make it in.
+  const bends = 1 + Math.floor(rng() * 2)
+  const room = middle / (bends + 1)
+  const amp = Math.min(halfSize * (0.12 + rng() * 0.12), (0.85 * room * room) / (Math.PI * Math.PI * MIN_RADIUS))
+  const ctrl: V2[] = [at(stub, 0)]
+  const sign0 = rng() < 0.5 ? -1 : 1
+  for (let j = 1; j <= bends; j++) {
+    const u = stub + (middle * (j + (rng() - 0.5) * 0.3)) / (bends + 1)
+    ctrl.push(at(u, sign0 * (j % 2 === 0 ? 1 : -1) * amp * (0.5 + rng() * 0.5)))
+  }
+  ctrl.push(at(chord - stub, 0))
+
+  // Straight stubs, then a Hermite spline through the middle that leaves each
+  // stub along its own direction, so the platform's straight really is straight.
+  const fine: V2[] = [a, ctrl[0]]
+  const m: V2[] = ctrl.map((p, i) => {
+    if (i === 0) return { x: d.x * Math.hypot(ctrl[1].x - p.x, ctrl[1].z - p.z), z: d.z * Math.hypot(ctrl[1].x - p.x, ctrl[1].z - p.z) }
+    if (i === ctrl.length - 1) {
+      const len = Math.hypot(p.x - ctrl[i - 1].x, p.z - ctrl[i - 1].z)
+      return { x: d.x * len, z: d.z * len }
+    }
+    return { x: (ctrl[i + 1].x - ctrl[i - 1].x) / 2, z: (ctrl[i + 1].z - ctrl[i - 1].z) / 2 }
+  })
+  for (let i = 0; i < ctrl.length - 1; i++) {
+    for (let k = 1; k <= 24; k++) fine.push(hermite(ctrl[i], ctrl[i + 1], m[i], m[i + 1], k / 24))
+  }
+  fine.push(b)
+  return fine
+}
+
+/** The polyline resampled to points a fixed arc-length step apart. */
+function resample(fine: V2[], step: number): V2[] {
+  const cum = [0]
+  for (let i = 1; i < fine.length; i++) cum.push(cum[i - 1] + Math.hypot(fine[i].x - fine[i - 1].x, fine[i].z - fine[i - 1].z))
+  const total = cum[cum.length - 1]
+  const count = Math.max(2, Math.round(total / step))
+  const out: V2[] = []
+  let seg = 1
+  for (let i = 0; i <= count; i++) {
+    const s = (i / count) * total
+    while (seg < fine.length - 1 && cum[seg] < s) seg++
+    const span = cum[seg] - cum[seg - 1] || 1
+    const t = Math.min(1, Math.max(0, (s - cum[seg - 1]) / span))
+    out.push({ x: fine[seg - 1].x + (fine[seg].x - fine[seg - 1].x) * t, z: fine[seg - 1].z + (fine[seg].z - fine[seg - 1].z) * t })
+  }
+  return out
+}
+
+/** Lower is better: what makes a candidate line a poor place for a railway. */
+function lineCost(pts: V2[], halfSize: number, ground: ElevationProvider, avoid?: (x: number, z: number) => boolean): number {
+  let cost = 0
+  // A line that is all but straight is not what was asked for.
+  const first = pts[0]
+  const last = pts[pts.length - 1]
+  const chord = Math.hypot(last.x - first.x, last.z - first.z) || 1
+  let swing = 0
+  for (const p of pts) swing = Math.max(swing, Math.abs((last.x - first.x) * (first.z - p.z) - (first.x - p.x) * (last.z - first.z)) / chord)
+  if (swing < halfSize * 0.07) cost += 20
+  const limit = halfSize * 0.96
+  let prevY = ground.heightAt(pts[0].x, pts[0].z)
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i]
+    if (avoid && avoid(p.x, p.z)) cost += 50
+    if (Math.abs(p.x) > limit || Math.abs(p.z) > limit) cost += 40
+    if (Math.hypot(p.x, p.z) < halfSize * 0.22) cost += 25 // the hut's clearing
+    if (i > 0) {
+      const y = ground.heightAt(p.x, p.z)
+      const grade = Math.abs(y - prevY) / RAIL_STEP
+      if (grade > 0.22) cost += (grade - 0.22) * 60
+      prevY = y
+    }
+    if (i > 0 && i < pts.length - 1) {
+      const a = Math.atan2(p.z - pts[i - 1].z, p.x - pts[i - 1].x)
+      const b = Math.atan2(pts[i + 1].z - p.z, pts[i + 1].x - p.x)
+      let turn = Math.abs(b - a)
+      if (turn > Math.PI) turn = 2 * Math.PI - turn
+      if (turn > RAIL_STEP / MIN_RADIUS) cost += 30 + turn * 40
     }
   }
-  return pts[pts.length - 1].y
+  return cost
 }
 
 /**
- * One tick of the train's back-and-forth run: advances `t` (0..1 along the
- * line) by however far `speed` carries it over `dt`, bouncing off either end
- * instead of running past it — a shuttle on a dead-end spur, not a loop.
+ * Sites the railway: a winding line right across the wood, straight for a stretch
+ * at each end (a portal into the hillside, then a platform) and curving between —
+ * so it reads as a line that comes from somewhere and goes on somewhere, not a
+ * bar laid on the ground. Of ninety candidate routes it takes the one that keeps
+ * out of the water (`avoid`, when given), off steep ground and out of the hut's
+ * clearing, and has no bend tighter than a small railway could take.
  */
-export function stepTrainT(
-  t: number, dir: 1 | -1, dt: number, speed: number, lineLength: number,
-): { t: number; dir: 1 | -1 } {
-  let nt = t + (dir * speed * dt) / lineLength
-  let ndir = dir
-  if (nt >= 1) {
-    nt = 1
-    ndir = -1
-  } else if (nt <= 0) {
-    nt = 0
-    ndir = 1
+export function placeRailLine(
+  ground: ElevationProvider, halfSize: number, seed: number, avoid?: (x: number, z: number) => boolean,
+): RailLine {
+  const rng = mulberry32(seed)
+  let best: V2[] | null = null
+  let bestCost = Infinity
+  for (let k = 0; k < CANDIDATES; k++) {
+    const pts = resample(candidateLine(halfSize, rng), RAIL_STEP)
+    const cost = lineCost(pts, halfSize, ground, avoid)
+    if (cost < bestCost) {
+      best = pts
+      bestCost = cost
+      if (cost === 0) break
+    }
   }
-  return { t: nt, dir: ndir }
+  return { points: best!.map((p) => ({ x: p.x, z: p.z, y: ground.heightAt(p.x, p.z) })) }
+}
+
+// ---- measuring along the line ----
+
+const cumulativeCache = new WeakMap<PlanLine['points'], number[]>()
+
+/** Distance along the line to each of its points, from the first. */
+function cumulative(points: PlanLine['points']): number[] {
+  let cum = cumulativeCache.get(points)
+  if (!cum) {
+    cum = [0]
+    for (let i = 1; i < points.length; i++) {
+      cum.push(cum[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z))
+    }
+    cumulativeCache.set(points, cum)
+  }
+  return cum
+}
+
+/** The line's length, metres. */
+export function lineLength(line: PlanLine): number {
+  const cum = cumulative(line.points)
+  return cum[cum.length - 1]
+}
+
+export interface RailSample {
+  x: number
+  y: number
+  z: number
+  /** Unit direction of travel along the line, in the ground plane. */
+  tx: number
+  tz: number
+}
+
+/**
+ * The point `s` metres along the line, with its direction. Past either end it
+ * carries straight on, so a car that has not yet come out of its tunnel still
+ * has somewhere to stand.
+ */
+export function pointAt(line: PlanLine, s: number): RailSample {
+  const pts = line.points
+  const cum = cumulative(pts)
+  const last = pts.length - 1
+  let i: number
+  if (s <= 0) i = 1
+  else if (s >= cum[last]) i = last
+  else {
+    let lo = 1
+    let hi = last
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (cum[mid] < s) lo = mid + 1
+      else hi = mid
+    }
+    i = lo
+  }
+  const a = pts[i - 1]
+  const b = pts[i]
+  const span = cum[i] - cum[i - 1] || 1
+  const tx = (b.x - a.x) / span
+  const tz = (b.z - a.z) / span
+  const u = s - cum[i - 1] // may be negative or beyond the span: straight on
+  const yT = Math.min(1, Math.max(0, u / span))
+  return { x: a.x + tx * u, z: a.z + tz * u, y: (a.y ?? 0) + ((b.y ?? 0) - (a.y ?? 0)) * yT, tx, tz }
+}
+
+/**
+ * Ground height along the line, `s` metres from its start — piecewise-linear
+ * between the sampled points. Shared by the mesh and the train so a car's own
+ * wheels never float above or sink into the rails it just rode over.
+ */
+export function railHeightAt(line: PlanLine, s: number): number {
+  return pointAt(line, s).y
+}
+
+/** The way the line faces at `s`, as a yaw for a thing whose own +x points along it. */
+export function yawOf(tx: number, tz: number): number {
+  return Math.atan2(-tz, tx)
 }
 
 export const RAIL_GAUGE = 0.7 // narrow-gauge, forest-logging scale — not a mainline
@@ -110,41 +307,43 @@ const SLEEPER_SPACING = 1.4
 const SLEEPER_LENGTH = 1.1
 const SLEEPER_WIDTH = 0.22
 const SLEEPER_HEIGHT = 0.1
+const BALLAST_HALF_WIDTH = 0.8
 
-/** The track bed itself — two rails and their sleepers, ground-following
- *  along the line's own span. Static geometry, never updated once built.
- *
- *  A live report caught the rails detached from both their own sleepers and
- *  the ground under a slope: each rail used to be ONE rigid box spanning the
- *  whole line, positioned at a single height sampled at the line's own
- *  midpoint — dead flat regardless of how much the terrain actually climbs
- *  or drops along the way, while the sleepers (already built per sampled
- *  point) correctly followed it. Now each rail is a chain of short segments,
- *  one per pair of consecutive `line.points` (the same `RAIL_STEP`-spaced
- *  samples the sleepers and the train already read off `railHeightAt`),
- *  each tilted to match its own local slope and merged into one mesh per
- *  side — still two draw calls, not one per segment. */
+/** A box's own +x along `f`, +y as close to world up as `f` allows, at `at`. */
+function alongMatrix(f: THREE.Vector3, at: THREE.Vector3): THREE.Matrix4 {
+  const x = f.clone().normalize()
+  const up = new THREE.Vector3(0, 1, 0)
+  const y = up.sub(x.clone().multiplyScalar(up.dot(x))).normalize()
+  const z = new THREE.Vector3().crossVectors(x, y)
+  return new THREE.Matrix4().makeBasis(x, y, z).setPosition(at)
+}
+
+/** The track bed itself — a ballast strip, two rails and their sleepers, all
+ *  following the line's bends and the ground's slope. Static geometry, three
+ *  draw calls in all. */
 export function buildRailMesh(line: RailLine): THREE.Group {
   const group = new THREE.Group()
   group.name = 'railway'
   const pts = line.points
-  const z = pts[0].z
-  const x0 = pts[0].x
-  const x1 = pts[pts.length - 1].x
-  const length = x1 - x0
+  const half = RAIL_GAUGE / 2
 
   const railMat = new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 0.6, metalness: 0.3 })
-  const half = RAIL_GAUGE / 2
   for (const side of [-1, 1]) {
     const segments: THREE.BufferGeometry[] = []
     for (let i = 0; i < pts.length - 1; i++) {
       const a = pts[i]
       const b = pts[i + 1]
       const dx = b.x - a.x
-      const dy = b.y - a.y
-      const seg = new THREE.BoxGeometry(Math.hypot(dx, dy), RAIL_HEIGHT, 0.07)
-      seg.rotateZ(Math.atan2(dy, dx))
-      seg.translate((a.x + b.x) / 2, (a.y + b.y) / 2 + RAIL_HEIGHT / 2, z + side * half)
+      const dz = b.z - a.z
+      const flat = Math.hypot(dx, dz) || 1
+      // The rail lies to the side of the chord, level with the ground under it.
+      const ox = (-dz / flat) * side * half
+      const oz = (dx / flat) * side * half
+      const from = new THREE.Vector3(a.x + ox, a.y + RAIL_HEIGHT / 2, a.z + oz)
+      const to = new THREE.Vector3(b.x + ox, b.y + RAIL_HEIGHT / 2, b.z + oz)
+      const dir = to.clone().sub(from)
+      const seg = new THREE.BoxGeometry(dir.length() + 0.1, RAIL_HEIGHT, 0.07)
+      seg.applyMatrix4(alongMatrix(dir, from.clone().add(to).multiplyScalar(0.5)))
       segments.push(seg)
     }
     const merged = mergeGeometries(segments, false)
@@ -152,365 +351,64 @@ export function buildRailMesh(line: RailLine): THREE.Group {
     group.add(new THREE.Mesh(merged, railMat))
   }
 
-  const sleeperMat = new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })
+  const length = lineLength(line)
   const sleeperCount = Math.max(1, Math.floor(length / SLEEPER_SPACING))
+  const sleepers: THREE.BufferGeometry[] = []
   for (let i = 0; i <= sleeperCount; i++) {
-    const x = x0 + (i / sleeperCount) * length
-    const sleeper = new THREE.Mesh(
-      new THREE.BoxGeometry(SLEEPER_WIDTH, SLEEPER_HEIGHT, SLEEPER_LENGTH), sleeperMat,
-    )
-    sleeper.position.set(x, railHeightAt(line, x) - SLEEPER_HEIGHT / 2 + RAIL_HEIGHT * 0.3, z)
-    group.add(sleeper)
+    const s = (i / sleeperCount) * length
+    const p = pointAt(line, s)
+    const g = new THREE.BoxGeometry(SLEEPER_WIDTH, SLEEPER_HEIGHT, SLEEPER_LENGTH)
+    g.rotateY(yawOf(p.tx, p.tz))
+    g.translate(p.x, p.y - SLEEPER_HEIGHT / 2 + RAIL_HEIGHT * 0.3, p.z)
+    sleepers.push(g)
   }
+  group.add(new THREE.Mesh(mergeGeometries(sleepers, false), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })))
+
+  // Ballast: a low strip of gravel under it all, so the track sits on something.
+  const verts: number[] = []
+  const idx: number[] = []
+  for (let i = 0; i < pts.length; i++) {
+    const p = pointAt(line, cumulative(pts)[i])
+    verts.push(
+      p.x + p.tz * BALLAST_HALF_WIDTH, p.y + 0.03, p.z - p.tx * BALLAST_HALF_WIDTH,
+      p.x - p.tz * BALLAST_HALF_WIDTH, p.y + 0.03, p.z + p.tx * BALLAST_HALF_WIDTH,
+    )
+    if (i > 0) {
+      const k = (i - 1) * 2
+      idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2)
+    }
+  }
+  const ballastGeo = new THREE.BufferGeometry()
+  ballastGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+  ballastGeo.setIndex(idx)
+  ballastGeo.computeVertexNormals()
+  const ballast = new THREE.Mesh(ballastGeo, new THREE.MeshStandardMaterial({ color: 0x6b665c, roughness: 1, side: THREE.DoubleSide }))
+  ballast.name = 'ballast'
+  group.add(ballast)
 
   return group
 }
 
-export interface Train {
-  update(dt: number): void
-  /** 0 by day, 1 at full night — the locomotive's headlight and every
-   *  wagon's windows glow, the same day/night rule the shelter's own
-   *  windows and lamp already follow (`world/shelter.ts`'s `setNight`). */
-  setNight(t: number): void
-  /** While the train stands at a station: which end (0 the west end of the
-   *  line, 1 the east) and where each car is, world x and z; otherwise null. */
-  stopped(): { end: 0 | 1; cars: { x: number; z: number }[] } | null
-  dispose(): void
-}
+// ---- stations and portals ----
 
-/** Toy/logging-railway pace, not a mainline train's — the whole line is
- *  under 200m, and a train crossing it in seconds would read as a blur, not
- *  something you watch pass. */
-const TRAIN_SPEED = 2.5
-/** How long the train sits at each end of the line before heading back —
- *  a real request (2026-09-15): the line's own dead-end spurs already read
- *  as stations, they just used to reverse instantly instead of stopping
- *  there like a train actually would. */
-const STATION_DWELL_RANGE: [number, number] = [60, 120]
-const CAR_COUNT = 3
-/** Every car — the locomotive included — occupies the same length of track,
- *  so the lead-car-plus-fixed-offset spacing below stays one simple formula
- *  regardless of what any one slot actually looks like. */
-const CAR_LENGTH = 2.0
-const CAR_GAP = 0.35
-const CAR_WIDTH = 1.0
-const CAR_HEIGHT = 1.05
-
-/** One colour per wagon (the locomotive has its own, below), cycling if
- *  there are ever more wagons than colours — distinct cars, not one long
- *  slab in a single random colour like the old build gave every car alike. */
-const CAR_COLORS = [0x7a4a32, 0x5f6b52, 0x8a3b34, 0x4a5a6b]
-
-const LOCO_COLOR = 0x2e3330
-const LOCO_CAB_COLOR = 0x232725
-/** Taller than a wagon — the cab needs headroom over the body it sits on,
- *  and the height difference alone reads as "this one is different" even
- *  before its colour or the stack/headlight register. */
-const LOCO_HEIGHT = CAR_HEIGHT * 1.3
-const LOCO_CAB_LENGTH = CAR_LENGTH * 0.4
-const LOCO_CAB_HEIGHT = CAR_HEIGHT * 0.55
-const STACK_RADIUS = 0.08
-const STACK_HEIGHT = 0.3
-
-/** Wheels: two axles a car, a wheel on each rail. The body rides
- *  `UNDERFRAME` above the rail head so the wheels have somewhere to be —
- *  `pose()` lifts every car by it, and each wheel sits that far back down,
- *  its tread on the rail. (The first version had no wheels at all: boxes set
- *  straight onto the track — a live report, 2026-09-19.) */
-const WHEEL_RADIUS = 0.16
-const WHEEL_WIDTH = 0.06
-const UNDERFRAME = WHEEL_RADIUS * 2
-const AXLE_X = CAR_LENGTH * 0.3
-const CHASSIS_HEIGHT = 0.07
-const WHEEL_COLOR = 0x1c1e1c
-
-const wheelGeo = new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, WHEEL_WIDTH, 14)
-wheelGeo.rotateX(Math.PI / 2) // axis along z, across the car
-const chassisGeo = new THREE.BoxGeometry(CAR_LENGTH * 0.96, CHASSIS_HEIGHT, CAR_WIDTH * 0.78)
-
-/** The running gear every car shares — an underframe slab and four named
- *  wheels — in the car's own local space (y = 0 is the body's floor). */
-function addRunningGear(group: THREE.Group): void {
-  const wheelMat = new THREE.MeshStandardMaterial({ color: WHEEL_COLOR, roughness: 0.6, metalness: 0.5 })
-  const chassis = new THREE.Mesh(chassisGeo, wheelMat)
-  chassis.name = 'chassis'
-  chassis.position.y = -CHASSIS_HEIGHT / 2
-  group.add(chassis)
-  for (const ax of [-1, 1]) {
-    for (const side of [-1, 1]) {
-      const wheel = new THREE.Mesh(wheelGeo, wheelMat)
-      wheel.name = 'wheel'
-      wheel.position.set(ax * AXLE_X, WHEEL_RADIUS - UNDERFRAME, (side * RAIL_GAUGE) / 2)
-      group.add(wheel)
-    }
-  }
-}
-
-const WINDOW_COLOR = 0xbfe0e6
-const WINDOW_EMISSIVE = 0xffcf8a
-const WINDOW_COUNT = 3
-const WINDOW_WIDTH = 0.26
-const WINDOW_HEIGHT = 0.32
-
-const SMOKE_N = 4
-
-/** Builds the lead car — a boxy diesel locomotive: a taller body, a cab set
- *  back toward the rear (the smoke needs the front clear), an exhaust stack
- *  puffing the same kind of drifting sprite smoke `world/shelter.ts`'s
- *  chimney already uses, and a real headlight (`THREE.SpotLight`, off by
- *  day) aimed along local +x — `pose()` below flips the whole group's own
- *  `rotation.y` between 0 and π as the train reverses, which already aims
- *  this correctly in world space without the light's own local aim ever
- *  needing to change.
- */
-function buildLocomotive(): {
-  group: THREE.Group
-  setNight: (t: number) => void
-  updateSmoke: (elapsed: number) => void
-} {
-  const group = new THREE.Group()
-  group.name = 'locomotive'
-
-  const bodyMat = new THREE.MeshStandardMaterial({ color: LOCO_COLOR, flatShading: true })
-  const body = new THREE.Mesh(new THREE.BoxGeometry(CAR_LENGTH, LOCO_HEIGHT, CAR_WIDTH), bodyMat)
-  body.name = 'body'
-  body.position.y = LOCO_HEIGHT / 2
-  group.add(body)
-  addRunningGear(group)
-
-  const cabMat = new THREE.MeshStandardMaterial({ color: LOCO_CAB_COLOR, flatShading: true })
-  const cab = new THREE.Mesh(
-    new THREE.BoxGeometry(LOCO_CAB_LENGTH, LOCO_CAB_HEIGHT, CAR_WIDTH * 0.92), cabMat,
-  )
-  cab.name = 'cab'
-  cab.position.set(-CAR_LENGTH / 2 + LOCO_CAB_LENGTH / 2 + 0.08, LOCO_HEIGHT + LOCO_CAB_HEIGHT / 2, 0)
-  group.add(cab)
-
-  const stackMat = new THREE.MeshStandardMaterial({ color: 0x1c1e1c, roughness: 0.9 })
-  const stack = new THREE.Mesh(new THREE.CylinderGeometry(STACK_RADIUS, STACK_RADIUS * 1.2, STACK_HEIGHT, 8), stackMat)
-  const stackLocal = new THREE.Vector3(CAR_LENGTH * 0.12, LOCO_HEIGHT + STACK_HEIGHT / 2, 0)
-  stack.position.copy(stackLocal)
-  group.add(stack)
-
-  // Small puffs drifting up and fading, looping through their own phase —
-  // the same recipe world/shelter.ts's chimney smoke uses, but in the
-  // locomotive's own local space: being a child of `group` (which `pose()`
-  // repositions/rotates every frame), each sprite's world position follows
-  // the moving, turning train for free.
-  const smokeMat = new THREE.SpriteMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0, depthWrite: false })
-  const smoke: THREE.Sprite[] = []
-  for (let i = 0; i < SMOKE_N; i++) {
-    const sprite = new THREE.Sprite(smokeMat.clone())
-    sprite.userData.phase = i / SMOKE_N
-    sprite.scale.setScalar(0.001)
-    group.add(sprite)
-    smoke.push(sprite)
-  }
-  const updateSmoke = (elapsed: number): void => {
-    for (const sprite of smoke) {
-      const t = (elapsed * 0.5 + sprite.userData.phase) % 1
-      sprite.position.set(
-        stackLocal.x + Math.sin(t * Math.PI * 2 + sprite.userData.phase * 6) * 0.05,
-        stackLocal.y + STACK_HEIGHT / 2 + t * 0.9,
-        stackLocal.z + Math.cos(t * Math.PI * 2 + sprite.userData.phase * 4) * 0.05,
-      )
-      sprite.scale.setScalar(0.1 + t * 0.3)
-      ;(sprite.material as THREE.SpriteMaterial).opacity = 0.35 * (1 - t)
-    }
-  }
-
-  // A visible lens even by day, and the actual light source at night — the
-  // same split the shelter's own lamp shade/bulb pair already makes.
-  const headlightMat = new THREE.MeshStandardMaterial({
-    color: 0xfff6d8, roughness: 0.3, emissive: 0xffcf8a, emissiveIntensity: 0,
-  })
-  const headlightGlow = new THREE.Mesh(new THREE.CircleGeometry(0.09, 12), headlightMat)
-  headlightGlow.name = 'headlightGlow'
-  headlightGlow.position.set(CAR_LENGTH / 2 + 0.01, LOCO_HEIGHT * 0.62, 0)
-  headlightGlow.rotation.y = Math.PI / 2
-  group.add(headlightGlow)
-
-  // Intensity/distance mirror the player's own flashlight (game/scene.ts) —
-  // three's physically-correct lighting makes that tuning read as a real
-  // headlamp a few tens of metres out, not a floodlight.
-  const headlight = new THREE.SpotLight(0xfff2cc, 500, 25, 0.3, 0.4, 2)
-  headlight.position.set(CAR_LENGTH / 2, LOCO_HEIGHT * 0.62, 0)
-  const headlightTarget = new THREE.Object3D()
-  headlightTarget.position.set(CAR_LENGTH / 2 + 5, LOCO_HEIGHT * 0.62, 0)
-  group.add(headlight, headlightTarget)
-  headlight.target = headlightTarget
-  headlight.visible = false
-
-  const setNight = (t: number): void => {
-    headlightMat.emissiveIntensity = t * 2.2
-    headlight.visible = t > 0.02
-    headlight.intensity = 500 * t
-  }
-
-  return { group, setNight, updateSmoke }
-}
-
-/** Builds one wagon — a plain boxy car in its own colour, with a row of
- *  windows along each side that glow amber at night (the shared
- *  `windowMat` this returns lets `createTrain` drive every wagon's windows,
- *  across the whole train, with one `emissiveIntensity` write instead of
- *  one per car).
- */
-function buildWagon(color: number): { group: THREE.Group; windowMat: THREE.MeshStandardMaterial } {
-  const group = new THREE.Group()
-  group.name = 'wagon'
-  const bodyMat = new THREE.MeshStandardMaterial({ color, flatShading: true })
-  const body = new THREE.Mesh(new THREE.BoxGeometry(CAR_LENGTH, CAR_HEIGHT, CAR_WIDTH), bodyMat)
-  body.name = 'body'
-  body.position.y = CAR_HEIGHT / 2
-  group.add(body)
-  addRunningGear(group)
-
-  const windowMat = new THREE.MeshStandardMaterial({
-    color: WINDOW_COLOR, roughness: 0.3, emissive: WINDOW_EMISSIVE, emissiveIntensity: 0, side: THREE.DoubleSide,
-  })
-  const windowGeo = new THREE.PlaneGeometry(WINDOW_WIDTH, WINDOW_HEIGHT)
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < WINDOW_COUNT; i++) {
-      const x = (i / (WINDOW_COUNT - 1) - 0.5) * (CAR_LENGTH - WINDOW_WIDTH * 1.6)
-      const win = new THREE.Mesh(windowGeo, windowMat)
-      win.name = 'window'
-      win.position.set(x, CAR_HEIGHT * 0.6, (side * CAR_WIDTH) / 2 + 0.005 * side)
-      win.rotation.y = side > 0 ? 0 : Math.PI
-      group.add(win)
-    }
-  }
-
-  return { group, windowMat }
-}
-
-/**
- * A short train that shuttles back and forth along `line` — a dead-end
- * spur, not a loop, the same honest scope cut `placeRailLine` explains.
- * The lead car (index 0 — always the front, regardless of which way the
- * train is currently heading, since every other car trails it by a fixed
- * offset toward the rear) is a locomotive; the rest are wagons, each in
- * their own colour. Cars trail the lead car by a fixed offset along the
- * line's own x, so the whole train reverses direction as one piece at
- * either end rather than each car turning around where it stands.
- */
-export function createTrain(scene: THREE.Scene, line: RailLine, seed: number): Train {
-  const rng = mulberry32(seed)
-  const group = new THREE.Group()
-  group.name = 'train'
-
-  const loco = buildLocomotive()
-  group.add(loco.group)
-  const cars: THREE.Object3D[] = [loco.group]
-  const windowMats: THREE.MeshStandardMaterial[] = []
-  const colorStart = Math.floor(rng() * CAR_COLORS.length)
-  for (let i = 1; i < CAR_COUNT; i++) {
-    const color = CAR_COLORS[(colorStart + i - 1) % CAR_COLORS.length]
-    const wagon = buildWagon(color)
-    group.add(wagon.group)
-    cars.push(wagon.group)
-    windowMats.push(wagon.windowMat)
-  }
-  scene.add(group)
-
-  const x0 = line.points[0].x
-  const x1 = line.points[line.points.length - 1].x
-  const z = line.points[0].z
-  // The locomotive leads whichever way the train runs, so the wagons trail on
-  // one side of it going one way and on the other going back. The head is
-  // therefore kept a whole train's length clear of both ends: wherever it is,
-  // in either formation, every car is on the line. (Before this the cars were
-  // clamped to the line's ends, which at a terminus piled every wagon onto the
-  // same spot — the train "merged into one car" — a live report, 2026-09-19.)
-  const trainLength = (cars.length - 1) * (CAR_LENGTH + CAR_GAP)
-  const headMin = x0 + trainLength
-  const length = Math.max(1, x1 - trainLength - headMin)
-
-  let t = rng()
-  let dir: 1 | -1 = rng() < 0.5 ? 1 : -1
-  // Which way the train is FORMED up — the way it last moved. It follows `dir`
-  // only once the train pulls away, not at the instant it arrives: standing
-  // at a station it keeps the formation it arrived in (locomotive in front),
-  // and turns round for the way back as it leaves.
-  let formation: 1 | -1 = dir
-
-  function pose(): void {
-    const headX = headMin + t * length
-    for (let i = 0; i < cars.length; i++) {
-      const carX = headX - i * (CAR_LENGTH + CAR_GAP) * formation
-      const y = railHeightAt(line, carX) + RAIL_HEIGHT + UNDERFRAME
-      cars[i].position.set(carX, y, z)
-      cars[i].rotation.y = formation > 0 ? 0 : Math.PI
-    }
-  }
-  pose()
-
-  let elapsed = 0
-  // >0 while stopped at a station (an end of the line) — set the instant it
-  // arrives, counted down instead of advancing t, so the train actually
-  // waits there rather than bouncing straight back.
-  let stationWait = 0
-  // Which end it is standing at, set the moment it arrives and cleared as it
-  // pulls away (see `stopped()`).
-  let stopEnd: 0 | 1 | null = null
-
-  return {
-    update(dt) {
-      if (stationWait > 0) {
-        stationWait = Math.max(0, stationWait - dt)
-      } else {
-        const before = t
-        ;({ t, dir } = stepTrainT(t, dir, dt, TRAIN_SPEED, length))
-        const arrived = t !== before && (t === 0 || t === 1)
-        if (arrived) {
-          stationWait = randRange(rng, STATION_DWELL_RANGE)
-          stopEnd = t === 0 ? 0 : 1
-        }
-        else if (t !== before) {
-          formation = dir
-          stopEnd = null // it has pulled away
-        }
-      }
-      pose()
-      elapsed += dt
-      loco.updateSmoke(elapsed)
-    },
-    stopped() {
-      if (stopEnd === null) return null
-      return { end: stopEnd, cars: cars.map((c) => ({ x: c.position.x, z: c.position.z })) }
-    },
-    setNight(nt) {
-      loco.setNight(nt)
-      for (const mat of windowMats) mat.emissiveIntensity = nt * 2.2
-    },
-    dispose() {
-      scene.remove(group)
-      group.traverse((o) => {
-        if (o instanceof THREE.Mesh) {
-          o.geometry.dispose()
-          if (!Array.isArray(o.material)) o.material.dispose()
-        }
-        if (o instanceof THREE.Sprite) o.material.dispose()
-      })
-    },
-  }
-}
-
-/** A platform beside the track, at one of the line's two ends — where the
- *  train dwells. `x0..x1` is the platform's length along the line, `z` the
- *  track's own z, `side` which side of the track the platform lies on (+1 /
- *  -1 in z). */
+/** A platform beside the track, at one of the line's two ends — where the train
+ *  dwells. It lies along a straight stretch of the line: `(cx, cz)` is its
+ *  middle on the track's own centre line, `(tx, tz)` the direction of increasing
+ *  `s`, `side` which side of the track it lies on (+1 the left of `(tx, tz)`
+ *  turned a quarter, -1 the other), `s0..s1` its length along the line. */
 export interface Station {
-  x0: number
-  x1: number
-  z: number
+  cx: number
+  cz: number
+  tx: number
+  tz: number
   side: 1 | -1
+  half: number
+  s0: number
+  s1: number
+  /** 0 the end where the line starts, 1 the end where it finishes. */
+  end: 0 | 1
 }
 
-/** Length of track the whole train occupies, front car's centre to the last's. */
-const TRAIN_LENGTH = (CAR_COUNT - 1) * (CAR_LENGTH + CAR_GAP)
-/** How far a platform reaches past the train's own front and back. */
-const STATION_OVERHANG = 1.2
 /** From the track's centre line to the platform's near edge: the car's side (0.5)
  *  and a small gap, and clear of the sleepers' ends (0.55). */
 export const STATION_PLATFORM_GAP = 0.7
@@ -522,29 +420,42 @@ export const STATION_PLATFORM_HEIGHT = 0.13
  *  measured across the line on the side away from the platform. */
 const STATION_CLEAR_TRACKSIDE = 1.8
 
+/** A station's local frame to world: `u` along the track from its middle, `v`
+ *  across it toward the platform's own side. */
+export function stationToWorld(st: Station, u: number, v: number): { x: number; z: number } {
+  // Local +z is the track's left; the platform's side may be either.
+  return {
+    x: st.cx + u * st.tx + v * st.side * -st.tz,
+    z: st.cz + u * st.tz + v * st.side * st.tx,
+  }
+}
+
 /**
- * The line's two stops, one at each end: the platform lies exactly along the
- * whole train as it stands during its dwell (`createTrain`: the head kept a
- * train's length clear of the line's ends, the locomotive leading toward the
- * end it arrived at), with a little to spare at each end. On the side of the
- * track that faces the middle of the wood, where a player is.
+ * The line's two stops, one near each end: the platform lies exactly along the
+ * whole train as it stands during its dwell (`train.ts` stops the nose
+ * `STATION_OVERHANG` short of the platform's far end in either direction), on the
+ * side of the track that faces the middle of the wood, where a player is.
  *
- * Pure and derived from the line alone, so the mesh, the clearing of trees
- * and the minimap all agree on where a stop is without carrying it around.
+ * Pure and derived from the line alone (only x and z of its points are read),
+ * so the mesh, the clearing of trees and the minimap all agree on where a stop is.
  */
-export function stationsFor(line: RailLine): Station[] {
-  const pts = line.points
-  const xa = pts[0].x
-  const xb = pts[pts.length - 1].x
-  const z = pts[0].z
-  const side: 1 | -1 = z > 0 ? -1 : 1
-  const half = CAR_LENGTH / 2
-  return [
-    // arrived heading toward xa: cars at xa + TL, xa + 2 TL ... behind the locomotive
-    { x0: xa + TRAIN_LENGTH - half - STATION_OVERHANG, x1: xa + 2 * TRAIN_LENGTH + half + STATION_OVERHANG, z, side },
-    // arrived heading toward xb: cars at xb - TL, xb - 2 TL
-    { x0: xb - 2 * TRAIN_LENGTH - half - STATION_OVERHANG, x1: xb - TRAIN_LENGTH + half + STATION_OVERHANG, z, side },
-  ]
+export function stationsFor(line: PlanLine): Station[] {
+  const length = lineLength(line)
+  const out: Station[] = []
+  for (const end of [0, 1] as const) {
+    const startFromEnd = Math.min(PORTAL_MOUTH + PLATFORM_APPROACH, length * 0.25)
+    const s0 = end === 0 ? startFromEnd : length - startFromEnd - PLATFORM_LENGTH
+    const s1 = s0 + PLATFORM_LENGTH
+    const mid = pointAt(line, (s0 + s1) / 2)
+    // Toward the middle of the wood: the side whose normal has the smaller distance to the origin.
+    const left = { x: -mid.tz, z: mid.tx }
+    const toCentre = -(mid.x * left.x + mid.z * left.z)
+    out.push({
+      cx: mid.x, cz: mid.z, tx: mid.tx, tz: mid.tz,
+      side: toCentre >= 0 ? 1 : -1, half: PLATFORM_LENGTH / 2, s0, s1, end,
+    })
+  }
+  return out
 }
 
 /**
@@ -554,8 +465,43 @@ export function stationsFor(line: RailLine): Station[] {
  */
 export function stationOccupies(stations: Station[], x: number, z: number, margin = 0): boolean {
   return stations.some((s) => {
-    if (x < s.x0 - margin || x > s.x1 + margin) return false
-    const across = (z - s.z) * s.side // >0 on the platform's side of the track
+    const dx = x - s.cx
+    const dz = z - s.cz
+    const u = dx * s.tx + dz * s.tz
+    if (Math.abs(u) > s.half + margin) return false
+    const across = (dx * -s.tz + dz * s.tx) * s.side // >0 on the platform's side of the track
     return across >= -STATION_CLEAR_TRACKSIDE - margin && across <= STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH + margin
   })
+}
+
+/** A tunnel portal: the mouth on the track, and the direction into the hill. */
+export interface PortalSite {
+  x: number
+  y: number
+  z: number
+  /** Unit direction from the mouth into the hill, along the line's own extension. */
+  ox: number
+  oz: number
+  end: 0 | 1
+}
+
+/** The two portals, one at each end of the line. */
+export function portalSites(line: PlanLine): PortalSite[] {
+  const length = lineLength(line)
+  const a = pointAt(line, PORTAL_MOUTH)
+  const b = pointAt(line, length - PORTAL_MOUTH)
+  return [
+    { x: a.x, y: a.y, z: a.z, ox: -a.tx, oz: -a.tz, end: 0 },
+    { x: b.x, y: b.y, z: b.z, ox: b.tx, oz: b.tz, end: 1 },
+  ]
+}
+
+/** How far the mound's middle is from the mouth, and its clearing radius. */
+const MOUND_CENTRE = 3.2
+export const MOUND_CLEAR_RADIUS = 6
+
+/** Whether (x, z) is on a portal's mound, widened by `margin`. */
+export function portalOccupies(line: PlanLine, x: number, z: number, margin = 0): boolean {
+  return portalSites(line).some((p) =>
+    Math.hypot(x - (p.x + p.ox * MOUND_CENTRE), z - (p.z + p.oz * MOUND_CENTRE)) < MOUND_CLEAR_RADIUS + margin)
 }

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Vec2 } from '../geo/types'
 import type { ElevationProvider } from '../terrain/provider'
+import { pointInPolygon, distanceToRing, distanceToPolyline } from '../util/geometry'
 
 /** Sits just above the sampled bed, so it reads as water rather than mud. */
 const WATER_OFFSET = 0.15
@@ -24,6 +25,23 @@ const SPRING_OFFSET_MIN = 2
 const SPRING_OFFSET_MAX = 6
 
 export type WaterKind = 'pond' | 'stream'
+
+/**
+ * A test for whether a point is in or beside water — a pond's outline, or a
+ * stream's bed with a strip either side — with `margin` metres to spare. What
+ * the railway keeps clear of when it picks a route.
+ */
+export function wetTest(water: Vec2[][], margin = 1.5): (x: number, z: number) => boolean {
+  const ponds = water.filter((ring) => ring.length >= 3 && classifyWater(ring) === 'pond')
+  const streams = water.filter((ring) => ring.length >= 2 && classifyWater(ring) === 'stream')
+  return (x, z) => {
+    for (const ring of ponds) {
+      if (pointInPolygon(x, z, ring) || distanceToRing(x, z, ring) < margin) return true
+    }
+    for (const ring of streams) if (distanceToPolyline(x, z, ring) < STREAM_WIDTH / 2 + margin) return true
+    return false
+  }
+}
 
 /** Where a stream's surface lies over the bed at (x, z) — what the ribbon in
  *  `buildStreamMesh` is drawn at, so anything floating on a stream (a fish)

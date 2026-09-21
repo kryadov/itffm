@@ -92,17 +92,26 @@ today, each with real field marks, edibility and season.
   always the lit opening behind you. Sited on a real surveyed cave/adit/
   mineshaft mouth where one exists, or picked procedurally otherwise, so every
   wood has one.
-- A **railway** crossing the wood, with a short train — a diesel locomotive
-  (cab, exhaust stack puffing smoke, a headlight that switches on at night)
-  pulling two wagons, each its own colour, each with windows that glow amber
-  after dark, all of them riding on wheels set on the rails — shuttling back
-  and forth along its own line, stopping for a minute or two at each end like
-  a real train at a station rather than bouncing straight back. The whole train
-  stays on the track, wagons apart, at either end. Each end is a **station**:
-  a low platform along the whole stopped train, with a yellow edge line, a roofed
-  shelter on posts, a bench and a lamp that lights after dark. The platform is
-  a step you simply walk onto; the shelter's posts and the bench are solid, and
-  nothing grows there.
+- A **railway** winding through the wood: a narrow-gauge line with real bends
+  (it goes round ponds and streams rather than through them, keeps off steep
+  ground and away from the hut), straight at each end and curving between. It
+  starts and ends in a **tunnel portal** — a stone headwall with a dark mouth
+  under a grassy mound — so it plainly comes from somewhere and goes somewhere.
+  A long **train** runs on it: a diesel locomotive (a cab with windows on every
+  side, a bonnet, a yellow bumper and buffers, a grille, handrails, an exhaust
+  stack puffing smoke, a headlight that switches on at night) pulling five
+  wagons — coaches with rows of windows, a boxcar, a flatcar of logs — every
+  window glowing amber after dark, all on wheels that turn. It comes out of one
+  tunnel, brakes for the first platform, stands there a minute or so, runs on to
+  the second, stands, and drives into the far tunnel and out of sight for a while,
+  before it comes back the other way. Its cars follow the bends and the slope on
+  two axles each and **lean out of a curve**, and it nods under braking. It is
+  shown on the minimap as a yellow dot while it is out in the open.
+  Each end has a **station**: a long low platform along the whole standing train,
+  with a yellow edge line, a roofed shelter on posts, a bench and lamp posts that
+  light after dark. The platform is a step you simply walk onto; the shelter's
+  posts, the bench, the lamp posts and the tunnel mounds are solid, and nothing
+  grows there.
 - **Weather** (clear, rain, snow, fog) and a **day/night cycle** with a real
   sun and moon, changeable in settings or left on a self-running cycle.
 - A **self-running accelerated calendar**: the game clock runs faster than
@@ -115,7 +124,7 @@ today, each with real field marks, edibility and season.
 - Streams, ponds, waterfalls and springs, each animated, not a flat panel.
 - A **minimap** (opt-in in settings) and a scrolling **compass**. Once the
   minimap is on, it always marks the hut, the mine, the campfire and the
-  railway's two stops, and draws the railway line itself — never a single
+  railway's two stops, draws the railway line itself and shows where the train is — never a single
   mushroom. A second, separate opt-in also marks the four hidden
   quest items while they're still out there, for anyone who wants the hint
   instead of the search.
@@ -161,17 +170,17 @@ clustering in whichever one the dice happened to favour:
   the hut like the other four; you have to actually search the forks to find
   it. A many-faceted, asymmetric cut, not a plain gem, and it visibly
   brightens as you approach it with a lit lamp. It is not for the hut: you
-  give it to the **conductor** — `E` beside a car of the train while it stands
-  at a platform (with no train in, `E` at a platform says to wait) — and it
+  give it to the **conductor** — `E` anywhere on the platform beside the
+  train while it stands there (with no train in, `E` at a platform says to wait) — and it
   earns you the **quadcopter**. A returning save whose diamond already sat on
   the table gets it back in its pocket, to hand over. The empty drone box
   ends up on the hut's table once the quadcopter is yours.
 
 ### The quadcopter
 
-Once the diamond is with the conductor, the train pulls out, and the next time
-it stands at the **other** end of the line it leaves a wooden crate on the
-platform, by the shelter; `E` at the crate makes the quadcopter yours.
+Once the diamond is with the conductor, the train pulls out within moments, and
+when it stands at the **other** end of the line it leaves a wooden crate on the
+platform, toward one end of it (a visit later, the crate is simply there); `E` at the crate makes the quadcopter yours.
 
 `R` launches it, and the view is **from the quadcopter** — the screen shows its
 own camera, a crosshair, and at the bottom its height above the ground, its

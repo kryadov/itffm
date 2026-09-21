@@ -5,6 +5,20 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.101.0
+The railway is rebuilt. The line now winds through the wood instead of running
+straight — it goes round water, off steep ground and away from the hut — and
+starts and ends in a tunnel portal, so the train visibly comes out of one hillside
+and goes into another. The train is longer (a locomotive and five wagons: coaches,
+a boxcar, a log flatcar), the platforms are as long as the train, the cars follow
+the bends and slope, lean out of curves and nod under braking, wheels turn, and the
+train shows on the minimap. The locomotive is redrawn with windows, a bumper,
+buffers, a grille and handrails. It stops at both platforms each way, so it is at
+either one often. The quadcopter crate no longer waits for the train to happen to
+be seen: the train leaves shortly after the diamond is handed over, and a crate
+ordered in an earlier visit is already on the platform. The diamond can be handed
+over anywhere on the platform beside the train.
+
 ## v0.100.1
 The front wheel of the bicycle in your hands now turns with the speed you ride, so
 you can see it: it is raised into the frame, the tyre is wider with a chunky

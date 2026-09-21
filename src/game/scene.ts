@@ -31,10 +31,12 @@ import { placeMine, mineObstacles, diamondSpotInMine, type Mine } from '../world
 import { createMineTerrain } from '../world/mineTerrain'
 import { buildMineMesh, setMineLighting, clearScatterOnMine } from '../world/mineMesh'
 import {
-  placeRailLine, buildRailMesh, createTrain, stationsFor, stationOccupies, RAIL_SEED_OFFSET,
-  type RailLine, type Train, type Station,
+  placeRailLine, buildRailMesh, stationsFor, stationOccupies, portalOccupies, RAIL_SEED_OFFSET,
+  type RailLine, type Station,
 } from '../world/railway'
 import { buildStationMesh, stationCrateSpot } from '../world/station'
+import { createTrain, type Train } from '../world/train'
+import { buildPortalMesh } from '../world/portal'
 import { buildDroneCrate } from '../world/droneCrate'
 import { buildSky } from '../world/sky'
 import { sampleDayNight, sunElevation, nightFactor } from '../world/daynight'
@@ -44,7 +46,7 @@ import { buildClouds } from '../world/clouds'
 import { buildWeather, type Weather } from '../world/weather'
 import { buildPathMeshes } from '../world/paths'
 import {
-  buildWaterMeshes, placeSprings, buildSpringMeshes, classifyWater, waterLevel, waterObstacles,
+  buildWaterMeshes, placeSprings, buildSpringMeshes, classifyWater, waterLevel, waterObstacles, wetTest,
 } from '../world/water'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
@@ -144,9 +146,14 @@ export interface Forest {
   stations: Station[]
   /** The railway's line, for the minimap. */
   railPoints: { x: number; z: number }[]
+  railLine: RailLine
   /** While the train stands at a station: which end (0 west, 1 east) and where
    *  each car is, world x and z; otherwise null. */
   trainStopped: () => { end: 0 | 1; cars: { x: number; z: number }[] } | null
+  /** Where the locomotive is, or null while the train is out of sight in a tunnel. */
+  trainLocomotive: () => { x: number; z: number } | null
+  /** Have the train standing at a platform leave shortly. */
+  trainDepartSoon: () => void
   /** Puts the quadcopter's crate on the platform at that end of the line, or
    *  takes it away (null). */
   setDroneCrate: (end: 0 | 1 | null) => void
@@ -389,8 +396,11 @@ export function createForest(
   // A narrow-gauge line and a small train shuttling along it — the lowest-
   // priority TODO item, a live request ported from race-the-city's own
   // idea, not its city-scale code (see world/railway.ts's own doc comment).
-  const railLine = source.railLine ?? placeRailLine(source.ground, halfSize, seed + RAIL_SEED_OFFSET)
+  const railLine = source.railLine ?? placeRailLine(source.ground, halfSize, seed + RAIL_SEED_OFFSET, wetTest(source.water ?? []))
   scene.add(buildRailMesh(railLine))
+  // Where the rails come from and go: a tunnel portal into a hillside at each end.
+  const portals = buildPortalMesh(railLine)
+  scene.add(portals.group)
   const train = createTrain(scene, railLine, seed + 30)
   trainFx = train
   // A platform and a shelter at each end of the line, where the train dwells.
@@ -542,7 +552,7 @@ export function createForest(
   // The stations' platforms are kept clear the same way (a shelter and a bench
   // stand there): "reserved" is either.
   const reserved = (x: number, z: number, margin = 0): boolean =>
-    mineTerrain.occupies(x, z, margin) || stationOccupies(stations, x, z, margin)
+    mineTerrain.occupies(x, z, margin) || stationOccupies(stations, x, z, margin) || portalOccupies(railLine, x, z, margin)
   for (const child of scene.children) {
     if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) clearScatterOnMine(child, (x, z) => reserved(x, z))
   }
@@ -552,7 +562,7 @@ export function createForest(
     }
   }
   const woodTrees = source.trees.filter((tr) => !reserved(tr.x, tr.z, tr.radius))
-  extraObstacles.push(...mineObstacles(mine, mineTerrain.deckRadius), ...stationFx.obstacles)
+  extraObstacles.push(...mineObstacles(mine, mineTerrain.deckRadius), ...stationFx.obstacles, ...portals.obstacles)
   // Whether the player is in the tunnels is a state of the walk in (through the
   // doorway) and out again, not a function of where they stand — the hill
   // above a tunnel is over the same x/z. This is called every frame with the
@@ -682,8 +692,10 @@ export function createForest(
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     campfire: { x: campfire.x, z: campfire.z },
     mine: { x: mine.x, z: mine.z },
-    stations, railPoints: railLine.points.map((p) => ({ x: p.x, z: p.z })),
+    stations, railPoints: railLine.points.map((p) => ({ x: p.x, z: p.z })), railLine,
     trainStopped: () => train.stopped(),
+    trainLocomotive: () => train.locomotive(),
+    trainDepartSoon: () => train.departSoon(),
     setDroneCrate: (end: 0 | 1 | null) => {
       droneCrate.visible = end !== null
       if (end !== null) droneCrate.position.set(crateSpots[end].x, crateSpots[end].y, crateSpots[end].z)

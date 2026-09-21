@@ -1,5 +1,5 @@
 import { regionalMix, placeOsmTrees } from '../../src/world/osmTrees'
-import { stationsFor, stationOccupies } from '../../src/world/railway'
+import { stationsFor, stationOccupies, portalOccupies } from '../../src/world/railway'
 import { isClearing } from '../../src/world/clearings'
 import type { WorldData } from '../../src/geo/types'
 import type { ElevationProvider } from '../../src/terrain/provider'
@@ -175,5 +175,14 @@ describe('placeOsmTrees', () => {
       }
     }
     expect(checked).toBeGreaterThan(0)
+  })
+
+  it("keeps the mounds of the line's two tunnel portals clear as well", () => {
+    const pts = [-60, -30, 0, 30, 60].map((x) => ({ x, z: 20, y: 0 }))
+    const railLine = { points: pts }
+    for (const seed of [1, 2, 3]) {
+      const trees = placeOsmTrees(world, flat, 55, seed, 60, railLine)
+      for (const t of trees) expect(portalOccupies(railLine, t.x, t.z, 0)).toBe(false)
+    }
   })
 })

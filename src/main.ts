@@ -46,7 +46,7 @@ import {
 } from './game/drone'
 import { buildPilotFigure, buildPilotBeacon } from './world/pilotFigure'
 import { createDroneHud } from './ui/droneHud'
-import { stationOccupies } from './world/railway'
+import { stationOccupies, stationToWorld, portalSites } from './world/railway'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 import { placeQuestItems, type QuestObstacle } from './quest/placement'
 import { interact } from './quest/state'
@@ -65,7 +65,7 @@ declare global {
   // picker and the network entirely and goes straight to the offline demo
   // wood, so the check never depends on Overpass, Nominatim or tile servers
   // being reachable from wherever it runs.
-  interface Window { __READY?: boolean; __BOOTCHECK?: boolean }
+  interface Window { __READY?: boolean; __BOOTCHECK?: boolean; __trainAt?: (end: 0 | 1) => void }
 }
 
 // PWA: an icon on the home screen and a wood that still opens with no signal
@@ -121,6 +121,13 @@ const DAY_LENGTH_SECONDS = 600
  *  as anything else the wood already seeds). Each item then derives its own
  *  seed from this one (see quest/placement.ts's placeQuestItems). */
 const QUEST_SEED_OFFSET = 31
+/** How far from the line of a standing train, metres, the diamond can still be handed over:
+ *  the whole width of a platform. */
+const TRAIN_HANDIN_REACH = 3.2
+
+/** The train's dot on the minimap. */
+const TRAIN_MARKER_COLOR = '#ffd45a'
+
 /** Fixed landmark colors — shelter keeps the minimap's original amber
  *  unchanged, mine and campfire get their own so the three are never
  *  confused for each other or for a quest-item hint. */
@@ -381,7 +388,7 @@ async function main(): Promise<void> {
     { position: forest.campfire, color: LANDMARK_COLOR.campfire },
     // Each station: the middle of its platform.
     ...forest.stations.map((s) => ({
-      position: { x: (s.x0 + s.x1) / 2, z: s.z + s.side * 1.8 },
+      position: stationToWorld(s, 0, 1.8),
       color: LANDMARK_COLOR.station,
     })),
   ]
@@ -491,8 +498,35 @@ async function main(): Promise<void> {
     if (q.has('debug')) {
       const tp = q.get('tp')?.split(',').map(Number)
       if (tp && tp.length === 2 && tp.every(Number.isFinite)) player = { ...player, x: tp[0], z: tp[1] }
+      // tp=station0 / tp=station1: on that platform, facing the track.
+      const stationTp = /^station([01])$/.exec(q.get('tp') ?? '')
+      if (stationTp) {
+        const st = forest.stations[Number(stationTp[1])]
+        const back = Number(q.get('back')) || 0 // metres further from the track, for a view of the whole train
+        const at = stationToWorld(st, Number(q.get('along')) || 0, 1.8 + back)
+        // Facing across the track: yaw so that -z (the camera's forward at yaw 0) turns to the track side.
+        const towardTrack = { x: st.cx - at.x, z: st.cz - at.z }
+        player = { ...player, x: at.x, z: at.z, yaw: Math.atan2(-towardTrack.x, -towardTrack.z) }
+      }
+      // tp=portal0 / tp=portal1: 4 m (plus back=) in front of that tunnel mouth, facing it.
+      const portalTp = /^portal([01])$/.exec(q.get('tp') ?? '')
+      if (portalTp) {
+        const site = portalSites(forest.railLine)[Number(portalTp[1])]
+        player = { ...player, x: site.x - site.ox * (4 + (Number(q.get('back')) || 0)), z: site.z - site.oz * (4 + (Number(q.get('back')) || 0)), yaw: Math.atan2(-site.ox, -site.oz) }
+      }
+      const yawDeg = Number(q.get('yaw'))
+      if (q.has('yaw') && Number.isFinite(yawDeg)) player = { ...player, yaw: (yawDeg * Math.PI) / 180 }
       const ahead = Number(q.get('train'))
       if (Number.isFinite(ahead) && ahead > 0) for (let i = 0; i < Math.min(ahead, 6000); i++) forest.updateTrain(1)
+      // window.__trainAt(end) does the same on demand, for a test driving the built game.
+      window.__trainAt = (end) => {
+        for (let i = 0; i < 6000 && forest.trainStopped()?.end !== end; i++) forest.updateTrain(1)
+      }
+      // trainAt=0|1: run the train until it stands at that platform.
+      const trainAt = q.get('trainAt')
+      if (trainAt === '0' || trainAt === '1') {
+        for (let i = 0; i < 6000 && forest.trainStopped()?.end !== Number(trainAt); i++) forest.updateTrain(1)
+      }
     }
   }
   let aimed: THREE.Object3D | null = null
@@ -580,6 +614,13 @@ async function main(): Promise<void> {
   }
   // Where the quadcopter is in its story: the crate on its platform, or the
   // empty box on the hut's table.
+  // An order placed in an earlier visit has long since been delivered: the train
+  // was not there to be watched, but the crate is.
+  if (droneOrder?.stage === 'ordered') {
+    droneOrder = { ...droneOrder, stage: 'crate' }
+    save = { ...save, drone: droneOrder }
+    void persistSave(save)
+  }
   if (droneOrder?.stage === 'crate') forest.setDroneCrate(droneOrder.crateEnd)
   if (droneOrder?.stage === 'owned') forest.setDroneBoxPlaced(true)
 
@@ -590,16 +631,26 @@ async function main(): Promise<void> {
   function trainHandIn(): { x: number; z: number } | null {
     const stopped = forest.trainStopped()
     if (!stopped) return null
-    let best = stopped.cars[0]
+    // Along the whole standing train, not a car's centre: anyone on the platform
+    // beside any of it can hand the diamond over.
+    let best = { x: stopped.cars[0].x, z: stopped.cars[0].z }
     let bestD = Infinity
-    for (const c of stopped.cars) {
-      const d = Math.hypot(c.x - player.x, c.z - player.z)
+    for (let i = 0; i < stopped.cars.length - 1; i++) {
+      const a = stopped.cars[i]
+      const b = stopped.cars[i + 1]
+      const dx = b.x - a.x
+      const dz = b.z - a.z
+      const len2 = dx * dx + dz * dz || 1
+      const t = Math.max(0, Math.min(1, ((player.x - a.x) * dx + (player.z - a.z) * dz) / len2))
+      const p = { x: a.x + dx * t, z: a.z + dz * t }
+      const d = Math.hypot(p.x - player.x, p.z - player.z)
       if (d < bestD) {
         bestD = d
-        best = c
+        best = p
       }
     }
-    return best
+    // Anywhere on the platform beside the train counts as beside it.
+    return bestD <= TRAIN_HANDIN_REACH ? { x: player.x, z: player.z } : best
   }
 
   /**
@@ -653,6 +704,8 @@ async function main(): Promise<void> {
           const stopped = forest.trainStopped()
           droneOrder = { stage: 'ordered', crateEnd: stopped && stopped.end === 1 ? 0 : 1 }
           save = { ...save, drone: droneOrder }
+          // The train takes the parcel and pulls out shortly, for the other end.
+          forest.trainDepartSoon()
         } else if (id === 'bike' && bikeDrop) {
           save = { ...save, bikeSpot: bikeDrop.spot }
           forest.setBikePlaced(true, bikeDrop.spot)
@@ -1422,7 +1475,11 @@ async function main(): Promise<void> {
     compass.update(viewYaw)
     updateQuestHud()
     if (save.prefs.minimap) {
-      minimap.setMarkers(buildMinimapMarkers(landmarks, quests, save.prefs.minimapQuestHints, QUEST_MARKER_COLOR))
+      const markers = buildMinimapMarkers(landmarks, quests, save.prefs.minimapQuestHints, QUEST_MARKER_COLOR)
+      // The train, while it is out of its tunnels: where it is, and so where it is going.
+      const loco = forest.trainLocomotive()
+      if (loco) markers.push({ position: loco, color: TRAIN_MARKER_COLOR })
+      minimap.setMarkers(markers)
       minimap.update({ x: focusX, z: focusZ, heading: headingFromYaw(viewYaw) })
     }
     if (save.prefs.timeMode === 'cycle') cycleT = (cycleT + dt / DAY_LENGTH_SECONDS) % 1

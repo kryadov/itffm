@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { ElevationProvider } from '../terrain/provider'
 import {
-  railHeightAt, STATION_PLATFORM_GAP, STATION_PLATFORM_WIDTH, STATION_PLATFORM_HEIGHT,
+  railHeightAt, stationToWorld, yawOf, STATION_PLATFORM_GAP, STATION_PLATFORM_WIDTH, STATION_PLATFORM_HEIGHT,
   type RailLine, type Station,
 } from './railway'
 
@@ -55,16 +55,21 @@ export function buildStationMesh(
   stations.forEach((s, index) => {
     const st = new THREE.Group()
     st.name = 'station'
-    const nearZ = s.z + s.side * STATION_PLATFORM_GAP
-    const farZ = s.z + s.side * (STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH)
+    // Everything below is in the station's own frame: x along the track from the
+    // platform's middle, z across it (the platform on the side it lies), y absolute.
+    st.position.set(s.cx, 0, s.cz)
+    st.rotation.y = yawOf(s.tx, s.tz)
+    const sMid = (s.s0 + s.s1) / 2
+    const nearZ = s.side * STATION_PLATFORM_GAP
+    const farZ = s.side * (STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH)
     const midZ = (nearZ + farZ) / 2
-    const topAt = (x: number): number => railHeightAt(line, x) + STATION_PLATFORM_HEIGHT
+    const topAt = (u: number): number => railHeightAt(line, sMid + u) + STATION_PLATFORM_HEIGHT
 
     // ---- the slab, in one-metre pieces each at its own height
     const slabs: THREE.BufferGeometry[] = []
     const edges: THREE.BufferGeometry[] = []
-    for (let xs = s.x0; xs < s.x1 - 1e-9; xs += SLAB_STEP) {
-      const xe = Math.min(s.x1, xs + SLAB_STEP)
+    for (let xs = -s.half; xs < s.half - 1e-9; xs += SLAB_STEP) {
+      const xe = Math.min(s.half, xs + SLAB_STEP)
       const top = topAt((xs + xe) / 2)
       const box = new THREE.BoxGeometry(xe - xs, SLAB_DEPTH, STATION_PLATFORM_WIDTH)
       box.translate((xs + xe) / 2, top - SLAB_DEPTH / 2, midZ)
@@ -81,8 +86,8 @@ export function buildStationMesh(
     st.add(edge)
 
     // ---- the shelter: a roof on four posts along the back of the platform
-    const midX = (s.x0 + s.x1) / 2
-    const roofLength = Math.min(ROOF_LENGTH, s.x1 - s.x0 - 1.5)
+    const midX = 0
+    const roofLength = Math.min(ROOF_LENGTH, 2 * s.half - 1.5)
     const topMid = topAt(midX)
     const canopy = new THREE.Group()
     canopy.name = 'canopy'
@@ -104,7 +109,7 @@ export function buildStationMesh(
         const post = new THREE.Mesh(new THREE.CylinderGeometry(POST_RADIUS, POST_RADIUS, ROOF_HEIGHT, 8), postMat)
         post.position.set(px, topAt(px) + ROOF_HEIGHT / 2, pz)
         canopy.add(post)
-        obstacles.push({ x: px, z: pz, radius: POST_OBSTACLE })
+        obstacles.push({ ...stationToWorld(s, px, pz * s.side), radius: POST_OBSTACLE })
       }
     }
     st.add(canopy)
@@ -124,12 +129,24 @@ export function buildStationMesh(
     }
     bench.position.set(midX, topMid, backZ - s.side * 0.35)
     st.add(bench)
-    obstacles.push({ x: midX, z: backZ - s.side * 0.35, radius: 0.45 })
+    obstacles.push({ ...stationToWorld(s, midX, (backZ - s.side * 0.35) * s.side), radius: 0.45 })
 
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), lampMat)
     lamp.name = 'lamp'
     lamp.position.set(midX, topMid + ROOF_HEIGHT - 0.22, (backZ + frontZ) / 2)
     st.add(lamp)
+
+    // ---- lamp posts toward both ends of the long platform, on its back edge
+    for (const u of [-(s.half - 1.4), s.half - 1.4]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.06, 2.2, 8), postMat)
+      post.position.set(u, topAt(u) + 1.1, backZ)
+      st.add(post)
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), lampMat)
+      bulb.name = 'lamp'
+      bulb.position.set(u, topAt(u) + 2.26, backZ - s.side * 0.02)
+      st.add(bulb)
+      obstacles.push({ ...stationToWorld(s, u, backZ * s.side), radius: 0.2 })
+    }
 
     group.add(st)
   })
@@ -150,11 +167,11 @@ export function buildStationMesh(
 }
 
 /**
- * Where the crate the train leaves stands on a station's platform: beyond the
- * shelter's roof and its bench, on the slab, at its top. In world metres.
+ * Where the crate the train leaves stands on a station's platform: toward one end
+ * of it, past the shelter's roof and its bench, on the slab, at its top. In world metres.
  */
 export function stationCrateSpot(line: RailLine, s: Station): { x: number; y: number; z: number } {
-  const x = (s.x0 + s.x1) / 2 + 3.6
-  const z = s.z + s.side * (STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH / 2)
-  return { x, y: railHeightAt(line, x) + STATION_PLATFORM_HEIGHT, z }
+  const u = 5.6
+  const { x, z } = stationToWorld(s, u, STATION_PLATFORM_GAP + STATION_PLATFORM_WIDTH / 2)
+  return { x, y: railHeightAt(line, (s.s0 + s.s1) / 2 + u) + STATION_PLATFORM_HEIGHT, z }
 }
