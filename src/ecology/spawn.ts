@@ -26,14 +26,14 @@ export interface SpawnContext {
   daysSinceRain: number
 }
 
-const FREQUENCY_WEIGHT: Record<Frequency, number> = {
+export const FREQUENCY_WEIGHT: Record<Frequency, number> = {
   common: 1,
   occasional: 0.4,
   rare: 0.12,
 }
 
 /** How many fruiting bodies one colony puts up. */
-const COLONY_SIZE: Record<Gregarious, [number, number]> = {
+export const COLONY_SIZE: Record<Gregarious, [number, number]> = {
   solitary: [1, 1],
   scattered: [1, 3],
   troops: [3, 8],
@@ -42,7 +42,7 @@ const COLONY_SIZE: Record<Gregarious, [number, number]> = {
 }
 
 /** How tightly a colony's fruiting bodies crowd together, metres. */
-const COLONY_SPREAD: Record<Gregarious, number> = {
+export const COLONY_SPREAD: Record<Gregarious, number> = {
   solitary: 0,
   scattered: 1.6,
   troops: 1.2,
@@ -62,7 +62,7 @@ const OCCUPANCY = 0.12
  *  the depths of winter). A steep but nonzero weight keeps mushrooms
  *  showing up every month, just far more of them, and far more often, in
  *  their real season. */
-const OFF_SEASON_WEIGHT = 0.08
+export const OFF_SEASON_WEIGHT = 0.08
 
 /**
  * How well this species suits this site. Zero means impossible.
@@ -75,6 +75,10 @@ const OFF_SEASON_WEIGHT = 0.08
  * them which tree to look under and which hollow to check.
  */
 export function speciesScore(species: Species, site: Site, ctx: SpawnContext): number {
+  // Fish live in the water, not on a wet bank: they never grow at a land site
+  // (a live report, 2026-09-20: a roach lying on the meadow). `world/fishSpawn.ts`
+  // places them in the ponds and streams themselves.
+  if (species.kind === 'fish') return 0
   const eco = species.ecology
   if (!eco.biomes.includes(site.biome)) return 0
   if (eco.substrate !== site.substrate) return 0

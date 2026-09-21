@@ -15,7 +15,7 @@ const STREAM_ASPECT = 3
 /** How wide a mapped stream reads on screen, metres — real width varies far
  *  more than a demo wood's OSM data ever specifies, so this is a fixed,
  *  modest brook rather than a guess at any one real channel. */
-const STREAM_WIDTH = 1.2
+export const STREAM_WIDTH = 1.2
 /** Horizontal drop a stream must make between two consecutive points to read
  *  as a waterfall rather than an ordinary sloped run. */
 const WATERFALL_DROP = 1.4
@@ -24,6 +24,13 @@ const SPRING_OFFSET_MIN = 2
 const SPRING_OFFSET_MAX = 6
 
 export type WaterKind = 'pond' | 'stream'
+
+/** Where a stream's surface lies over the bed at (x, z) — what the ribbon in
+ *  `buildStreamMesh` is drawn at, so anything floating on a stream (a fish)
+ *  rides the same surface. */
+export function streamSurfaceAt(ground: ElevationProvider, x: number, z: number): number {
+  return ground.heightAt(x, z) + WATER_OFFSET * 0.4
+}
 
 /** Structurally identical to game/player.ts's Obstacle (a plain circle) —
  *  see the same note in world/deadwood.ts and world/boulders.ts. Kept local
@@ -163,8 +170,8 @@ function buildStreamMesh(
     const len = Math.hypot(dx, dz) || 1
     const nx = -dz / len
     const nz = dx / len
-    const levelP = ground.heightAt(p.x, p.z) + WATER_OFFSET * 0.4
-    const levelQ = ground.heightAt(q.x, q.z) + WATER_OFFSET * 0.4
+    const levelP = streamSurfaceAt(ground, p.x, p.z)
+    const levelQ = streamSurfaceAt(ground, q.x, q.z)
     const p1 = [p.x + nx * half, levelP, p.z + nz * half]
     const p2 = [p.x - nx * half, levelP, p.z - nz * half]
     const q1 = [q.x + nx * half, levelQ, q.z + nz * half]

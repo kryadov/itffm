@@ -22,7 +22,7 @@ import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import {
   placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, interiorObstacles, doorPosition,
-  nearestBikeSpot, type ShelterFx, type BikeSpot,
+  nearestBikeSpot, rodSpotWorld, bikeSpotWorld, insideHut as insideHutAt, type ShelterFx, type BikeSpot,
 } from '../world/shelter'
 import { collectScatterCullers, sweepAll, STATIC_SCATTER_GROUP_NAMES } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
@@ -43,6 +43,7 @@ import {
 } from '../world/water'
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
+import { spawnFish } from '../world/fishSpawn'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies } from '../species/load'
 import { buildPlacementObject } from '../collectible/placement'
@@ -179,6 +180,12 @@ export interface Forest {
    *  the hut's outline that is (for a range check) — where a bicycle handed
    *  over from `p` would be left. */
   bikeSpotNear: (p: { x: number; z: number }) => { spot: BikeSpot; point: { x: number; z: number } }
+  /** Where a delivered rod or bicycle waits at the hut (the bicycle wherever
+   *  `bikeSpot` says it was left), in world metres — the place to walk to and
+   *  press `E` to take it again. */
+  homeSpot: (id: 'rod' | 'bike', bikeSpot?: BikeSpot) => { x: number; z: number }
+  /** Whether (x, z) is on the hut's floor. */
+  insideHut: (x: number, z: number) => boolean
   /** Drifts the shelter's chimney smoke — call every frame. */
   updateShelter: (dt: number) => void
   /** Drifts the campfire's smoke and flickers its embers — call every frame. */
@@ -590,10 +597,12 @@ export function createForest(
     source.water ?? [],
   )
   const month = gameMonth(gameDays)
+  const allSpecies = loadSpecies()
+  const spawnCtx = { month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays) }
   // Nothing grows on the mine's rock mound or its levelled doorstep.
-  const placements = spawnMushrooms(loadSpecies(), sites, {
-    month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays),
-  }).filter((p) => !mineTerrain.occupies(p.x, p.z))
+  const placements = spawnMushrooms(allSpecies, sites, spawnCtx).filter((p) => !mineTerrain.occupies(p.x, p.z))
+  // Fish are not sites on the land at all: they swim in the wood's own water.
+  placements.push(...spawnFish(allSpecies, source.water ?? [], source.ground, spawnCtx))
 
   for (const marker of fairyRingMarkers(placements)) {
     scene.add(buildFairyRingMesh(marker, staticGround))
@@ -646,6 +655,9 @@ export function createForest(
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
     setBikePlaced: (on: boolean, spot?: BikeSpot) => shelterFx!.setBikePlaced(on, spot),
     bikeSpotNear: (p: { x: number; z: number }) => nearestBikeSpot(shelter, p),
+    homeSpot: (id: 'rod' | 'bike', bikeSpot?: BikeSpot) =>
+      id === 'rod' ? rodSpotWorld(shelter) : bikeSpotWorld(shelter, bikeSpot),
+    insideHut: (x: number, z: number) => insideHutAt(shelter, x, z),
     updateShelter, updateCampfire, updateBirds,
     birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
     updateMushroomLod, pendingPlacements, buildPlacements, updateScatterCulling,

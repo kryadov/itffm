@@ -11,6 +11,12 @@ export type QuestItemId = 'axe' | 'lamp' | 'rod' | 'bike' | 'diamond'
 
 export const QUEST_ITEM_IDS: QuestItemId[] = ['axe', 'lamp', 'rod', 'bike', 'diamond']
 
+/** The items you use while you carry them, and so go back to the hut for once
+ *  they are delivered: a delivered one waits at a spot there and can be taken
+ *  again (see `quest/state.ts`'s `tryTake`). The others — hatchet and lamp
+ *  (unlocked for good once delivered) and the diamond (a trophy) — cannot. */
+export const RETRIEVABLE_ITEM_IDS: QuestItemId[] = ['rod', 'bike']
+
 /** One `Quest` per item id — the caller's own record; `quest/state.ts`'s
  *  `tryPickUp`/`tryDeliver` still operate on a single `Quest` at a time. */
 export type Quests = Record<QuestItemId, Quest>

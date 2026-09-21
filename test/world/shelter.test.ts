@@ -13,6 +13,10 @@ import {
   DOOR_WIDTH,
   nearestBikeSpot,
   bikeSpotLocal,
+  DEFAULT_BIKE_SPOT,
+  rodSpotWorld,
+  bikeSpotWorld,
+  insideHut,
   type ShelterWall,
 } from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
@@ -536,5 +540,54 @@ describe('buildShelterMesh — quest trophies', () => {
     expect(Math.abs(bike.position.z) > DEPTH / 2 || Math.abs(bike.position.x) > 1.8).toBe(true)
     const box = new THREE.Box3().setFromObject(bike)
     expect(box.max.z < -DEPTH / 2 ? box.min.x > DOOR_WIDTH / 2 || box.max.x < -DOOR_WIDTH / 2 : true).toBe(true)
+  })
+})
+
+describe('where the rod and the bicycle wait at home', () => {
+  const huts = [
+    { x: 0, z: 0, y: 0, rotationY: 0 },
+    { x: 12, z: -7, y: 1, rotationY: 1.1 },
+    { x: -30, z: 20, y: 0, rotationY: 4.0 },
+  ]
+
+  it.each(huts)('is where the rod actually stands in the hut, whichever way it faces: %o', (hut) => {
+    const { group } = buildShelterMesh(hut)
+    group.updateMatrixWorld(true)
+    const at = group.getObjectByName('rod')!.getWorldPosition(new THREE.Vector3())
+    const spot = rodSpotWorld(hut)
+    expect(spot.x).toBeCloseTo(at.x, 5)
+    expect(spot.z).toBeCloseTo(at.z, 5)
+  })
+
+  it.each(huts)('is where the bicycle actually stands, at each wall: %o', (hut) => {
+    for (const wall of ['front', 'back', 'left', 'right'] as const) {
+      const { group, setBikePlaced } = buildShelterMesh(hut)
+      const bikeSpot = { wall, along: 0.3 }
+      setBikePlaced(true, bikeSpot)
+      group.updateMatrixWorld(true)
+      const at = group.getObjectByName('bike')!.getWorldPosition(new THREE.Vector3())
+      const spot = bikeSpotWorld(hut, bikeSpot)
+      expect(spot.x).toBeCloseTo(at.x, 5)
+      expect(spot.z).toBeCloseTo(at.z, 5)
+    }
+  })
+
+  it('uses the default wall when none was chosen yet', () => {
+    expect(bikeSpotWorld(huts[1])).toEqual(bikeSpotWorld(huts[1], DEFAULT_BIKE_SPOT))
+  })
+
+  it.each(huts)('puts the rod inside the hut and the bicycle outside it: %o', (hut) => {
+    expect(insideHut(hut, rodSpotWorld(hut).x, rodSpotWorld(hut).z)).toBe(true)
+    for (const wall of ['front', 'back', 'left', 'right'] as const) {
+      const b = bikeSpotWorld(hut, { wall, along: 0 })
+      expect(insideHut(hut, b.x, b.z)).toBe(false)
+    }
+  })
+
+  it('knows the hut floor from its outside, rotated or not', () => {
+    const hut = { x: 5, z: 5, y: 0, rotationY: 0.7 }
+    expect(insideHut(hut, 5, 5)).toBe(true)
+    expect(insideHut(hut, 5 + 6, 5)).toBe(false)
+    expect(insideHut(hut, 5, 5 + 6)).toBe(false)
   })
 })

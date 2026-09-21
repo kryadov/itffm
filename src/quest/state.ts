@@ -43,3 +43,43 @@ export function tryDeliver(
   if (distance2D(playerPos, shelterDoor) > range) return quest
   return { ...quest, state: 'done' }
 }
+
+/**
+ * Takes a delivered item back into your hands: `done` -> `carrying` once the
+ * player is at the spot in the hut where it was left. Only some items have such
+ * a spot (the fishing rod and the bicycle — the ones you use while carrying,
+ * and go back for); the caller knows which. A no-op in any other state or out
+ * of range, same as the other transitions.
+ */
+export function tryTake(
+  quest: Quest,
+  playerPos: { x: number; z: number },
+  homeSpot: { x: number; z: number },
+  range: number,
+): Quest {
+  if (quest.state !== 'done') return quest
+  if (distance2D(playerPos, homeSpot) > range) return quest
+  return { ...quest, state: 'carrying' }
+}
+
+/**
+ * One press of `E` for one item: at most ONE transition, whichever fits where
+ * the item is now — pick it up if it lies out in the wood, deliver it if you
+ * carry it, take it back if it waits at home. Deliberately never two in a row:
+ * standing at the hut, taking the rod and putting it straight back down again
+ * in the same press would look like nothing happened.
+ *
+ * @param spots where a carried item is handed in, and (null for an item that
+ *   cannot be taken back — the hatchet, the lamp, the diamond) where a delivered
+ *   one waits
+ */
+export function interact(
+  quest: Quest,
+  playerPos: { x: number; z: number },
+  spots: { deliverAt: { x: number; z: number }; takeFrom: { x: number; z: number } | null },
+  range: number,
+): Quest {
+  if (quest.state === 'pending') return tryPickUp(quest, playerPos, range)
+  if (quest.state === 'carrying') return tryDeliver(quest, playerPos, spots.deliverAt, range)
+  return spots.takeFrom ? tryTake(quest, playerPos, spots.takeFrom, range) : quest
+}

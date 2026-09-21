@@ -3,7 +3,6 @@ import {
   eyeHeight,
   cameraBob,
   biomeSpeedFactor,
-  bikeSpeedFactor,
   ridingSpeedFactor,
   type PlayerState,
   type PlayerInput,
@@ -27,24 +26,6 @@ describe('biomeSpeedFactor', () => {
     expect(biomeSpeedFactor('forest-mixed')).toBe(1)
     expect(biomeSpeedFactor('dunes-coast')).toBe(1)
     expect(biomeSpeedFactor('meadow-scrub')).toBe(1)
-  })
-})
-
-describe('bikeSpeedFactor', () => {
-  it('is neutral without the bike owned, even right on a path', () => {
-    expect(bikeSpeedFactor(false, 0, 0.6)).toBe(1)
-  })
-
-  it('is neutral owned but off any path', () => {
-    expect(bikeSpeedFactor(true, 5, 0.6)).toBe(1)
-  })
-
-  it('speeds up only when owned AND on a path', () => {
-    expect(bikeSpeedFactor(true, 0.3, 0.6)).toBeGreaterThan(1)
-  })
-
-  it('treats exactly the path\'s own half-width as still on it', () => {
-    expect(bikeSpeedFactor(true, 0.6, 0.6)).toBeGreaterThan(1)
   })
 })
 
@@ -300,22 +281,14 @@ describe('stepPlayer', () => {
 
 describe('ridingSpeedFactor', () => {
   // A live report (2026-09-20): with the bicycle in your hands the view showed
-  // its handlebar, but you moved at walking pace.
-  it('is neutral when not riding, wherever you are', () => {
-    expect(ridingSpeedFactor(false, 0, 0.6)).toBe(1)
-    expect(ridingSpeedFactor(false, 50, 0.6)).toBe(1)
+  // its handlebar, but you moved at walking pace. The owner then chose 1.6x,
+  // everywhere (2026-09-21) — path or no path — and only while riding it.
+  it('is neutral when you are not riding', () => {
+    expect(ridingSpeedFactor(false)).toBe(1)
   })
 
-  it('is faster on a path than off it, and faster than walking either way', () => {
-    const onPath = ridingSpeedFactor(true, 0.3, 0.6)
-    const offPath = ridingSpeedFactor(true, 5, 0.6)
-    expect(offPath).toBeGreaterThan(1)
-    expect(onPath).toBeGreaterThan(offPath)
-  })
-
-  it('treats the path edge as on the path, the same rule as the parked bike', () => {
-    expect(ridingSpeedFactor(true, 0.6, 0.6)).toBe(ridingSpeedFactor(true, 0, 0.6))
-    expect(ridingSpeedFactor(true, 0.6, 0.6)).toBe(bikeSpeedFactor(true, 0.6, 0.6))
+  it('is 1.6x while riding, wherever you are', () => {
+    expect(ridingSpeedFactor(true)).toBe(1.6)
   })
 })
 

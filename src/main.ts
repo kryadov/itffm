@@ -12,10 +12,9 @@ import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
 import { distanceToRing } from './util/geometry'
 import {
-  stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, bikeSpeedFactor, ridingSpeedFactor, type PlayerState,
+  stepPlayer, eyeHeight, cameraBob, biomeSpeedFactor, ridingSpeedFactor, type PlayerState,
   type Obstacle,
 } from './game/player'
-import { distanceToNearestPath, HALF_WIDTH as PATH_HALF_WIDTH } from './world/paths'
 import { chooseStartPose } from './game/startPose'
 import { createBasket, nearestInView, nearestScrubInView, canPick, debugRaycastHits } from './game/pick'
 import type { Placement } from './ecology/spawn'
@@ -43,7 +42,7 @@ import {
 } from './save/store'
 import { setLang, getLang, t, speciesName } from './i18n/i18n'
 import { placeQuestItems, type QuestObstacle } from './quest/placement'
-import { tryPickUp, tryDeliver } from './quest/state'
+import { interact } from './quest/state'
 import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
 import { chopScrub } from './quest/scrub'
 import { lampIsOn } from './quest/lamp'
@@ -131,6 +130,13 @@ const QUEST_COMPLETE_KEY: Record<
   bike: 'questCompleteBike',
   diamond: 'questCompleteDiamond',
 }
+/** What a toast says when the rod or the bicycle comes into your hands (out in
+ *  the wood or from the hut) — the two you use while carrying them. */
+const TOOK_KEY: Partial<Record<QuestItemId, 'questTookRod' | 'questTookBike'>> = {
+  rod: 'questTookRod',
+  bike: 'questTookBike',
+}
+
 /** Which i18n key names each item's own display name — see ui/questGuide.ts's
  *  own identical map; kept local rather than imported, same as every other
  *  small per-file lookup table in this module (LANDMARK_COLOR, above). */
@@ -305,6 +311,9 @@ async function main(): Promise<void> {
   // go faster, the camera stops swaying like a walk, and no footsteps sound
   // (a live report, 2026-09-20: it looked like a bike and moved like a walk).
   const isRiding = (): boolean => quests.bike.state === 'carrying'
+  // Fishing needs the rod in your hands, not merely delivered: it waits in the
+  // hut until you take it (the owner's decision, 2026-09-21).
+  const rodInHand = (): boolean => quests.rod.state === 'carrying'
   // 1 walking, 0 riding — eased, so mounting and dismounting do not snap.
   let bobScale = 1
   // Whatever `save` holds right now — likely the real loaded save by this
@@ -532,10 +541,21 @@ async function main(): Promise<void> {
   }
 
   /**
-   * Tries both quest transitions, for every item at once, at the player's
-   * current position — a no-op for an item unless it is actually in the
-   * matching state and range (see quest/state.ts's own doc comments), so
-   * calling both unconditionally for all four is safe and mirrors the
+   * Where a delivered item can be taken from again, or null if it cannot: the
+   * rod stands inside the hut (so only from inside it, not through its wall),
+   * the bicycle wherever it was left. The other three are not for taking back.
+   */
+  function takeSpot(id: QuestItemId): { x: number; z: number } | null {
+    if (id === 'rod') return forest.insideHut(player.x, player.z) ? forest.homeSpot('rod') : null
+    if (id === 'bike') return forest.homeSpot('bike', readBikeSpot(save.bikeSpot))
+    return null
+  }
+
+  /**
+   * One press of `E` for every quest item at the player's position — at most
+   * one transition each (see quest/state.ts's `interact`): pick up, deliver,
+   * or take back from the hut. A no-op for an item unless it is in the matching
+   * state and in range, so calling it for all five is safe and mirrors the
    * shelter door's own "just walk up and press E" feel. Returns whether
    * anything actually happened, so the caller (the `E` keydown handler and
    * the touch tap handler) knows whether to fall through to the door check /
@@ -545,16 +565,26 @@ async function main(): Promise<void> {
     let changed = false
     for (const id of QUEST_ITEM_IDS) {
       const before = quests[id].state
-      quests[id] = tryPickUp(quests[id], player, DOOR_INTERACT_RADIUS)
       // The bicycle is left against whichever wall of the hut the player is
       // standing at, not handed in at the doorway like the rest: its delivery
       // point is the nearest point on the hut's outline.
       const bikeDrop = id === 'bike' ? forest.bikeSpotNear(player) : null
-      quests[id] = tryDeliver(quests[id], player, bikeDrop?.point ?? forest.shelterDoor, DOOR_INTERACT_RADIUS)
-      if (quests[id].state === before) continue
+      quests[id] = interact(
+        quests[id], player,
+        { deliverAt: bikeDrop?.point ?? forest.shelterDoor, takeFrom: takeSpot(id) },
+        DOOR_INTERACT_RADIUS,
+      )
+      const now = quests[id].state
+      if (now === before) continue
       changed = true
       if (before === 'pending') hideQuestItem(id)
-      if (quests[id].state === 'done') {
+      if (now === 'carrying') {
+        // Picked up out in the wood, or taken again from the hut: in hand.
+        if (before === 'done') TROPHY_SETTER[id]?.(false)
+        const took = TOOK_KEY[id]
+        if (took) toast(t(took))
+      }
+      if (now === 'done') {
         toast(t(QUEST_COMPLETE_KEY[id]))
         if (id === 'bike' && bikeDrop) {
           save = { ...save, bikeSpot: bikeDrop.spot }
@@ -745,7 +775,7 @@ async function main(): Promise<void> {
     const species = aimed ? speciesById(aimed.userData.placement.speciesId) : undefined
     if (species) {
       nearDoor = false
-      hud.setTarget(speciesName(species), canPick(species, quests.rod.state === 'done') ? undefined : t('needRod'))
+      hud.setTarget(speciesName(species), canPick(species, rodInHand()) ? undefined : t('needRod'))
       return
     }
     // No mushroom in the crosshair — check for a quest item within pickup
@@ -753,9 +783,11 @@ async function main(): Promise<void> {
     // by plain distance rather than aim, so the hint has to use it too or
     // it would show up too early/late compared to when `E` actually works).
     for (const id of QUEST_ITEM_IDS) {
-      if (quests[id].state !== 'pending') continue
-      const pos = quests[id].position
-      if (Math.hypot(player.x - pos.x, player.z - pos.z) >= DOOR_INTERACT_RADIUS) continue
+      // Lying out in the wood, or (rod, bicycle) waiting at home to be taken.
+      const state = quests[id].state
+      const spot = state === 'pending' ? quests[id].position : state === 'done' ? takeSpot(id) : null
+      if (!spot) continue
+      if (Math.hypot(player.x - spot.x, player.z - spot.z) >= DOOR_INTERACT_RADIUS) continue
       nearDoor = false
       hud.setTarget(t(QUEST_ITEM_NAME_KEY[id]))
       return
@@ -795,12 +827,12 @@ async function main(): Promise<void> {
     const placement = target.userData.placement
     const species = speciesById(placement.speciesId)
     if (!species) return
-    // The rod's own gate: a fish is visible and aimable before the rod quest
-    // is delivered, but cannot be taken until then — and says so, rather than
-    // leaving `E` to do nothing (a live report, 2026-09-20: "E does not work
-    // on the roach").
-    if (!canPick(species, quests.rod.state === 'done')) {
-      toast(t('needRodToast'))
+    // The rod's own gate: a fish is visible and aimable, but cannot be taken
+    // without the rod in your hands — and says so, and where the rod is, rather
+    // than leaving `E` to do nothing (a live report, 2026-09-20: "E does not
+    // work on the roach").
+    if (!canPick(species, rodInHand())) {
+      toast(t(quests.rod.state === 'done' ? 'needRodToastHome' : 'needRodToast'))
       return
     }
 
@@ -1102,14 +1134,7 @@ async function main(): Promise<void> {
     if (!modalOpen()) {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
-      const pathDistance = distanceToNearestPath(player, source.paths ?? [])
-      // The delivered bike's passive path bonus and riding the carried one
-      // never stack: whichever is better applies.
-      const bike = Math.max(
-        bikeSpeedFactor(quests.bike.state === 'done', pathDistance, PATH_HALF_WIDTH),
-        ridingSpeedFactor(isRiding(), pathDistance, PATH_HALF_WIDTH),
-      )
-      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * bike
+      const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * ridingSpeedFactor(isRiding())
       const input = touch.active ? touch.read(dt) : controls.read(dt)
       const stepObstacles = worldStream ? [...currentObstacles(), ...worldStream.obstacles()] : currentObstacles()
       const prevBobPhase = player.bobPhase

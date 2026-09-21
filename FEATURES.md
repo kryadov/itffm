@@ -120,7 +120,9 @@ today, each with real field marks, edibility and season.
 
 A one-time prompt at the start of a new game points you at five lost items,
 each found in its own place and carried home (`E` to pick up, `E` at the
-hut's doorway to deliver). Standing close enough to pick one up shows its
+hut's doorway to deliver). The rod and the bicycle can then be taken again
+from the hut (`E` where they wait), and put back the same way — you use them
+in your hands. Standing close enough to pick one up shows its
 name on screen, the same way aiming at a mushroom does. The four found out in
 the open (everything but the diamond) each render as their own real
 model — an axe, a lantern, a fishing rod, a bicycle — not a shared coloured
@@ -132,20 +134,21 @@ clustering in whichever one the dice happened to favour:
   quest items) become choppable.
 - **Lamp** — a warm light that follows you once owned, on automatically
   after dark or inside the mine, with a manual `L` override on top.
-- **Fishing rod** — unlocks catching fish, a real collectible kind spawned
-  near water; a rod trophy leans by the hut's own table once delivered. Out in
-  the wood it lies flat as a chunky pole with a pale handle and a reel, raised
-  clear of a trail so it can be seen. Until it is delivered, a fish in your
-  crosshair says it needs a fishing rod, and `E` on it says so too, instead of
-  quietly doing nothing.
-- **Bicycle** — moves you faster while on a mapped path or track. While you
-  carry it you are riding it: faster everywhere (fastest on a path), the view
-  stops swaying like a walk and there are no footsteps, and its handlebar and
-  front wheel show low in your view and turn as you turn; you leave it against
-  whichever wall of the hut you are standing at when you press `E` (any of the
-  four — not only by the door), and it stays there, standing on the real
-  ground, off the doorway, and gone from your view. The path bonus stays once
-  it is home.
+- **Fishing rod** — lets you catch fish while it is in your hands. Fish swim
+  in the wood's own ponds and streams — in the shallows along the bank, on the
+  surface, where you can reach them — not on the land. Once delivered the rod
+  leans by the hut's own table (you take it from inside the hut with `E`).
+  Out in the wood it lies flat as a chunky pole with a pale handle and a reel,
+  raised clear of a trail so it can be seen. A fish in your crosshair without
+  the rod in hand says it needs a fishing rod, and `E` on it says where the
+  rod is, instead of quietly doing nothing.
+- **Bicycle** — while you carry it you are riding it: 1.6 times faster
+  everywhere, path or not; the view stops swaying like a walk and there are no
+  footsteps; its handlebar and front wheel show low in your view and turn as you
+  turn. You leave it against whichever wall of the hut you are standing at when
+  you press `E` (any of the four — not only by the door), where it stands on
+  the real ground, off the doorway, and is gone from your view — and take it
+  again from there with `E`. Left at the hut it does nothing.
 - **Diamond** — found at the end of the mine's own branching cave, not near
   the hut like the other four; you have to actually search the forks to find
   it. A many-faceted, asymmetric cut, not a plain gem, and it visibly

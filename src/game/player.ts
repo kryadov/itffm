@@ -106,37 +106,19 @@ export function biomeSpeedFactor(biome: Biome): number {
   return biome === 'wetland' ? WETLAND_SPEED : 1
 }
 
-/** How much faster the bicycle quest's own ability makes you on a path — the
- *  opposite direction of WETLAND_SPEED above, tuned during implementation
- *  (a gameplay-feel number, not an architectural one). */
-const BIKE_SPEED = 1.6
+/** How much faster riding the bicycle makes you — the opposite direction of
+ *  WETLAND_SPEED above. The owner's own choice (2026-09-21): 1.6x, on a path or
+ *  across country. */
+const RIDING_SPEED = 1.6
 
 /**
- * Speed multiplier for the bicycle quest's own ability: faster only once the
- * bike is owned AND the player is within a path's own half-width of its
- * centreline (`world/paths.ts`'s `distanceToNearestPath`/`HALF_WIDTH`) — a
- * bicycle only helps on an actual trail, not cross-country. 1 (no effect)
- * whenever either condition is missing, same "neutral by default" shape as
- * `biomeSpeedFactor`.
+ * Speed multiplier while riding: the bicycle in your hands. It is not a
+ * passive bonus of owning one — a bicycle left at the hut does nothing until
+ * you take it again. 1 (no effect) when you are not riding, same "neutral by
+ * default" shape as `biomeSpeedFactor`.
  */
-export function bikeSpeedFactor(owned: boolean, distanceToPath: number, pathHalfWidth: number): number {
-  return owned && distanceToPath <= pathHalfWidth ? BIKE_SPEED : 1
-}
-
-/** What riding gets you off a path — a bicycle still beats walking on the
- *  forest floor, just not by as much as on a trail (`BIKE_SPEED`). A
- *  gameplay-feel number like the two above. */
-const BIKE_OFF_PATH_SPEED = 1.3
-
-/**
- * Speed multiplier while riding — the bicycle in your hands, not parked at the
- * hut (`bikeSpeedFactor` above is the delivered bike's passive path bonus).
- * Faster than walking everywhere, and fastest on a mapped path, by the same
- * "within a path's own half-width" rule. 1 (no effect) when not riding.
- */
-export function ridingSpeedFactor(riding: boolean, distanceToPath: number, pathHalfWidth: number): number {
-  if (!riding) return 1
-  return distanceToPath <= pathHalfWidth ? BIKE_SPEED : BIKE_OFF_PATH_SPEED
+export function ridingSpeedFactor(riding: boolean): number {
+  return riding ? RIDING_SPEED : 1
 }
 
 /** Eye height above the ground, accounting for the crouch. */

@@ -284,6 +284,25 @@ function usableAlong(wall: ShelterWall, along: number): number {
   return Math.max(-limit, Math.min(limit, along))
 }
 
+/** Whether (x, z) is on the hut's floor — inside its walls. */
+export function insideHut(s: Shelter, x: number, z: number): boolean {
+  const local = new THREE.Vector3(x - s.x, 0, z - s.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), -s.rotationY)
+  return Math.abs(local.x) < WIDTH / 2 - WALL_THICKNESS && Math.abs(local.z) < DEPTH / 2 - WALL_THICKNESS
+}
+
+/** Where the fishing rod waits once delivered — leaned against the wall by the
+ *  table — in world metres. */
+export function rodSpotWorld(s: Shelter): { x: number; z: number } {
+  return toWorld(s, ROD_X, ROD_Z)
+}
+
+/** Where a bicycle left at `spot` (`DEFAULT_BIKE_SPOT` if none was chosen)
+ *  stands, in world metres. */
+export function bikeSpotWorld(s: Shelter, spot: BikeSpot = DEFAULT_BIKE_SPOT): { x: number; z: number } {
+  const at = bikeSpotLocal(spot)
+  return toWorld(s, at.x, at.z)
+}
+
 /** Where a bike left at `spot` stands, in the hut's local space: its centre,
  *  and the yaw that lays its length along the wall with its side toward it. */
 export function bikeSpotLocal(spot: BikeSpot): { x: number; z: number; yaw: number } {

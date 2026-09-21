@@ -13,15 +13,15 @@ const ITEM_NAME_KEY = {
   diamond: 'questItemNameDiamond',
 } as const
 
-/** What each item does once delivered — reuses the exact same message
- *  main.ts's own toast shows on delivery (QUEST_COMPLETE_KEY there), so this
- *  screen never drifts from what actually happens in the wood. */
+/** What each item does — and, for the rod and the bicycle, where it waits
+ *  and how to take it again. Its own text, not the delivery toast's: a toast
+ *  says what just happened ("left in the hut"), this says what it is for. */
 const ITEM_ABILITY_KEY = {
-  axe: 'questCompleteAxe',
-  lamp: 'questCompleteLamp',
-  rod: 'questCompleteRod',
-  bike: 'questCompleteBike',
-  diamond: 'questCompleteDiamond',
+  axe: 'questAbilityAxe',
+  lamp: 'questAbilityLamp',
+  rod: 'questAbilityRod',
+  bike: 'questAbilityBike',
+  diamond: 'questAbilityDiamond',
 } as const
 
 const STATE_KEY: Record<QuestState, 'questStatePending' | 'questStateCarrying' | 'questStateDone'> = {

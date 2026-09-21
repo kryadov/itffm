@@ -33,7 +33,10 @@ export function buildPlacementObject(p: Placement, ground: ElevationProvider): P
   const lod = buildCollectibleLod(toWorldMesh(buildCollectible(species, p.seed, p.age)))
   let object: THREE.Object3D = lod
   if (species.kind !== 'mushroom') object = withPickHitbox(object)
-  object.position.set(p.x, ground.heightAt(p.x, p.z), p.z)
+  // A fish swims on the water, not the bed under it: its own `y` (the water's
+  // surface, set by world/fishSpawn.ts) stands. Everything else is set on the
+  // ground actually under it.
+  object.position.set(p.x, species.kind === 'fish' ? p.y : ground.heightAt(p.x, p.z), p.z)
   object.rotateY(p.rotationY)
   object.userData.placement = p
   return { object, lod }
