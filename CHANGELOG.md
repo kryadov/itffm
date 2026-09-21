@@ -5,6 +5,14 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.98.0
+The fishing rod and the bicycle work in your hands: you fish with the rod you
+carry and ride the bicycle you carry (1.6 times faster, everywhere), and after
+leaving them at the hut you can take them again with E — the bicycle from its
+wall, the rod from inside. Fish now swim in the wood's ponds and streams, in
+the shallows where you can reach them from the bank, instead of lying on the
+meadow. The rules screen and prompts are updated.
+
 ## v0.97.1
 Carrying the bicycle now means riding it: you go faster (most on a path), the view
 stops swaying like a walk, and there are no footsteps. The fishing rod lying in the
