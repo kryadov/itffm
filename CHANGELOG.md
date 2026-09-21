@@ -5,6 +5,12 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.99.0
+The railway has stations. Each end of the line now has a platform along the whole
+stopped train, with a yellow edge line, a roofed shelter, a bench and a lamp that
+lights after dark; nothing grows there. The minimap draws the line and marks both
+stops.
+
 ## v0.98.0
 The fishing rod and the bicycle work in your hands: you fish with the rod you
 carry and ride the bicycle you carry (1.6 times faster, everywhere), and after
