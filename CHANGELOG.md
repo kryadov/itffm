@@ -5,6 +5,16 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.100.0
+A quadcopter. The diamond now goes to the train: give it to the conductor while
+the train stands at a platform, and the train leaves a crate at the other end of
+the line with a quadcopter in it. R launches it and the view is from the
+quadcopter — height, distance, battery, signal and an arrow home on screen —
+while you stand on the ground as a little person with a controller, under a tall
+orange pole that shows above the trees. R again, or an empty battery, flies it
+home. Up to 150 m away, 40 m high, two minutes of battery. How to start and end
+a flight is in the H help and the Rules & Quests screen.
+
 ## v0.99.0
 The railway has stations. Each end of the line now has a platform along the whole
 stopped train, with a yellow edge line, a roofed shelter, a bench and a lamp that
