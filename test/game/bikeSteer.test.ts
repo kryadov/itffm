@@ -1,4 +1,4 @@
-import { steerTarget, smoothSteer, easeToward, MAX_STEER } from '../../src/game/bikeSteer'
+import { steerTarget, smoothSteer, easeToward, wheelSpin, forwardSpeedOf, ROLLING_RADIUS, MAX_STEER } from '../../src/game/bikeSteer'
 
 describe('steerTarget', () => {
   it('is straight when not turning', () => {
@@ -67,5 +67,51 @@ describe('easeToward', () => {
 
   it('a faster rate arrives sooner', () => {
     expect(easeToward(1, 0, 0.1, 20)).toBeLessThan(easeToward(1, 0, 0.1, 5))
+  })
+})
+
+describe('wheelSpin', () => {
+  // A live request (2026-09-21): the front wheel of the bicycle you ride must turn,
+  // and visibly. Forward is a negative turn about the axle (the model's +x is
+  // forward and the axle is z), so the top of the wheel moves ahead.
+  it('turns once round for every circumference travelled, and forward is negative', () => {
+    const circumference = 2 * Math.PI * ROLLING_RADIUS
+    expect(wheelSpin(0, circumference, 1)).toBeCloseTo(-2 * Math.PI, 6)
+    expect(wheelSpin(0, 3, 1)).toBeLessThan(0)
+  })
+
+  it('turns the other way when going backward, and not at all when standing', () => {
+    expect(wheelSpin(0, -3, 1)).toBeGreaterThan(0)
+    expect(wheelSpin(1.25, 0, 1 / 60)).toBe(1.25)
+  })
+
+  it('adds to where the wheel already is, and is the same however the time is cut up', () => {
+    let coarse = 0.5
+    for (let i = 0; i < 5; i++) coarse = wheelSpin(coarse, 4, 0.2)
+    let fine = 0.5
+    for (let i = 0; i < 50; i++) fine = wheelSpin(fine, 4, 0.02)
+    expect(coarse).toBeCloseTo(fine, 6)
+  })
+
+  it('has the rolling radius of the wheel the model draws (wheel 0.32 + tyre 0.025 + tread 0.004)', () => {
+    expect(ROLLING_RADIUS).toBeCloseTo(0.349, 6)
+  })
+})
+
+describe('forwardSpeedOf', () => {
+  it('is the speed along the way you face (yaw 0 faces -z; +90 degrees faces -x)', () => {
+    expect(forwardSpeedOf(0, -1, 0, 0.5)).toBeCloseTo(2)
+    expect(forwardSpeedOf(-1, 0, Math.PI / 2, 0.5)).toBeCloseTo(2)
+  })
+
+  it('is negative moving backward, and zero sideways or standing', () => {
+    expect(forwardSpeedOf(0, 1, 0, 0.5)).toBeCloseTo(-2)
+    expect(forwardSpeedOf(1, 0, 0, 0.5)).toBeCloseTo(0) // strafing: the front wheel does not roll
+    expect(forwardSpeedOf(0, 0, 0.3, 0.5)).toBe(0)
+  })
+
+  it('is zero for a frame with no time, and never absurd when the player is moved outright', () => {
+    expect(forwardSpeedOf(0, -5, 0, 0)).toBe(0)
+    expect(Math.abs(forwardSpeedOf(0, -500, 0, 0.016))).toBeLessThanOrEqual(30)
   })
 })

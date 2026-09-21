@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { createBikeView } from '../../src/game/bikeView'
+import { ROLLING_RADIUS } from '../../src/game/bikeSteer'
 
 function world() {
   const scene = new THREE.Scene()
@@ -68,6 +69,31 @@ describe('createBikeView', () => {
     expect(wheel.y).toBeLessThan(bar.y)
   })
 
+  it('shows the wheel itself, not just the fork: its middle and its top are on screen', () => {
+    // A live request (2026-09-21): the wheel must be seen turning. It sat below the
+    // bottom edge of the view, with only the fork showing.
+    const view = createBikeView(world().scene)
+    view.setVisible(true)
+    const cam = new THREE.PerspectiveCamera(70, 16 / 9, 0.02, 2000) // the game's own
+    cam.position.set(0, 0, 0)
+    cam.updateMatrixWorld(true)
+    view.update(1 / 60, 0, cam)
+    view.group.updateMatrixWorld(true)
+    const frustum = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse),
+    )
+    const wheel = view.group.getObjectByName('wheel')!
+    expect(frustum.containsPoint(wheel.getWorldPosition(new THREE.Vector3()))).toBe(true)
+    const top = view.group.getObjectByName('reflector')!.children[0].getWorldPosition(new THREE.Vector3())
+    expect(frustum.containsPoint(top)).toBe(true)
+    // ...and a fair part of the wheel, not a sliver: the box around it is mostly inside.
+    const box = new THREE.Box3().setFromObject(wheel)
+    let inside = 0
+    const corners = [box.min.x, box.max.x].flatMap((x) => [box.min.y, box.max.y].flatMap((y) => [box.min.z, box.max.z].map((z) => new THREE.Vector3(x, y, z))))
+    for (const c of corners) if (frustum.containsPoint(c)) inside++
+    expect(inside).toBeGreaterThanOrEqual(6)
+  })
+
   it('turns the bar toward a turn, and only while turning', () => {
     const view = createBikeView(world().scene)
     view.setVisible(true)
@@ -128,5 +154,46 @@ describe('createBikeView', () => {
     const view = createBikeView(new THREE.Scene())
     view.setVisible(true)
     expect(() => view.update(1 / 60, 0, camera())).not.toThrow()
+  })
+
+  it('turns the front wheel with the speed you ride, backward when you back up, and not at all when you stop', () => {
+    const view = createBikeView(world().scene)
+    view.setVisible(true)
+    const cam = camera()
+    const rot = () => view.group.getObjectByName('wheel')!.rotation.z
+    view.update(1 / 60, 0, cam, 0)
+    const rest = rot()
+    for (let i = 0; i < 60; i++) view.update(1 / 60, 0, cam, 4)
+    const forward = rot()
+    expect(forward).not.toBeCloseTo(rest, 2)
+    // four metres of road on a wheel of rolling radius 0.349: about 11.5 radians
+    const turned = ((forward - rest) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI
+    const expected = ((-4 / ROLLING_RADIUS) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI
+    expect(turned).toBeCloseTo(expected, 1)
+    for (let i = 0; i < 60; i++) view.update(1 / 60, 0, cam, 0)
+    expect(rot()).toBeCloseTo(forward, 6) // stopped: it stays as it is
+    for (let i = 0; i < 60; i++) view.update(1 / 60, 0, cam, -4)
+    expect(rot()).toBeCloseTo(rest, 4) // backed up as far as it came
+  })
+
+  it('does not turn while the bicycle is not in your hands', () => {
+    const view = createBikeView(world().scene)
+    const rot = () => view.group.getObjectByName('wheel')!.rotation.z
+    const before = rot()
+    for (let i = 0; i < 30; i++) view.update(1 / 60, 0, camera(), 6)
+    expect(rot()).toBe(before)
+  })
+
+  it('keeps the wheel angle small however long you ride, and still steers while it turns', () => {
+    const view = createBikeView(world().scene)
+    view.setVisible(true)
+    const cam = camera()
+    let yaw = 0
+    for (let i = 0; i < 20000; i++) {
+      yaw += i < 30 ? 0.04 : 0
+      view.update(1 / 60, yaw, cam, 9)
+    }
+    expect(Math.abs(view.group.getObjectByName('wheel')!.rotation.z)).toBeLessThanOrEqual(Math.PI + 1e-9)
+    expect(view.steerAngle()).toBeCloseTo(0, 1) // the turn was long ago
   })
 })

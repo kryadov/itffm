@@ -32,3 +32,34 @@ export function easeToward(current: number, target: number, dt: number, rate: nu
 export function smoothSteer(current: number, target: number, dt: number): number {
   return easeToward(current, target, dt, STEER_RESPONSE)
 }
+
+/** How far the front wheel rolls for a turn: its tread to its axle — the wheel's
+ *  own 0.32, its tyre's 0.025 and the tread's 0.004 (`world/questItemModels.ts`'s
+ *  `buildBikeWheel`, checked by a test there). */
+export const ROLLING_RADIUS = 0.349
+
+/** Beyond this the player was moved outright (a teleport), not ridden — no
+ *  wheel spins that fast. */
+const MAX_WHEEL_SPEED = 30
+
+/**
+ * The wheel's angle after `dt` seconds of rolling at `forwardSpeed` m/s. The
+ * bicycle model faces +x with its axle along z, so rolling forward is a NEGATIVE
+ * turn (the top of the wheel moves ahead); backing up turns it the other way.
+ */
+export function wheelSpin(angle: number, forwardSpeed: number, dt: number): number {
+  return angle - (forwardSpeed * dt) / ROLLING_RADIUS
+}
+
+/**
+ * How fast the player moved along the way they face over a frame: `dx`, `dz` is
+ * the displacement, `yaw` the facing (0 faces -z, as in `PlayerState`). Sideways
+ * is nothing — the front wheel does not roll for a strafe — and backward is
+ * negative. 0 for a frame with no time.
+ */
+export function forwardSpeedOf(dx: number, dz: number, yaw: number, dt: number): number {
+  if (dt <= 0) return 0
+  const ahead = -Math.sin(yaw) * dx - Math.cos(yaw) * dz
+  // + 0 turns a -0 (standing still, or straight sideways) into a plain 0.
+  return Math.max(-MAX_WHEEL_SPEED, Math.min(MAX_WHEEL_SPEED, ahead / dt)) + 0
+}

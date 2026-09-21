@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { buildBikeCockpitModel } from '../world/questItemModels'
-import { steerTarget, smoothSteer } from './bikeSteer'
+import { steerTarget, smoothSteer, wheelSpin } from './bikeSteer'
 
 /**
  * The bicycle you are carrying, seen from the saddle: its handlebar and front
@@ -19,9 +19,10 @@ export interface BikeView {
   /** Whether the bicycle is drawn at all — only while it is being carried. */
   setVisible(on: boolean): void
   isVisible(): boolean
-  /** Follows the camera and eases the bar toward the way the view is turning.
-   *  Call once a frame, after the camera has been posed. */
-  update(dt: number, yaw: number, camera: THREE.Camera): void
+  /** Follows the camera, eases the bar toward the way the view is turning, and
+   *  rolls the front wheel with `forwardSpeed` (m/s along the way you face,
+   *  negative backing up). Call once a frame, after the camera has been posed. */
+  update(dt: number, yaw: number, camera: THREE.Camera, forwardSpeed?: number): void
   /** Draws the bicycle over what is already on screen. Call right after the
    *  wood's own `renderer.render`. */
   render(renderer: THREE.WebGLRenderer, camera: THREE.Camera): void
@@ -34,8 +35,13 @@ export interface BikeView {
  *  of the bottom of it. */
 const VIEW_SCALE = 0.75
 /** Where the bar's middle sits in the camera's own frame: centred, low, a
- *  little ahead of the eye. */
-const BAR_IN_VIEW = new THREE.Vector3(0, -0.22, -0.7)
+ *  little ahead of the eye. Higher than a rider's real bar, and the whole front
+ *  end tipped up (`VIEW_TILT`), so the wheel — 0.6 m below the bar — comes up
+ *  into the frame instead of sitting under its bottom edge: the wheel is the part
+ *  that turns, and it has to be seen. */
+const BAR_IN_VIEW = new THREE.Vector3(0, -0.09, -0.62)
+/** How far the front end is tipped up about the bar, radians. */
+const VIEW_TILT = 0.62
 /** The bar's own position in the model (see `buildBikeModel`). */
 const BAR_IN_MODEL = new THREE.Vector3(0.31, 0.92, 0)
 
@@ -61,16 +67,22 @@ export function createBikeView(worldScene: THREE.Scene): BikeView {
   const mount = new THREE.Group()
   mount.rotation.y = Math.PI / 2
   mount.scale.setScalar(VIEW_SCALE)
-  // Where the model's origin has to go for its bar to land on BAR_IN_VIEW:
+  // Where the model's origin has to go for its bar to sit on the tilt's pivot:
   // the bar's own offset, scaled and turned the way the model is, subtracted.
   const barOffset = BAR_IN_MODEL.clone().multiplyScalar(VIEW_SCALE).applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)
-  mount.position.copy(BAR_IN_VIEW).sub(barOffset)
+  mount.position.copy(barOffset).negate()
   mount.add(cockpit.group)
-  group.add(mount)
+  // Pivoting at the bar, so tipping the front end up leaves the bar where it is.
+  const tilt = new THREE.Group()
+  tilt.position.copy(BAR_IN_VIEW)
+  tilt.rotation.x = VIEW_TILT
+  tilt.add(mount)
+  group.add(tilt)
 
   let visible = false
   group.visible = false
   let steer = 0
+  let wheelAngle = 0
   let lastYaw: number | null = null
 
   return {
@@ -85,7 +97,7 @@ export function createBikeView(worldScene: THREE.Scene): BikeView {
       }
     },
     isVisible: () => visible,
-    update(dt, yaw, camera) {
+    update(dt, yaw, camera, forwardSpeed = 0) {
       if (!visible) return
       group.position.copy(camera.position)
       group.quaternion.copy(camera.quaternion)
@@ -94,6 +106,10 @@ export function createBikeView(worldScene: THREE.Scene): BikeView {
       lastYaw = yaw
       steer = smoothSteer(steer, steerTarget(rate), dt)
       cockpit.steer(steer)
+      // Kept within a half turn either way, so a long ride never loses precision.
+      wheelAngle = wheelSpin(wheelAngle, forwardSpeed, dt)
+      wheelAngle = Math.atan2(Math.sin(wheelAngle), Math.cos(wheelAngle))
+      cockpit.spin(wheelAngle)
       if (worldHemi) {
         hemi.color.copy(worldHemi.color)
         hemi.groundColor.copy(worldHemi.groundColor)

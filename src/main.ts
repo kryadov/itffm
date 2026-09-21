@@ -29,7 +29,7 @@ import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
 import { yieldToPaint } from './util/yield'
 import { createBikeView } from './game/bikeView'
-import { easeToward } from './game/bikeSteer'
+import { easeToward, forwardSpeedOf } from './game/bikeSteer'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
@@ -323,6 +323,8 @@ async function main(): Promise<void> {
   const rodInHand = (): boolean => quests.rod.state === 'carrying'
   // 1 walking, 0 riding — eased, so mounting and dismounting do not snap.
   let bobScale = 1
+  let bikePrevX = 0
+  let bikePrevZ = 0
   // Whatever `save` holds right now — likely the real loaded save by this
   // point, same trade-off `setLang` above already accepts: a real user's
   // place-picker interaction takes far longer than the IndexedDB round trip.
@@ -1479,7 +1481,11 @@ async function main(): Promise<void> {
     updateAim()
     updateDebugOverlay()
     bikeView.setVisible(isRiding() && !flight)
-    bikeView.update(dt, player.yaw, camera)
+    // The front wheel rolls with the ground the player actually covers: blocked by
+    // a trunk it stands still, backing up it turns the other way.
+    bikeView.update(dt, player.yaw, camera, forwardSpeedOf(player.x - bikePrevX, player.z - bikePrevZ, player.yaw, dt))
+    bikePrevX = player.x
+    bikePrevZ = player.z
     renderer.render(forest.scene, camera)
     bikeView.render(renderer, camera)
     if (loadingOpen) {

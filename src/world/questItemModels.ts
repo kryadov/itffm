@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 /**
  * Real-world-shaped models for the five quest items — shared by the mesh a
@@ -108,7 +109,9 @@ function tube(a: THREE.Vector3, b: THREE.Vector3, radius: number, mat: THREE.Mat
 // bicycle — a live report, 2026-09-19.)
 const BIKE_WHEEL_RADIUS = 0.32
 const BIKE_TIRE_RADIUS = 0.025
-const BIKE_AXLE_Y = BIKE_WHEEL_RADIUS + BIKE_TIRE_RADIUS
+/** How far the tread blocks stand proud of the tyre. */
+const BIKE_TREAD_PROUD = 0.004
+const BIKE_AXLE_Y = BIKE_WHEEL_RADIUS + BIKE_TIRE_RADIUS + BIKE_TREAD_PROUD
 const BIKE_WHEELBASE = 1.0
 const BIKE_REAR_AXLE = new THREE.Vector3(-BIKE_WHEELBASE / 2, BIKE_AXLE_Y, 0)
 const BIKE_FRONT_AXLE = new THREE.Vector3(BIKE_WHEELBASE / 2, BIKE_AXLE_Y, 0)
@@ -129,16 +132,72 @@ function bikeMaterials() {
 type BikeMaterials = ReturnType<typeof bikeMaterials>
 
 /** A spoked wheel in its own local space, centred on its axle, turning in x-y. */
+/** The tyre's width over its thickness. */
+const BIKE_TYRE_WIDENING = 2
+/** How many blocks (alternately light and dark) the tread is made of. */
+export const TREAD_BLOCKS = 6
+
 function buildBikeWheel(m: BikeMaterials): THREE.Group {
   const wheel = new THREE.Group()
   wheel.name = 'wheel'
-  wheel.add(new THREE.Mesh(new THREE.TorusGeometry(BIKE_WHEEL_RADIUS, BIKE_TIRE_RADIUS, 8, 24), m.tire))
-  const spokeGeo = new THREE.CylinderGeometry(0.003, 0.003, BIKE_WHEEL_RADIUS * 2, 4)
-  for (let i = 0; i < 3; i++) {
+  // A wide tyre (twice as wide as it is thick) with a tread of blocks in two
+  // alternating shades round it. From the saddle the front wheel is seen edge-on
+  // as a strip of tyre, and the blocks running along that strip are what makes a
+  // turn readable (a live request, 2026-09-21).
+  const tyre = new THREE.Mesh(new THREE.TorusGeometry(BIKE_WHEEL_RADIUS, BIKE_TIRE_RADIUS, 8, 24), m.tire)
+  tyre.scale.z = BIKE_TYRE_WIDENING
+  wheel.add(tyre)
+  // Six blocks, alternately light and dark: coarse on purpose. A pattern that
+  // repeats every P degrees seems to run BACKWARD once the wheel turns more than
+  // P/2 between two frames (the wagon-wheel effect), and a fast ride on a slow
+  // machine turns it ~55 degrees a frame; a fine tread of two dozen blocks would
+  // seem to spin the wrong way. Each block is a sleeve over the tyre: an arc of a
+  // slightly fatter torus, so it follows the curve of the wheel.
+  const shades: THREE.BufferGeometry[][] = [[], []]
+  for (let i = 0; i < TREAD_BLOCKS; i++) {
+    const block = new THREE.TorusGeometry(
+      BIKE_WHEEL_RADIUS, BIKE_TIRE_RADIUS + BIKE_TREAD_PROUD, 8, 4, (Math.PI * 2) / TREAD_BLOCKS,
+    )
+    block.scale(1, 1, BIKE_TYRE_WIDENING)
+    block.rotateZ((i * Math.PI * 2) / TREAD_BLOCKS)
+    shades[i % 2].push(block)
+  }
+  shades.forEach((geos, k) => {
+    const tread = new THREE.Mesh(
+      mergeGeometries(geos, false),
+      new THREE.MeshStandardMaterial({ color: k === 0 ? 0x111111 : 0x5a5a58, roughness: 0.9 }),
+    )
+    tread.name = 'tread'
+    wheel.add(tread)
+  })
+  // Sixteen spokes (eight diameters), thin but many, so it reads as a wheel and
+  // its turning shows as a shimmer, not a few sticks.
+  const spokeGeo = new THREE.CylinderGeometry(0.0035, 0.0035, BIKE_WHEEL_RADIUS * 2, 4)
+  for (let i = 0; i < 8; i++) {
     const spoke = new THREE.Mesh(spokeGeo, m.metal)
-    spoke.rotation.z = (i * Math.PI) / 3
+    spoke.name = 'spoke'
+    spoke.rotation.z = (i * Math.PI) / 8
     wheel.add(spoke)
   }
+  // One bright reflector on the rim: evenly spaced spokes look the same every
+  // few degrees, so on their own a turning wheel cannot be seen to turn. A patch
+  // on the tread and one on each side of the tyre, at the top when the wheel is
+  // at rest.
+  const reflectorMat = new THREE.MeshStandardMaterial({
+    color: 0xff8a2a, roughness: 0.4, emissive: 0xff6a00, emissiveIntensity: 0.9,
+  })
+  const reflector = new THREE.Group()
+  reflector.name = 'reflector'
+  const patch = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, BIKE_TIRE_RADIUS * 2 * BIKE_TYRE_WIDENING), reflectorMat)
+  // 20 mm thick; its outer face stands 6 mm proud of the tyre, a little above the tread.
+  patch.position.set(0, BIKE_WHEEL_RADIUS + BIKE_TIRE_RADIUS - 0.004, 0)
+  reflector.add(patch)
+  for (const side of [-1, 1]) {
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, 0.005), reflectorMat)
+    plate.position.set(0, BIKE_WHEEL_RADIUS - 0.01, side * (BIKE_TIRE_RADIUS * BIKE_TYRE_WIDENING + 0.003))
+    reflector.add(plate)
+  }
+  wheel.add(reflector)
   const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.05, 8), m.metal)
   hub.rotation.x = Math.PI / 2
   wheel.add(hub)
@@ -231,7 +290,12 @@ export function buildBikeModel(): THREE.Group {
  *  with the steering assembly on its own pivot: `steer(angle)` turns it about
  *  the fork's own axis, positive toward the rider's left (matching a positive
  *  camera yaw), so the bar and wheel swing together like a real front end. */
-export function buildBikeCockpitModel(): { group: THREE.Group; steer: (angle: number) => void } {
+export function buildBikeCockpitModel(): {
+  group: THREE.Group
+  steer: (angle: number) => void
+  /** Turns the front wheel about its own axle to `angle` radians. */
+  spin: (angle: number) => void
+} {
   const m = bikeMaterials()
   const group = new THREE.Group()
   group.name = 'bikeCockpit'
@@ -248,10 +312,14 @@ export function buildBikeCockpitModel(): { group: THREE.Group; steer: (angle: nu
   group.add(tube(BIKE_HEAD_TOP, topTubeEnd, BIKE_FRAME_RADIUS, m.frame))
 
   const axis = BIKE_HEAD_TOP.clone().sub(BIKE_FRONT_AXLE).normalize()
+  const wheel = steering.getObjectByName('wheel')!
   return {
     group,
     steer: (angle) => {
       pivot.quaternion.setFromAxisAngle(axis, angle)
+    },
+    spin: (angle) => {
+      wheel.rotation.z = angle
     },
   }
 }

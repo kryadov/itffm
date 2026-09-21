@@ -5,6 +5,12 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.100.1
+The front wheel of the bicycle in your hands now turns with the speed you ride, so
+you can see it: it is raised into the frame, the tyre is wider with a chunky
+tread and an orange reflector, it runs backward when you back up and stands
+still when you stop.
+
 ## v0.100.0
 A quadcopter. The diamond now goes to the train: give it to the conductor while
 the train stands at a platform, and the train leaves a crate at the other end of
