@@ -6,6 +6,14 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.101.5
+Two live-report tuning fixes. The bicycle's carried front wheel no longer
+sits at a strongly canted angle jammed up against the screen — a smaller
+turn opens the rim into a natural-looking ellipse instead of an oval, and
+the frame's rear tube stub no longer reaches so far toward the camera.
+Ground tracks (footprints, tyre and paw marks) are a rounded stadium shape
+now instead of a plain sharp-cornered rectangle.
+
 ## v0.101.4
 A long play session now learns when a new version has shipped: a banner
 offers to reload now or dismiss it, rather than the old build silently

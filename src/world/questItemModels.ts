@@ -289,10 +289,15 @@ export function buildBikeCockpitModel(): {
   pivot.add(steering)
   group.add(pivot)
 
-  // Run well past where the view's own tilt and framing crop it, so the tube
+  // Reaches past where the view's own tilt and framing crop it, so the tube
   // reads as the rest of the bike continuing behind and below the rider, not
-  // as a stub cut off in mid-air (a live report, 2026-09-22).
-  const topTubeEnd = new THREE.Vector3(BIKE_HEAD_TOP.x - 0.6, BIKE_HEAD_TOP.y - 0.3, 0)
+  // as a stub cut off in mid-air (a live report, 2026-09-22) — but only just
+  // past it: the same fix's first attempt ran nearly twice this far and put
+  // the tube uncomfortably close to the camera, reading as jammed up against
+  // the screen (a live report, 2026-09-22, same day: "рама выглядит в упор
+  // экрана не хорошо" — this end moves toward the camera as it lengthens,
+  // since the model's -x is the view's near side once mounted, see bikeView.ts).
+  const topTubeEnd = new THREE.Vector3(BIKE_HEAD_TOP.x - 0.38, BIKE_HEAD_TOP.y - 0.18, 0)
   group.add(tube(BIKE_HEAD_TOP, topTubeEnd, BIKE_FRAME_RADIUS, m.frame))
 
   // The wheel, viewed dead ahead (its axle running straight across the bike,
@@ -306,8 +311,12 @@ export function buildBikeCockpitModel(): {
   // and `buildBikeSteering`, both shared with the parked bike. It sits
   // OUTSIDE the wheel's own spin, so a rolling wheel still turns cleanly
   // about its own (now tilted) axle rather than wobbling: `spin()` below
-  // keeps setting `wheel.rotation.z`, unchanged, as it always has.
-  const WHEEL_VIEW_TURN = 0.55
+  // keeps setting `wheel.rotation.z`, unchanged, as it always has. The first
+  // attempt at this (0.55 rad, ~31.5°) overshot — a live report the same day
+  // called it a strongly canted oval rather than a wheel seen at an angle;
+  // this is a little over half that, enough to open the rim into a visible
+  // ellipse without reading as a permanent, unnatural cant.
+  const WHEEL_VIEW_TURN = 0.3
   const wheel = steering.getObjectByName('wheel')!
   const wheelTilt = new THREE.Group()
   wheelTilt.name = 'wheelTilt'

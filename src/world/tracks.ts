@@ -131,9 +131,37 @@ interface Pool {
   next: number
 }
 
+/** A rounded-rectangle outline, X the long axis and Y the short one, both
+ *  centred on the origin — the corner radius is the smaller half-dimension,
+ *  so an elongated shape (a footprint, a tyre segment) comes out a full
+ *  stadium (straight sides, semicircular ends) rather than merely
+ *  chamfered, and a near-square one (a paw print) comes out close to a
+ *  circle. A plain `PlaneGeometry` here read as a stamped rectangle, not a
+ *  mark pressed into the ground (a live report, 2026-09-22: "footprints
+ *  look like a plain rectangle") — this is the simplest outline that isn't
+ *  one, while staying a flat primitive, no texture, same as everything else
+ *  this project draws.
+ */
+function roundedRectShape(length: number, width: number): THREE.Shape {
+  const hl = length / 2
+  const hw = width / 2
+  const r = Math.min(hl, hw)
+  const shape = new THREE.Shape()
+  shape.moveTo(-hl + r, -hw)
+  shape.lineTo(hl - r, -hw)
+  shape.quadraticCurveTo(hl, -hw, hl, -hw + r)
+  shape.lineTo(hl, hw - r)
+  shape.quadraticCurveTo(hl, hw, hl - r, hw)
+  shape.lineTo(-hl + r, hw)
+  shape.quadraticCurveTo(-hl, hw, -hl, hw - r)
+  shape.lineTo(-hl, -hw + r)
+  shape.quadraticCurveTo(-hl, -hw, -hl + r, -hw)
+  return shape
+}
+
 function markGeometry(kind: TrackKind): THREE.BufferGeometry {
   const { length, width } = TRACK_SIZE[kind]
-  const geo = new THREE.PlaneGeometry(length, width)
+  const geo = new THREE.ShapeGeometry(roundedRectShape(length, width))
   geo.rotateX(-Math.PI / 2)
   return geo
 }
