@@ -1,10 +1,91 @@
 import type { Vec2, BBox } from '../geo/types'
 import type { Projector } from '../geo/project'
 import type { ElevationProvider } from './provider'
+import { idbGet, idbPut, idbKeys, idbDelete } from '../util/idbCache'
 
 const TILE_URL = (z: number, x: number, y: number) =>
   `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`
 const TILE_SIZE = 256
+
+const TILE_DB = 'itffm-terrain'
+const TILE_STORE = 'tiles'
+/** A tile's own cache key — the same z/x/y that names it in the slippy-map grid. */
+export function tileKey(z: number, x: number, y: number): string {
+  return `${z}/${x}/${y}`
+}
+/** Above this many cached tiles, the oldest (by last use) get evicted back down
+ *  to it — a handful of real places' worth (a plot's bbox at zoom 14 is
+ *  typically a few tiles to a couple of dozen), so a long-lived tab can keep
+ *  many places offline without the store growing without bound. */
+const TILE_CACHE_CAP = 1500
+
+interface CachedTile {
+  bytes: ArrayBuffer
+  /** Last time this tile was used (written or re-read), for the cap's eviction. */
+  usedAt: number
+}
+
+/**
+ * Picks which cached entries to drop so the store holds no more than `cap`:
+ * the ones least recently used. Pure so the ordering itself is testable
+ * without touching IndexedDB.
+ */
+export function pickEvictions(entries: { key: string; usedAt: number }[], cap: number): string[] {
+  if (entries.length <= cap) return []
+  return [...entries].sort((a, b) => a.usedAt - b.usedAt).slice(0, entries.length - cap).map((e) => e.key)
+}
+
+async function pruneTileCache(): Promise<void> {
+  const keys = await idbKeys(TILE_DB, TILE_STORE)
+  if (keys.length <= TILE_CACHE_CAP) return
+  const entries = await Promise.all(
+    keys.map(async (key) => ({ key, usedAt: (await idbGet<CachedTile>(TILE_DB, TILE_STORE, key))?.usedAt ?? 0 })),
+  )
+  for (const key of pickEvictions(entries, TILE_CACHE_CAP)) void idbDelete(TILE_DB, TILE_STORE, key)
+}
+
+function loadImageFromBytes(bytes: ArrayBuffer): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(new Blob([bytes]))
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(img)
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('tile decode failed'))
+    }
+    img.src = url
+  })
+}
+
+/**
+ * One Terrarium tile's image, from the IndexedDB cache when it's there —
+ * elevation never changes under a place, so there is no freshness to worry
+ * about, unlike Overpass or Nominatim — and off the network on a miss, caching
+ * the bytes for next time. A corrupt cache entry (a browser bug, a half-written
+ * value) is not fatal: it just falls through to a fresh fetch.
+ */
+async function loadTile(z: number, x: number, y: number): Promise<HTMLImageElement> {
+  const key = tileKey(z, x, y)
+  const cached = await idbGet<CachedTile>(TILE_DB, TILE_STORE, key)
+  if (cached) {
+    try {
+      const img = await loadImageFromBytes(cached.bytes)
+      void idbPut(TILE_DB, TILE_STORE, key, { bytes: cached.bytes, usedAt: Date.now() } satisfies CachedTile)
+      return img
+    } catch {
+      /* fall through to a fresh fetch below */
+    }
+  }
+  const url = TILE_URL(z, x, y)
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`tile load failed: ${url}`)
+  const bytes = await res.arrayBuffer()
+  void idbPut(TILE_DB, TILE_STORE, key, { bytes, usedAt: Date.now() } satisfies CachedTile).then(() => pruneTileCache())
+  return loadImageFromBytes(bytes)
+}
 
 export function decodeTerrarium(r: number, g: number, b: number): number {
   return r * 256 + g + b / 256 - 32768
@@ -31,16 +112,6 @@ export function sampleGrid(heights: Float32Array, w: number, h: number, fx: numb
   const top = h00 + (h10 - h00) * tx
   const bot = h01 + (h11 - h01) * tx
   return top + (bot - top) * ty
-}
-
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`tile load failed: ${url}`))
-    img.src = url
-  })
 }
 
 /**
@@ -72,7 +143,7 @@ export async function loadTerrarium(
 
   for (let ty = minTileY; ty <= maxTileY; ty++) {
     for (let tx = minTileX; tx <= maxTileX; tx++) {
-      const img = await loadImage(TILE_URL(zoom, tx, ty))
+      const img = await loadTile(zoom, tx, ty)
       ctx.drawImage(img, 0, 0)
       const data = ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data
       const ox = (tx - minTileX) * TILE_SIZE

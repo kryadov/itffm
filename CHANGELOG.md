@@ -5,6 +5,15 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.101.1
+Geocoding and elevation tiles are cached offline now, the same way the map data
+already was: a place looked up once, or a terrain tile fetched once, is served
+from IndexedDB on every later visit instead of hitting Nominatim or the AWS
+elevation tiles again — the whole loading pipeline (place name → map data →
+terrain) is now cache-first, and a place you've built before still works with
+the network down. The terrain tile cache is capped and evicts its
+least-recently-used tiles past that, so it never grows without bound.
+
 ## v0.101.0
 The railway is rebuilt. The line now winds through the wood instead of running
 straight — it goes round water, off steep ground and away from the hut — and

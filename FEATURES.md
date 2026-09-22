@@ -20,7 +20,11 @@ trees, clearings, water and paths come from OpenStreetMap, so the wood
 actually matches that place's real ecology. **"Just show me a wood"** drops
 you straight into a **baked-in offline demo wood** instead — and if a named
 place ever fails to build (not found, no map data, the network down), the
-game falls back to that same demo wood rather than an error screen. A
+game falls back to that same demo wood rather than an error screen. A place
+you've built before, and the elevation tiles it stood on, are cached offline
+in the browser, so typing the same name again (or the network being down
+this time) loads it straight from there — no place is fetched from the
+network twice. A
 **plot size** picker controls how large an area to build once you've typed a
 place. A **language switch** (Russian/English) and a **settings** gear (the
 same panel the in-game pause menu opens — walking speed, mouse sensitivity,

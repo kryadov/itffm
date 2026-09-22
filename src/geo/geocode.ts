@@ -1,4 +1,5 @@
 import type { LatLon } from './types'
+import { geocodeCacheGet, geocodeCachePut } from './geocodeCache'
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search'
 
@@ -8,7 +9,7 @@ export function nominatimUrl(query: string): string {
   return `${NOMINATIM_URL}?format=json&limit=8&q=${encodeURIComponent(query)}`
 }
 
-interface NominatimHit {
+export interface NominatimHit {
   lat: string
   lon: string
   class?: string
@@ -43,11 +44,18 @@ export function parseNominatim(json: unknown): LatLon {
   return { lat: parseFloat(hit.lat), lon: parseFloat(hit.lon) }
 }
 
-/** Accepts "lat,lon" directly, otherwise geocodes the free-text query. */
+/**
+ * Accepts "lat,lon" directly, otherwise geocodes the free-text query — from a
+ * cache first (place names don't move), Nominatim only on a miss.
+ */
 export async function geocode(query: string): Promise<LatLon> {
   const coord = query.match(/^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/)
   if (coord) return { lat: parseFloat(coord[1]), lon: parseFloat(coord[2]) }
+  const cached = await geocodeCacheGet(query)
+  if (cached) return parseNominatim(cached)
   const res = await fetch(nominatimUrl(query), { headers: { 'Accept-Language': 'en' } })
   if (!res.ok) throw new Error(`Geocoding error ${res.status}`)
-  return parseNominatim(await res.json())
+  const hits = (await res.json()) as NominatimHit[]
+  void geocodeCachePut(query, hits)
+  return parseNominatim(hits)
 }

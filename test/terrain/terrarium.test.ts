@@ -1,4 +1,4 @@
-import { decodeTerrarium, lonLatToTilePixel, sampleGrid } from '../../src/terrain/terrarium'
+import { decodeTerrarium, lonLatToTilePixel, sampleGrid, tileKey, pickEvictions } from '../../src/terrain/terrarium'
 import { gridProviderFromArray } from '../../src/terrain/gridded'
 
 describe('decodeTerrarium', () => {
@@ -73,5 +73,42 @@ describe('gridProviderFromArray', () => {
 
   it('clamps beyond the edge', () => {
     expect(gridProviderFromArray([0, 10, 20, 30], 10, 1).heightAt(-100, -100)).toBeCloseTo(0)
+  })
+})
+
+describe('tileKey', () => {
+  it('names a tile by its zoom/x/y', () => {
+    expect(tileKey(14, 1234, 5678)).toBe('14/1234/5678')
+  })
+
+  it('keeps different tiles apart', () => {
+    expect(tileKey(14, 1, 2)).not.toBe(tileKey(14, 2, 1))
+    expect(tileKey(14, 1, 2)).not.toBe(tileKey(15, 1, 2))
+  })
+})
+
+describe('pickEvictions', () => {
+  it('picks nothing under the cap', () => {
+    const entries = [{ key: 'a', usedAt: 1 }, { key: 'b', usedAt: 2 }]
+    expect(pickEvictions(entries, 5)).toEqual([])
+    expect(pickEvictions(entries, 2)).toEqual([])
+  })
+
+  it('picks the least recently used entries down to the cap', () => {
+    const entries = [
+      { key: 'newest', usedAt: 30 },
+      { key: 'oldest', usedAt: 10 },
+      { key: 'middle', usedAt: 20 },
+    ]
+    expect(pickEvictions(entries, 2)).toEqual(['oldest'])
+    expect(pickEvictions(entries, 1)).toEqual(['oldest', 'middle'])
+    expect(pickEvictions(entries, 0)).toEqual(['oldest', 'middle', 'newest'])
+  })
+
+  it('does not mutate the entries it was given', () => {
+    const entries = [{ key: 'b', usedAt: 2 }, { key: 'a', usedAt: 1 }]
+    const copy = [...entries]
+    pickEvictions(entries, 0)
+    expect(entries).toEqual(copy)
   })
 })
