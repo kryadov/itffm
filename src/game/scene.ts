@@ -3,6 +3,7 @@ import { buildGround } from '../world/ground'
 import { buildTreeMeshes, treePerches, type Tree } from '../world/trees'
 import { createBirds } from '../world/birds'
 import { createHares, createSquirrels, createSnakes, placeCritterHomes } from '../world/critters'
+import { createTrackFx, type FootSide } from '../world/tracks'
 import { placeHive, hiveObstacle, buildHiveMesh } from '../world/hive'
 import { createBees, createDragonflies } from '../world/insects'
 import { mulberry32 } from '../util/rng'
@@ -223,6 +224,16 @@ export interface Forest {
   /** Steps hares and squirrels — call every frame with the player's own
    *  position, same as `updateBirds`. */
   updateCritters: (dt: number, playerX: number, playerZ: number) => void
+  /** Lays a player footprint at (x, z) — see world/tracks.ts. */
+  layFootTrack: (x: number, z: number, heading: number, side: FootSide) => void
+  /** Lays one segment of a bicycle's tyre track at (x, z). */
+  layBikeTrack: (x: number, z: number, heading: number) => void
+  /** Whether tracks are laid and drawn at all — the settings toggle
+   *  (default on), independent of every other pref. */
+  setTracksEnabled: (on: boolean) => void
+  /** Ages every laid mark toward invisible — call every frame, same as
+   *  updateWater. */
+  updateTracks: (dt: number) => void
   /** Shuttles the train along its line — call every frame. Ambient: no
    *  player position needed, same as `updateInsects` below. */
   updateTrain: (dt: number) => void
@@ -594,14 +605,24 @@ export function createForest(
   // land in — a squirrel idles on the ground and only takes to a trunk when
   // it flees.
   const perches = treePerches(woodTrees)
+  // Fading ground marks — see world/tracks.ts. One shared instance: the
+  // player's own footsteps/bike and every ground animal's paw/trail marks
+  // all land in the same five pools, laid low and ground-toned rather than
+  // the black asphalt skid marks race-the-city's driftfx.ts draws them from.
+  const trackFx = createTrackFx(scene, seed + 40)
+  const onHareStep = (x: number, z: number, heading: number): void => trackFx.layAnimal(staticGround, 'hare', x, z, heading)
+  const onSquirrelStep = (x: number, z: number, heading: number): void =>
+    trackFx.layAnimal(staticGround, 'squirrel', x, z, heading)
+  const onSnakeStep = (x: number, z: number, heading: number): void => trackFx.layAnimal(staticGround, 'snake', x, z, heading)
+
   const hareHomes = placeCritterHomes(staticGround, halfSize, seed + 20, 5, [...treeCircles, ...extraObstacles])
-  const hares = createHares(scene, mulberry32(seed + 21), 5, staticGround, hareHomes)
+  const hares = createHares(scene, mulberry32(seed + 21), 5, staticGround, hareHomes, onHareStep)
   const squirrelHomes = placeCritterHomes(staticGround, halfSize, seed + 22, 5, [...treeCircles, ...extraObstacles])
-  const squirrels = createSquirrels(scene, mulberry32(seed + 23), 5, staticGround, squirrelHomes, perches)
+  const squirrels = createSquirrels(scene, mulberry32(seed + 23), 5, staticGround, squirrelHomes, perches, 20, onSquirrelStep)
   // Rare, per the brainstorm: two snakes to a wood, not five — same species
   // count order of magnitude smaller than hares/squirrels.
   const snakeHomes = placeCritterHomes(staticGround, halfSize, seed + 24, 2, [...treeCircles, ...extraObstacles])
-  const snakes = createSnakes(scene, mulberry32(seed + 25), 2, staticGround, snakeHomes)
+  const snakes = createSnakes(scene, mulberry32(seed + 25), 2, staticGround, snakeHomes, onSnakeStep)
   const updateCritters = (dt: number, playerX: number, playerZ: number): void => {
     hares.update(dt, playerX, playerZ)
     squirrels.update(dt, playerX, playerZ)
@@ -713,6 +734,10 @@ export function createForest(
     insideHut: (x: number, z: number) => insideHutAt(shelter, x, z),
     updateShelter, updateCampfire, updateBirds,
     birdPositions, updateCritters, updateTrain, updateInsects, updateWater,
+    layFootTrack: (x: number, z: number, heading: number, side: FootSide) => trackFx.layFoot(staticGround, x, z, heading, side),
+    layBikeTrack: (x: number, z: number, heading: number) => trackFx.layBike(staticGround, x, z, heading),
+    setTracksEnabled: (on: boolean) => trackFx.setEnabled(on),
+    updateTracks: (dt: number) => trackFx.update(dt),
     updateMushroomLod, pendingPlacements, buildPlacements, updateScatterCulling,
   }
 }

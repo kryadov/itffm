@@ -7,6 +7,7 @@ import { createControls } from './game/controls'
 import { createTouchControls } from './game/touchControls'
 import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
+import { footSide } from './world/tracks'
 import { nearestWater, waterAmbienceGain, type WaterBody } from './audio/waterAmbience'
 import { campfireGain } from './audio/musicAmbience'
 import { classifyWater } from './world/water'
@@ -85,6 +86,9 @@ const BASKET_CAPACITY = 24
 /** How close to a pond/stream ring a footstep reads as "water" underfoot —
  *  close enough to be at its edge, not merely somewhere in view of it. */
 const WATER_FOOTSTEP_RADIUS = 1.5
+/** How far apart the bicycle's tyre-track marks land, metres — see
+ *  world/tracks.ts. */
+const BIKE_TRACK_SPACING = 0.4
 /** Real distance culling for static scatter (trees, boulders, deadwood,
  *  undergrowth, flora, grass) — see world/instanceCulling.ts and TODO.md's
  *  "…но БЕЗ отсечения по дальности". Set past the fog's own far distance
@@ -298,6 +302,7 @@ async function main(): Promise<void> {
   // The loading screen is closed by the render loop, after the first frame
   // has actually been drawn (see `loadingOpen` below) — not here.
   forest.setWeather(save.prefs.weather)
+  forest.setTracksEnabled(save.prefs.groundTracks)
   // Infinite wilderness beyond the home plot — the demo wood only
   // (fellBackTo === 'demo' covers both a deliberate "just show the forest"
   // press and a real query that failed and fell back to it; either way it
@@ -330,6 +335,9 @@ async function main(): Promise<void> {
   const rodInHand = (): boolean => quests.rod.state === 'carrying'
   // 1 walking, 0 riding — eased, so mounting and dismounting do not snap.
   let bobScale = 1
+  // Distance covered since the bicycle last laid a tyre-track mark — see
+  // BIKE_TRACK_SPACING.
+  let bikeTrackAcc = 0
   let bikePrevX = 0
   let bikePrevZ = 0
   // Whatever `save` holds right now — likely the real loaded save by this
@@ -1147,6 +1155,7 @@ async function main(): Promise<void> {
         audio.setFootstepVolume(prefs.footstepVolume)
         forest.setWeather(prefs.weather)
         minimap.setVisible(prefs.minimap)
+        forest.setTracksEnabled(prefs.groundTracks)
         void persistSave(save)
       },
       // The wood is already built around the old quests (items lying out, the
@@ -1415,6 +1424,8 @@ async function main(): Promise<void> {
       const input = touch.active ? touch.read(dt) : controls.read(dt)
       const stepObstacles = worldStream ? [...currentObstacles(), ...worldStream.obstacles()] : currentObstacles()
       const prevBobPhase = player.bobPhase
+      const trackPrevX = player.x
+      const trackPrevZ = player.z
       player = stepPlayer(player, input, combinedGround, stepObstacles, speed)
       if (!worldStream) {
         player.x = Math.max(-halfSize, Math.min(halfSize, player.x))
@@ -1432,6 +1443,19 @@ async function main(): Promise<void> {
         )
         if (nearWater) audio.footstep(footstepSubstrate(biome, nearWater))
         else audio.footstepClip(input.sprinting)
+        forest.layFootTrack(player.x, player.z, player.yaw, footSide(player.bobPhase))
+      }
+
+      // A bicycle leaves a continuous tyre track rather than a footstep-
+      // cadenced pair — one mark roughly every BIKE_TRACK_SPACING metres
+      // actually covered, the same "lay by distance, not by event" driftfx.ts
+      // uses for skid marks.
+      if (isRiding()) {
+        bikeTrackAcc += Math.hypot(player.x - trackPrevX, player.z - trackPrevZ)
+        while (bikeTrackAcc >= BIKE_TRACK_SPACING) {
+          bikeTrackAcc -= BIKE_TRACK_SPACING
+          forest.layBikeTrack(player.x, player.z, player.yaw)
+        }
       }
 
       // Water ambience runs every frame, not on a timer — it is a
@@ -1514,6 +1538,7 @@ async function main(): Promise<void> {
     forest.updateInsects(dt)
     forest.updateTrain(dt)
     forest.updateWater(dt)
+    forest.updateTracks(dt)
     if (flashlightOn) forest.updateFlashlight(camera.position, camera.getWorldDirection(camDir))
 
     cullDistantMushrooms()

@@ -5,6 +5,13 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.101.3
+Fading ground tracks: walking leaves footprints, riding the bicycle leaves a
+tyre track, and a fleeing hare, squirrel or snake leaves its own paw prints
+or trail — pressed into the ground in a dark earth tone rather than a black
+smear, and fading out after a while. On by default; a new settings toggle
+turns it off.
+
 ## v0.101.2
 The bicycle's carried view actually reads as a bicycle now: the front wheel
 was almost dead edge-on to the camera, a flat sliver indistinguishable from

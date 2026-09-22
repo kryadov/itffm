@@ -125,6 +125,11 @@ today, each with real field marks, edibility and season.
 - **Wildlife**: birds nesting and flying between the trees, hares and
   squirrels that bolt when you get close, snakes that quietly slip away,
   bees around a wild hive, dragonflies over the water.
+- **Fading tracks** (on by default, opt-out in settings): footprints trail
+  behind you as you walk, a thin tyre track behind the bicycle, and paw
+  prints or a sinuous trail behind a fleeing hare, squirrel or snake — pressed
+  into the actual ground in a dark earth tone, not a black smear, and gone
+  again after a while rather than staying forever.
 - Streams, ponds, waterfalls and springs, each animated, not a flat panel.
 - A **minimap** (opt-in in settings) and a scrolling **compass**. Once the
   minimap is on, it always marks the hut, the mine, the campfire and the
@@ -226,6 +231,8 @@ whether it's still out there, in your hands, or already home.
 - **Weather** — clear, rain, snow, fog.
 - **Minimap** on/off, plus a separate **quest items on the map** on/off,
   and **invert look** on/off.
+- **Ground tracks** on/off — footprints, tyre and animal tracks (on by
+  default).
 - **Reset quests** — behind a confirmation, from the pause menu or the start
   screen: all five items go back into the wood at their usual spots, the
   hut's trophies and the bicycle's wall are forgotten, and the walk restarts

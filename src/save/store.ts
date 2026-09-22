@@ -53,6 +53,9 @@ export interface Prefs {
    *  and game/touchControls.ts's own dPitch), for players who read "up" on
    *  the stick/mouse as "look down" (a common flight-sim-style preference). */
   invertMouseY: boolean
+  /** On by default — fading footprints/tyre tracks/animal tracks in the
+   *  ground behind whoever left them. See world/tracks.ts. */
+  groundTracks: boolean
 }
 
 export interface SaveData {
@@ -131,6 +134,7 @@ export function defaultPrefs(): Prefs {
     musicVolume: 0.5,
     footstepVolume: 0.6,
     invertMouseY: false,
+    groundTracks: true,
   }
 }
 

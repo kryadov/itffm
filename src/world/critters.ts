@@ -195,6 +195,12 @@ export function createCritterGroup(
   ) => void,
   color: number,
   findFleeTarget?: (x: number, z: number) => { x: number; y: number; z: number } | null,
+  /** Called roughly every `trackSpacing` metres a fleeing critter actually
+   *  covers — its own footprints/paw marks (`world/tracks.ts`), never
+   *  during idle wander, which never moves `c.x`/`c.z` for real. Omit to
+   *  leave a species trackless (nothing calls this for birds, say). */
+  onStep?: (x: number, z: number, heading: number) => void,
+  trackSpacing = 0.35,
 ): CritterGroup {
   const group = new THREE.Group()
   group.name = name
@@ -223,6 +229,10 @@ export function createCritterGroup(
   }
 
   let time = 0
+  // Last spot each critter actually left a mark at, in flee-distance terms —
+  // reset to null so the very first flee step always lays one.
+  const lastTrackX: (number | null)[] = new Array(n).fill(null)
+  const lastTrackZ: (number | null)[] = new Array(n).fill(null)
 
   return {
     setEnabled(on) {
@@ -246,6 +256,15 @@ export function createCritterGroup(
           coreY = c.y
           coreZ = c.z
           heading = c.fleeHeading
+          if (onStep) {
+            const lx = lastTrackX[i]
+            const lz = lastTrackZ[i]
+            if (lx === null || Math.hypot(coreX - lx, coreZ - lz!) >= trackSpacing) {
+              onStep(coreX, coreZ, heading)
+              lastTrackX[i] = coreX
+              lastTrackZ[i] = coreZ
+            }
+          }
         } else if (c.state === 'alert') {
           coreX = c.x
           coreY = c.y
@@ -336,6 +355,7 @@ export function createHares(
   count: number,
   provider: ElevationProvider,
   homes: HomeSpot[],
+  onStep?: (x: number, z: number, heading: number) => void,
 ): CritterGroup {
   return createCritterGroup(
     scene,
@@ -385,6 +405,8 @@ export function createHares(
       tail.setMatrixAt(i, m)
     },
     0x9a8468, // sandy grey-brown fur
+    undefined,
+    onStep,
   )
 }
 
@@ -414,6 +436,7 @@ export function createSquirrels(
   homes: HomeSpot[],
   perches: HomeSpot[],
   perchSearchRadius = 20,
+  onStep?: (x: number, z: number, heading: number) => void,
 ): CritterGroup {
   return createCritterGroup(
     scene,
@@ -466,6 +489,7 @@ export function createSquirrels(
     },
     0xa8542e, // rust-red fur
     (x, z) => nearestPoint(x, z, perches, perchSearchRadius),
+    onStep,
   )
 }
 
@@ -503,6 +527,7 @@ export function createSnakes(
   count: number,
   provider: ElevationProvider,
   homes: HomeSpot[],
+  onStep?: (x: number, z: number, heading: number) => void,
 ): CritterGroup {
   return createCritterGroup(
     scene,
@@ -536,5 +561,8 @@ export function createSnakes(
       }
     },
     0x5a6b3c, // olive-green scales
+    undefined,
+    onStep,
+    0.15, // closer spacing than hare/squirrel — a sinuous trail, not two dots
   )
 }

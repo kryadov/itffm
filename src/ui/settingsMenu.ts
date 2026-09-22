@@ -217,8 +217,8 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   // a second toggle (invert-Y, below) needed the exact same wiring the
   // minimap toggle already had.
   const toggle = (
-    key: 'minimap' | 'minimapQuestHints' | 'invertMouseY',
-    labelKey: 'settingsMinimap' | 'settingsMinimapHints' | 'settingsInvertY',
+    key: 'minimap' | 'minimapQuestHints' | 'invertMouseY' | 'groundTracks',
+    labelKey: 'settingsMinimap' | 'settingsMinimapHints' | 'settingsInvertY' | 'settingsTracks',
   ): void => {
     const row = document.createElement('div')
     row.style.cssText = LABEL_STYLE
@@ -260,6 +260,10 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   toggle('minimapQuestHints', 'settingsMinimapHints')
   // Off by default — most players read "mouse up" as "look up".
   toggle('invertMouseY', 'settingsInvertY')
+  // On by default — fading footprints/tyre tracks/animal tracks read as part
+  // of an ordinary walk in the woods, not a spoiler like the quest hints
+  // above; a player opts out rather than in. See world/tracks.ts.
+  toggle('groundTracks', 'settingsTracks')
 
   // Destructive, so never one click: "Reset…" swaps for a question and a pair
   // of buttons, and a Cancel puts it back exactly as it was.
