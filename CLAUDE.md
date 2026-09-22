@@ -131,9 +131,10 @@ buildings, carriageways and lanes is dropped on the way.
   commit messages, this file. The one exception is the game's own
   player-facing localization: strings live in `src/i18n/` as parallel
   `RU`/`EN` data and are never hardcoded in modules — Russian belongs there
-  and nowhere else in the project. (`CHANGELOG.md` and the specs under
-  `docs/superpowers/specs/` predate this rule and stay Russian where they
-  already are — write new entries in English, don't translate old ones.)
+  and nowhere else in the project. (The specs under `docs/superpowers/specs/`
+  predate this rule and stay Russian where they already are — write new ones
+  in English, don't translate old ones. `CHANGELOG.md` used to be the same
+  way but was translated to English in full on 2026-09-22.)
 - **Determinism.** No `Math.random` anywhere in `src/`. Everything generated
   draws from `mulberry32` (`src/util/rng.ts`), and every generator has a test
   asserting one seed gives one result. The wood must look the same for everyone

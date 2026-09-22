@@ -1,9 +1,10 @@
 # CHANGELOG
 
-Одна строка на релиз, сверху вниз от новых к старым. Что именно и почему —
-в истории коммитов; здесь только краткая сводка того, что вышло. Что есть в
-игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
-[GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
+One line per release, newest to oldest. What exactly and why is in the
+commit history; this is only a short summary of what shipped. What's in the
+game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
+[GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
+`master`.
 
 ## v0.101.4
 A long play session now learns when a new version has shipped: a banner
@@ -273,9 +274,9 @@ Footsteps: a short synthesized sound per substrate underfoot (leaf litter,
 moss, sand, a splash near water), timed off the camera's own walking bob.
 
 ## v0.72.0
-The "Размер участка" (world-size) picker now hides itself whenever it
-would have meant nothing — an empty place field already falls back to the
-demo wood, size and all.
+The world-size picker now hides itself whenever it would have meant
+nothing — an empty place field already falls back to the demo wood, size
+and all.
 
 ## v0.71.0
 Real moon phases in the night sky — `world/moonPhase.ts` reads tonight's
@@ -338,198 +339,205 @@ Fixed the hut's toy-sized scale, and firewood that poked through its own
 wall.
 
 ## v0.56.0
-LOD для собранных находок — дешёвый силуэт (конус на bounding box, цвет
-усреднён из запечённых вершинных цветов) дальше 18м, настоящая геометрия
-ближе.
+LOD for collected finds — a cheap silhouette (a cone on the bounding box,
+colour averaged from baked vertex colours) past 18m, real geometry closer.
 
 ## v0.55.0
-Звук сбора гриба — короткий синтезированный «щелчок» (шумовой всплеск через
-highpass), не CC0-запись: тот же принцип «рисуем без картинок», применённый
-к звуку.
+The sound of picking a mushroom — a short synthesized "click" (a noise
+burst through a highpass), not a CC0 recording: the same "draw without
+pictures" principle, applied to sound.
 
 ## v0.54.0
-PWA — офлайн-запуск и иконка на домашний экран. Сервис-воркер
-предзакеширует текущий бандл в `install`, а не пассивно по мере запросов.
+PWA — offline launch and a home-screen icon. The service worker precaches
+the current bundle in `install`, rather than passively as requests come in.
 
 ## v0.53.0
-Портретная раскладка энциклопедии и карточки вида — вертикальный стек вместо
-двух узких колонок на телефонном экране.
+Portrait layout for the encyclopedia and the species card — a vertical
+stack instead of two narrow columns on a phone screen.
 
 ## v0.52.0
-Экранные кнопки для тач-устройств — энциклопедия, разбор корзины, присесть.
+On-screen buttons for touch devices — encyclopedia, basket review, crouch.
 
 ## v0.51.0
-Тач-управление — виртуальный стик для ходьбы, свайп для обзора, тап прямо по
-находке вместо прицела с `E`.
+Touch controls — a virtual stick for walking, swipe to look around, tapping
+a find directly instead of aiming with `E`.
 
 ## v0.50.0
-Землянка ставится на настоящую отмеченную в OSM хижину/вышку, если такая
-есть в этом месте, а не только процедурно.
+The shelter is now sited on a real hut/tower actually marked in OSM, if
+this place has one, instead of only procedurally.
 
 ## v0.49.0
-Fix: ягоды растут на настоящем кусте с ветками и листьями, не кластером сфер
-в воздухе — заодно решило и старую жалобу «ягоды не собираются».
+Fix: berries now grow on a real bush with branches and leaves, not a
+cluster of spheres floating in the air — this also fixed the old complaint
+"berries can't be picked."
 
 ## v0.48.0
-Землянка — настоящие рамы на окнах, убран протекающий из-под пола свет,
-охапка дров и колодец рядом; постоянный `?debug=1`/`F3` оверлей для живой
-отладки прицела.
+The shelter — real window frames, the light leaking from under the floor
+fixed, a stack of firewood and a well nearby; a permanent `?debug=1`/`F3`
+overlay for live aim debugging.
 
 ## v0.47.0
-Fix: ягоды/травы/находки теперь прицеливаются той же логикой, что и гриб —
-невидимый хитбокс по размеру модели вместо отдельного углового кода.
+Fix: berries/herbs/finds now aim the same way a mushroom does — an
+invisible hitbox sized to the model instead of separate one-off angle code.
 
 ## v0.46.0
-Fix: конус прицеливания для мелких находок; деревья больше не растут поверх
-тропинок.
+Fix: an aiming cone for small finds; trees no longer grow over paths.
 
 ## v0.45.0
-Подстилка лесного пола — шумовые пятна тёмной земли вместо ровной заливки.
+Forest-floor litter — noisy patches of dark earth instead of a flat fill.
 
 ## v0.44.0
-Fix: конус прицеливания для мелких находок гасился любой травинкой на луче.
+Fix: the aiming cone for small finds was blocked by any blade of grass on
+the ray.
 
 ## v0.43.0
-Экспорт энциклопедии картинкой — сетка найденных видов, обычное скачивание
-PNG.
+Export the encyclopedia as an image — a grid of found species, a plain PNG
+download.
 
 ## v0.42.0
-Свои заметки к находке — где нашёл, что запомнилось, в «Разборе корзины».
+Your own notes on a find — where you found it, what you remember, in
+"Basket review."
 
 ## v0.41.0
-Рельеф дюн и болота — гряды и кочки, не только цвет земли.
+Terrain for dunes and bog — ridges and hummocks, not just the colour of the
+ground.
 
 ## v0.40.0
-Ручьи, водопады и родники — лента вдоль русла, а не одна плоская панель.
+Streams, waterfalls and springs — a ribbon along the streambed, not one
+flat panel.
 
 ## v0.39.0
-Птицы — взлёт, полёт, посадка, наземная возня; последний крупный перенос из
+Birds — takeoff, flight, landing, ground fidgeting; the last big port from
 race-the-city.
 
 ## v0.38.0
-Мини-карта — по умолчанию выключена, компас остаётся основным ориентиром.
+A minimap — off by default, the compass stays the main way to orient.
 
 ## v0.37.0
-Хвойные деревья — своя крона на каждый род, не один конус на всех.
+Conifer trees — their own crown per genus, not one cone for all of them.
 
 ## v0.36.0
-Постоянная подсказка по управлению (`H`) во время ходьбы.
+A permanent controls hint (`H`) while walking.
 
 ## v0.35.0
-Номер версии на титульном экране; три живых фикса подряд (возврат мыши после
-осмотра, дрожь камеры, углы землянки).
+The version number on the title screen; three live fixes in a row (the
+mouse returning after inspection, camera jitter, the shelter's corners).
 
 ## v0.34.0
-Покачивание камеры и ритм шага; фиксы `E` на мелких находках и тропинки за
-краем участка.
+Camera bob and footstep rhythm; fixes for `E` on small finds and paths past
+the edge of the plot.
 
 ## v0.33.0
-Землянка — окна, дверь, труба с дымом, свет ночью, объёмнее стены.
+The shelter — windows, a door, a smoking chimney, light at night, chunkier
+walls.
 
 ## v0.32.0
-Подлесок растёт пятнами, не ровным газоном.
+Undergrowth grows in patches, not an even lawn.
 
 ## v0.31.0
-Полу-поваленные деревья.
+Half-fallen trees.
 
 ## v0.30.0
-Запрыгнуть на валун, пень или тонкое бревно, если высота позволяет.
+Jump onto a boulder, stump or a thin log, if the height allows it.
 
 ## v0.29.0
-След потревоженной подстилки на месте сбора.
+A mark of disturbed litter where something was picked.
 
 ## v0.28.0
-Корзина в 3D — карточки-превью реальных экземпляров вместо счётчиков.
+The basket in 3D — preview cards of the real specimens instead of counters.
 
 ## v0.27.0
-Экран загрузки — вращающийся гриб и прогресс-бар по стадии загрузки.
+A loading screen — a spinning mushroom and a progress bar by loading stage.
 
 ## v0.26.0
-Находки — пятый и последний `kind` лесных находок (птичье гнездо, рог,
-камень).
+Finds — the fifth and last `kind` of forest finds (a bird's nest, an
+antler, a stone).
 
 ## v0.25.0
-Орехи — четвёртый `kind` (лещина, жёлудь).
+Nuts — the fourth `kind` (hazelnut, acorn).
 
 ## v0.24.0
-Травы — третий `kind` (крапива, черемша, щавель).
+Herbs — the third `kind` (nettle, ramsons, sorrel).
 
 ## v0.23.0
-Морошка — четвёртая ягода, единственная на болоте.
+Cloudberry — the fourth berry, the only one on the bog.
 
 ## v0.22.0
-Ягоды — второй `kind` собираемого; `Species` стал дискриминированным
-объединением по `kind` вместо только грибов.
+Berries — the second collectible `kind`; `Species` became a discriminated
+union by `kind` instead of mushrooms only.
 
 ## v0.21.0
-Кнопка настроек в углу экрана; посадочные точки на деревьях для будущих
-птиц.
+A settings button in the corner of the screen; perch points on trees for
+future birds.
 
 ## v0.20.0
-Фонарик на `F`.
+A flashlight on `F`.
 
 ## v0.19.0
-Погода — дождь, снег, туман.
+Weather — rain, snow, fog.
 
 ## v0.18.0
-Дюны и болото — цвет земли и физика ходьбы; срезать гриб, не только
-собрать.
+Dunes and bog — ground colour and walking physics; cut a mushroom, not just
+pick it.
 
 ## v0.17.0
-Номер версии в углу экрана; выход в меню на `Esc`.
+The version number in the corner of the screen; `Esc` exits to the menu.
 
 ## v0.16.0
-Смена дня и ночи — режимы день/ночь/цикл.
+A day/night change — day/night/cycle modes.
 
 ## v0.15.0
-Меню настроек — скорость ходьбы, чувствительность мыши, дальность
-прорисовки, язык.
+A settings menu — walking speed, mouse sensitivity, draw distance,
+language.
 
 ## v0.14.0
-Водоёмы — поверхность, юбка по берегу, источник влажности для экологии.
+Water bodies — a surface, a skirt along the bank, a moisture source for
+ecology.
 
 ## v0.13.0
-Тропинки — земляная лента вдоль путей из OSM.
+Paths — an earthen ribbon along OSM ways.
 
 ## v0.12.0
-Облака, переносимые над лесом.
+Clouds, drifting over the wood.
 
 ## v0.11.0
-Небо — купол с градиентом, солнцем и звёздами вместо плоской заливки.
+The sky — a dome with a gradient, a sun and stars instead of a flat fill.
 
 ## v0.10.0
-Гриб прячется за травой и подлеском от прицела, не только от глаза.
+A mushroom hides behind grass and undergrowth from the aim, not just from
+the eye.
 
 ## v0.9.0
-Трава — гуще во влажных низинах.
+Grass — thicker in damp low ground.
 
 ## v0.8.0
-Размер участка настраивается на экране выбора места; фильтры в энциклопедии
-— биом, съедобность, гименофор, сезон.
+Plot size is configurable on the place-picker screen; encyclopedia filters
+— biome, edibility, hymenophore, season.
 
 ## v0.7.0
-Случайные ямы и западины в рельефе; поляны и опушки внутри леса.
+Random pits and hollows in the terrain; clearings and glades inside the
+wood.
 
 ## v0.6.0
-Список известных лесов на экране выбора места; ведьмино кольцо шампиньона;
-землянка (первая версия — точка старта игрока); цветы, папоротник,
-кустарник.
+A list of known woods on the place-picker screen; a champignon fairy ring;
+the shelter (first version — the player's starting point); flowers, fern,
+shrub.
 
 ## v0.5.0
-Склон замедляет подъём, прыжок, компас, честный выбор точки старта, формы
-крон деревьев, валежник, валуны.
+A slope slows the climb, a jump, a compass, an honest choice of starting
+point, tree-crown shapes, deadwood, boulders.
 
 ## v0.4.0
-База видов расширена с 3 до 25 — сморчок, строчок, груздь, подосиновик,
-лисичка ложная и другие.
+The species database expanded from 3 to 25 — morel, false morel, milk-cap,
+orange birch bolete, false chanterelle and others.
 
 ## v0.3.0
-Реальная география — план 2 завершён: лес строится из настоящего места по
-OpenStreetMap и AWS Terrain Tiles, с офлайн-демо-лесом как честным
-запасным вариантом.
+Real geography — plan 2 is done: the wood is built from a real place via
+OpenStreetMap and AWS Terrain Tiles, with an offline demo wood as an honest
+fallback.
 
 ## v0.2.0
-Играбельный срез целиком — план 1 завершён (задачи 1-17).
+A whole playable slice — plan 1 is done (tasks 1-17).
 
 ## v0.1.0
-Первая играбельная версия — задачи 1-6.
+The first playable version — tasks 1-6.
