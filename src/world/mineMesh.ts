@@ -245,6 +245,22 @@ function buildInterior(m: Mine, material: THREE.Material): THREE.Mesh {
   return mesh
 }
 
+/** The mound's own smooth surface normal at (x, z) — the height field's
+ *  gradient, central-differenced. Shared by `buildDeck` (every vertex) and
+ *  `buildFace` (only its top row, which sits at this same height): giving
+ *  both meshes the identical normal exactly on their shared edge is what
+ *  makes the two read as one continuous surface instead of a lighting seam
+ *  at the join (a live report, 2026-09-22: "some outcrop edges are poorly
+ *  glued") — `buildFace`'s own strips are otherwise flat-shaded and would
+ *  disagree with the mound's smooth shading right at the boundary they share. */
+function deckNormalAt(terrain: MineTerrain, x: number, z: number): [number, number, number] {
+  const e = 0.25
+  const dx = terrain.deckAt(x + e, z) - terrain.deckAt(x - e, z)
+  const dz = terrain.deckAt(x, z + e) - terrain.deckAt(x, z - e)
+  const l = Math.hypot(dx, 2 * e, dz)
+  return [-dx / l, (2 * e) / l, -dz / l]
+}
+
 /** Where the mound meets the levelled apron: one strip of rock face per pair
  *  of neighbouring z stations, doorway left open. Its top edge is the mound's
  *  own front row, so the two share vertices. */
@@ -297,6 +313,23 @@ function buildFace(m: Mine, terrain: MineTerrain, material: THREE.Material): THR
   }
   const mesh = new THREE.Mesh(b.geometry(), material)
   mesh.name = 'mine-face'
+
+  // Every strip's top edge is a point on the mound (see `strip`'s own t0/t1,
+  // taken straight from `terrain.deckAt`) — overriding just those vertices'
+  // normals with the mound's own analytic one (`deckNormalAt`, identical to
+  // `buildDeck`'s `b.smooth`) removes the shading discontinuity right at the
+  // join, without touching the rest of the face's own flat-shaded rock.
+  const facePos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
+  const faceNorm = mesh.geometry.getAttribute('normal') as THREE.BufferAttribute
+  for (let i = 0; i < facePos.count; i++) {
+    const x = facePos.getX(i)
+    const z = facePos.getZ(i)
+    if (Math.abs(facePos.getY(i) - terrain.deckAt(x, z)) < 0.01) {
+      const [nx, ny, nz] = deckNormalAt(terrain, x, z)
+      faceNorm.setXYZ(i, nx, ny, nz)
+    }
+  }
+  faceNorm.needsUpdate = true
   return mesh
 }
 
@@ -328,13 +361,7 @@ function buildDeck(m: Mine, terrain: MineTerrain, material: THREE.Material): THR
     return rockMix.lerp(GRASS_COLOR, Math.min(1, k * 1.15))
   }
   const up: [number, number, number] = [0, 1e4, 0]
-  b.smooth = (x, _y, z) => {
-    const e = 0.25
-    const dx = terrain.deckAt(x + e, z) - terrain.deckAt(x - e, z)
-    const dz = terrain.deckAt(x, z + e) - terrain.deckAt(x, z - e)
-    const l = Math.hypot(dx, 2 * e, dz)
-    return [-dx / l, (2 * e) / l, -dz / l]
-  }
+  b.smooth = (x, _y, z) => deckNormalAt(terrain, x, z)
   for (let i = 0; i < ni; i++) {
     for (let j = -nj; j < nj; j++) {
       const cx = (i + 0.5) * DECK_STEP

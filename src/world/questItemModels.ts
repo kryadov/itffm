@@ -185,8 +185,15 @@ function buildBikeWheel(m: BikeMaterials): THREE.Group {
   return wheel
 }
 
-/** The bar across the bike (along z) with a rubber grip at each end, centred
- *  where it is fixed to the stem. */
+/** A bell's own bright brass, distinct from the frame/spoke metal — it is
+ *  a small, separately coloured fitting on a real bike, not another grey part. */
+const BELL_COLOR = 0xcaa23a
+
+/** The bar across the bike (along z) with a rubber grip at each end, a hand
+ *  brake lever curving forward and down from just inboard of each grip, and
+ *  a bell perched on top near the right grip — three details a bare tube
+ *  and two grips left out, read as "not quite a real handlebar" (a live
+ *  report, 2026-09-22). Centred where the bar is fixed to the stem. */
 function buildBikeHandlebar(m: BikeMaterials): THREE.Group {
   const bar = new THREE.Group()
   bar.name = 'handlebar'
@@ -199,7 +206,20 @@ function buildBikeHandlebar(m: BikeMaterials): THREE.Group {
     grip.rotation.x = Math.PI / 2
     grip.position.z = side * 0.19
     bar.add(grip)
+
+    // A lever just inboard of the grip, reaching forward and down the way a
+    // real brake lever does — one straight tube is enough at this size.
+    const leverStart = new THREE.Vector3(0.012, 0, side * 0.145)
+    const leverEnd = new THREE.Vector3(0.09, -0.05, side * 0.145)
+    bar.add(tube(leverStart, leverEnd, 0.006, m.metal))
   }
+  const bellMat = new THREE.MeshStandardMaterial({ color: BELL_COLOR, roughness: 0.35, metalness: 0.7 })
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.02, 12), bellMat)
+  bell.position.set(0, 0.02, 0.1)
+  bar.add(bell)
+  const bellButton = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.01, 8), m.metal)
+  bellButton.position.set(0, 0.035, 0.1)
+  bar.add(bellButton)
   bar.position.copy(BIKE_STEM_TOP)
   return bar
 }

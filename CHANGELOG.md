@@ -6,6 +6,14 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.101.6
+Two more live-report fixes. Some of the mine's outcrop edges read as poorly
+joined — the rock face and the grassy mound over it disagreed on their
+shared edge's lighting; they now share the identical surface normal there.
+The bicycle's handlebar gets a bell and hand brake levers, so it reads as a
+real handlebar rather than a bare bar with grips — visible both parked at
+the shelter and low in view while riding.
+
 ## v0.101.5
 Two live-report tuning fixes. The bicycle's carried front wheel no longer
 sits at a strongly canted angle jammed up against the screen — a smaller
