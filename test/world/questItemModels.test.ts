@@ -1,10 +1,9 @@
 import * as THREE from 'three'
 import {
   buildAxeModel, buildLampModel, buildRodModel, buildBikeModel, buildBikeCockpitModel,
-  buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH,
+  buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH, BIKE_WHEEL_RADIUS,
 } from '../../src/world/questItemModels'
 import { ROLLING_RADIUS } from '../../src/game/bikeSteer'
-import { TREAD_BLOCKS } from '../../src/world/questItemModels'
 
 function meshCount(o: THREE.Object3D): number {
   let n = 0
@@ -186,46 +185,38 @@ describe('the bicycle wheel turns, and you can see it turn', () => {
   const wheelOf = (g: THREE.Object3D) => g.getObjectByName('wheel')!
 
   it('the cockpit can spin its front wheel about its own axle, leaving it where it is', () => {
+    // The wheel sits inside its own extra `wheelTilt` turn (see
+    // buildBikeCockpitModel) so it opens toward the camera instead of
+    // showing edge-on as a flat line — a live report, 2026-09-22, "this
+    // doesn't look like a bicycle at all". `spin()` still only ever sets the
+    // wheel's OWN rotation.z, so it keeps turning cleanly about its own
+    // (now tilted) axle; its axis-aligned box can and does wiggle a little
+    // as it turns, same as any tilted disc's world-axis-aligned box does.
     const { group, spin } = buildBikeCockpitModel()
     group.updateMatrixWorld(true)
     const before = wheelOf(group).getWorldPosition(new THREE.Vector3())
-    const size = new THREE.Box3().setFromObject(wheelOf(group)).getSize(new THREE.Vector3())
     spin(1.3)
     group.updateMatrixWorld(true)
     expect(wheelOf(group).rotation.z).toBeCloseTo(1.3)
     expect(wheelOf(group).getWorldPosition(new THREE.Vector3()).distanceTo(before)).toBeLessThan(1e-9)
-    const after = new THREE.Box3().setFromObject(wheelOf(group)).getSize(new THREE.Vector3())
-    expect(after.z).toBeCloseTo(size.z, 6) // it turns in its own plane: no wobble across the bike
   })
 
-  it('has a wide tyre with a tread of alternating blocks, which is what shows a turn from the saddle', () => {
-    // From behind the bar the front wheel is seen edge-on, as a strip of tyre: only
-    // a tread pattern running round it reads as turning.
+  it('has a modest tyre with a tread of studs in one matte shade, not a barcode of alternating colours', () => {
+    // From behind the bar the front wheel is seen edge-on, as a strip of tyre: it
+    // has to read as rubber, not as a striped decal (a live report, 2026-09-22).
     const wheel = wheelOf(buildBikeCockpitModel().group)
     const size = new THREE.Box3().setFromObject(wheel).getSize(new THREE.Vector3())
-    expect(size.z).toBeGreaterThan(0.08) // a tyre you can see, not a wire
+    expect(size.z).toBeGreaterThan(0.05) // a tyre you can see, not a wire
+    expect(size.z).toBeLessThan(0.09) // but a bicycle tyre, not an offroad one
     const treads: THREE.Mesh[] = []
     wheel.traverse((o) => { if (o.name === 'tread' && o instanceof THREE.Mesh) treads.push(o) })
-    expect(treads.length).toBe(2) // two shades, alternating round the rim
-    const colours = treads.map((t) => (t.material as THREE.MeshStandardMaterial).color.getHex())
-    expect(new Set(colours).size).toBe(2)
-  })
-
-  it('has a pattern coarse enough that the wheel never seems to run backward at riding speed', () => {
-    // The wagon-wheel effect: a pattern that repeats every P degrees seems to run
-    // BACKWARD once the wheel turns more than P/2 between two frames. Riding at
-    // 1.6 x walking speed sprinting is about 10 m/s, and a slow machine draws 30
-    // frames a second: 10 / 0.349 / 30 = 0.95 rad, 55 degrees a frame. The pattern's
-    // period (a light block and a dark one) has to be at least twice that.
-    const wheel = wheelOf(buildBikeCockpitModel().group)
-    let blocks = 0
-    wheel.traverse((o) => {
-      if (o.name === 'tread' && o instanceof THREE.Mesh) blocks += o.geometry.getAttribute('position').count > 0 ? 1 : 0
-    })
-    expect(blocks).toBe(2)
-    const period = (2 * Math.PI) / TREAD_BLOCKS * 2
-    const perFrameAt30fps = (10 / ROLLING_RADIUS) / 30
-    expect(period / 2).toBeGreaterThan(perFrameAt30fps)
+    expect(treads.length).toBe(1) // one mesh, the studs are geometry, not colour
+    const tireColour = (wheel.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh).material as THREE.MeshStandardMaterial
+    const treadColour = treads[0].material as THREE.MeshStandardMaterial
+    expect(tireColour.color.getHex()).not.toBe(treadColour.color.getHex()) // still a shade apart, not identical
+    // ...but close: both dark, not a light/dark checkerboard.
+    const luma = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+    expect(Math.abs(luma(tireColour.color) - luma(treadColour.color))).toBeLessThan(0.15)
   })
 
   it('has many spokes, so it reads as a wheel and not a few sticks', () => {
@@ -234,21 +225,23 @@ describe('the bicycle wheel turns, and you can see it turn', () => {
     expect(spokes).toBeGreaterThanOrEqual(8)
   })
 
-  it('has one bright reflector on the rim, so a turn is seen: with evenly spaced spokes alone it looks the same every few degrees', () => {
+  it('a spoke sweeps round the hub as the wheel spins, so the turn is visible without any marker', () => {
+    // No more bright rim reflector (a live report, 2026-09-22: it read as a
+    // foreign sticker, not part of a bike) — the turn is now read straight off a
+    // spoke's own swept position, the way an eye actually reads a turning wheel.
     const { group, spin } = buildBikeCockpitModel()
-    const reflector = () => {
+    const wheel = wheelOf(group)
+    const spoke = wheel.children.find((c) => c.name === 'spoke') as THREE.Mesh
+    const tip = () => {
       group.updateMatrixWorld(true)
-      // the patch on the tread (the group itself sits on the axle and does not move)
-      return group.getObjectByName('reflector')!.children[0].getWorldPosition(new THREE.Vector3())
+      return spoke.localToWorld(new THREE.Vector3(0, BIKE_WHEEL_RADIUS, 0))
     }
-    const at0 = reflector()
-    spin(Math.PI / 8) // the spoke spacing: everything else would look identical
-    expect(reflector().distanceTo(at0)).toBeGreaterThan(0.05)
+    const at0 = tip()
+    spin(Math.PI / 8) // the spoke spacing: with evenly spaced spokes alone this would look identical
+    expect(tip().distanceTo(at0)).toBeGreaterThan(0.05)
     spin(2 * Math.PI)
-    expect(reflector().distanceTo(at0)).toBeLessThan(1e-6)
-    const mesh = group.getObjectByName('reflector')!.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh
-    expect(mesh.material).toBeInstanceOf(THREE.MeshStandardMaterial)
-    expect((mesh.material as THREE.MeshStandardMaterial).emissiveIntensity).toBeGreaterThan(0.3)
+    expect(tip().distanceTo(at0)).toBeLessThan(1e-6)
+    expect(group.getObjectByName('reflector')).toBeUndefined()
   })
 
   it('the rim sits where the rolling radius says, so the road speed and the turn agree', () => {

@@ -84,8 +84,6 @@ describe('createBikeView', () => {
     )
     const wheel = view.group.getObjectByName('wheel')!
     expect(frustum.containsPoint(wheel.getWorldPosition(new THREE.Vector3()))).toBe(true)
-    const top = view.group.getObjectByName('reflector')!.children[0].getWorldPosition(new THREE.Vector3())
-    expect(frustum.containsPoint(top)).toBe(true)
     // ...and a fair part of the wheel, not a sliver: the box around it is mostly inside.
     const box = new THREE.Box3().setFromObject(wheel)
     let inside = 0

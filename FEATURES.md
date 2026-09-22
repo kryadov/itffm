@@ -163,10 +163,10 @@ clustering in whichever one the dice happened to favour:
   rod is, instead of quietly doing nothing.
 - **Bicycle** — while you carry it you are riding it: 1.6 times faster
   everywhere, path or not; the view stops swaying like a walk and there are no
-  footsteps; its handlebar and front wheel show low in your view and turn as you
-  turn, and the wheel spins with the speed you ride (a chunky tread and an
-  orange reflector make it easy to see; it runs backward when you back up and
-  stops when you do). You leave it against whichever wall of the hut you are standing at when
+  footsteps; its handlebar and front wheel show low in your view, angled so the
+  rim opens toward you rather than edge-on, and turn as you turn; the wheel
+  spins with the speed you ride, its spokes visibly sweeping round as it does
+  (it runs backward when you back up and stops when you do). You leave it against whichever wall of the hut you are standing at when
   you press `E` (any of the four — not only by the door), where it stands on
   the real ground, off the doorway, and is gone from your view — and take it
   again from there with `E`. Left at the hut it does nothing.

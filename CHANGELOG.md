@@ -5,6 +5,17 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.101.2
+The bicycle's carried view actually reads as a bicycle now: the front wheel
+was almost dead edge-on to the camera, a flat sliver indistinguishable from
+the fork beside it, so nothing about it — tread, spokes, thickness — could
+read at all. It now sits at its own fixed angle so the rim opens toward the
+rider, a slimmer tyre (it had doubled its own width), a uniform matte tread
+instead of a light/dark barcode round the rim, thicker and more contrasty
+spokes, no more bright reflector patch (it read as a stuck-on sticker; a
+turn now shows straight off the spokes' own sweep), and a longer top-tube
+stub that runs off the edge of the view instead of stopping short in mid-air.
+
 ## v0.101.1
 Geocoding and elevation tiles are cached offline now, the same way the map data
 already was: a place looked up once, or a terrain tile fetched once, is served
