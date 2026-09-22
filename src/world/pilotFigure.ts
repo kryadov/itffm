@@ -122,6 +122,93 @@ export function buildPilotFigure(): {
 }
 
 /**
+ * A person just standing and waving — the start screen's own live backdrop
+ * (docs/superpowers/specs, the attract-mode flyover): same materials and
+ * proportions as `buildPilotFigure`, but no controller, and one arm raised
+ * and swinging rather than both held forward. A separate build rather than
+ * a mode flag on the pilot figure, since the two poses share no geometry
+ * beyond legs/torso/head.
+ */
+export function buildWavingFigure(): { group: THREE.Group; wave: (t: number) => void; dispose: () => void } {
+  const group = new THREE.Group()
+  group.name = 'wavingFigure'
+  const mat = (color: number, rough = 0.85): THREE.MeshStandardMaterial =>
+    new THREE.MeshStandardMaterial({ color, roughness: rough })
+  const put = (mesh: THREE.Mesh, name: string, x: number, y: number, z: number): THREE.Mesh => {
+    mesh.name = name
+    mesh.position.set(x, y, z)
+    group.add(mesh)
+    return mesh
+  }
+
+  for (const side of [-1, 1]) {
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.72, 0.2), mat(TROUSERS)), 'leg', side * 0.1, 0.5, 0)
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.14, 0.32), mat(BOOTS)), 'boot', side * 0.1, 0.07, -0.05)
+  }
+  put(new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.6, 0.26), mat(JACKET)), 'torso', 0, 1.14, 0)
+
+  // The still arm, hanging at the side.
+  put(new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.42, 0.11), mat(JACKET)), 'arm', -0.26, 0.98, 0)
+  put(new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), mat(SKIN)), 'hand', -0.26, 0.75, 0)
+
+  // The waving arm: one shoulder pivot so the whole limb swings as a single
+  // piece, raised out to the same side it is attached (+x) and above
+  // shoulder height before any wave motion — the simplest shape that still
+  // reads as "waving" from any angle a circling camera can see it from.
+  const shoulder = new THREE.Group()
+  shoulder.name = 'waveShoulder'
+  shoulder.position.set(0.26, 1.4, 0)
+  const waveArm = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.4, 0.11), mat(JACKET))
+  waveArm.position.set(0, -0.2, 0)
+  shoulder.add(waveArm)
+  const waveHand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 8, 6), mat(SKIN))
+  waveHand.name = 'hand'
+  waveHand.position.set(0, -0.42, 0)
+  shoulder.add(waveHand)
+  group.add(shoulder)
+
+  const headPivot = new THREE.Group()
+  headPivot.name = 'head'
+  headPivot.position.set(0, 1.5, 0)
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), mat(SKIN))
+  skull.position.y = 0.11
+  headPivot.add(skull)
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.125, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(CAP))
+  cap.name = 'cap'
+  cap.position.y = 0.14
+  headPivot.add(cap)
+  const brim = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.02, 0.13), mat(CAP))
+  brim.position.set(0, 0.145, -0.13)
+  headPivot.add(brim)
+  group.add(headPivot)
+
+  /** Where the shoulder swings between, radians about its own Z: near
+   *  straight up (WAVE_CENTRE + WAVE_SWING) to out at the side and a little
+   *  above shoulder height (WAVE_CENTRE - WAVE_SWING). */
+  const WAVE_CENTRE = 2.1
+  const WAVE_SWING = 0.35
+  /** How fast the arm swings side to side, radians a second. */
+  const WAVE_RATE = 6
+
+  /** Pose the waving arm for elapsed time `t`, seconds — call every frame. */
+  const wave = (t: number): void => {
+    shoulder.rotation.z = WAVE_CENTRE + Math.sin(t * WAVE_RATE) * WAVE_SWING
+  }
+  wave(0)
+
+  const dispose = (): void => {
+    group.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        o.geometry.dispose()
+        const m = o.material
+        if (!Array.isArray(m)) m.dispose()
+      }
+    })
+  }
+  return { group, wave, dispose }
+}
+
+/**
  * A tall slim pole with a flag on top, standing where the pilot stands and
  * reaching above the tallest tree: seen from over the canopy, where the pilot
  * themself is hidden, it says where home is. Unlit, so it shows in any light.

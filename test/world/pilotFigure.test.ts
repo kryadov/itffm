@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { buildPilotFigure, buildPilotBeacon } from '../../src/world/pilotFigure'
+import { buildPilotFigure, buildPilotBeacon, buildWavingFigure } from '../../src/world/pilotFigure'
 import { LOOK } from '../../src/world/trees'
 
 const box = (o: THREE.Object3D) => {
@@ -72,6 +72,62 @@ describe('buildPilotFigure', () => {
 
   it('disposes without throwing', () => {
     const { dispose } = buildPilotFigure()
+    expect(() => dispose()).not.toThrow()
+  })
+})
+
+describe('buildWavingFigure', () => {
+  // The start screen's own live backdrop: a person standing near the shelter,
+  // waving, no controller — a separate pose from the drone pilot's.
+  it('is a person: about human height, standing on the ground', () => {
+    const { group } = buildWavingFigure()
+    const b = box(group)
+    const size = b.getSize(new THREE.Vector3())
+    expect(size.y).toBeGreaterThan(1.55)
+    expect(size.y).toBeLessThan(1.95)
+    expect(b.min.y).toBeCloseTo(0, 2)
+    // Wider than the piloting pose across x: one arm is raised out to the
+    // side rather than both held forward — still a person's proportions,
+    // not something ballooning out of shape.
+    expect(size.x).toBeLessThan(1.3)
+    expect(size.z).toBeLessThan(1)
+  })
+
+  it('has legs, a torso, a head with a cap, a still arm and a waving one — no controller', () => {
+    const { group } = buildWavingFigure()
+    for (const name of ['leg', 'torso', 'arm', 'head', 'cap', 'waveShoulder']) {
+      expect(group.getObjectByName(name), name).toBeDefined()
+    }
+    expect(group.getObjectByName('controller')).toBeUndefined()
+  })
+
+  it('swings the waving arm back and forth over time, not just holding a pose', () => {
+    const { group, wave } = buildWavingFigure()
+    const shoulder = group.getObjectByName('waveShoulder')!
+    wave(0)
+    const a = shoulder.rotation.z
+    wave(0.3)
+    const b = shoulder.rotation.z
+    wave(0.6)
+    const c = shoulder.rotation.z
+    expect(a).not.toBeCloseTo(b, 3)
+    expect(b).not.toBeCloseTo(c, 3)
+  })
+
+  it('keeps the waving hand above the shoulder at every point of the swing, never dangling', () => {
+    const { group, wave } = buildWavingFigure()
+    const shoulder = group.getObjectByName('waveShoulder')!
+    for (let i = 0; i < 40; i++) {
+      wave(i / 10)
+      group.updateMatrixWorld(true)
+      const hand = shoulder.getObjectByName('hand')
+      const handWorld = hand ? hand.getWorldPosition(new THREE.Vector3()) : shoulder.getWorldPosition(new THREE.Vector3())
+      expect(handWorld.y).toBeGreaterThan(shoulder.getWorldPosition(new THREE.Vector3()).y)
+    }
+  })
+
+  it('disposes without throwing', () => {
+    const { dispose } = buildWavingFigure()
     expect(() => dispose()).not.toThrow()
   })
 })
