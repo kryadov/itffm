@@ -28,6 +28,7 @@ import { openQuestGuide } from './ui/questGuide'
 import { openInspect } from './ui/inspect'
 import { openEncyclopedia } from './ui/encyclopedia'
 import { openPlacePicker, showLoading } from './ui/placePicker'
+import { createAttractBackdrop } from './ui/attractBackdrop'
 import { yieldToPaint } from './util/yield'
 import { createBikeView } from './game/bikeView'
 import { easeToward, forwardSpeedOf } from './game/bikeSteer'
@@ -251,6 +252,14 @@ async function main(): Promise<void> {
     save = loaded
     setLang(save.lang)
   })
+
+  // The real demo wood, actually loaded and simulated, behind the place
+  // picker and (below) the loading screen — the same idea race-the-city's
+  // own "attract mode" uses. Skipped under boot-check, which never shows the
+  // picker at all (see the __BOOTCHECK branch just below). Stopped once the
+  // real game's first frame renders (search `backdrop.stop()`).
+  const backdrop = window.__BOOTCHECK ? null : createAttractBackdrop(app)
+  backdrop?.start()
 
   const [query, pickedHalfSize] = window.__BOOTCHECK
     ? [null, DEFAULT_WORLD_SIZE.halfSize]
@@ -1605,6 +1614,7 @@ async function main(): Promise<void> {
     if (loadingOpen) {
       loadingOpen = false
       loading.close()
+      backdrop?.stop()
     }
 
     // Boot-check needs only a handful of frames, and can't afford more: a few

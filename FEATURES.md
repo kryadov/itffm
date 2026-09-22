@@ -13,6 +13,11 @@ be found.
 
 ## Start screen
 
+Behind the picker itself, a quadcopter circles slowly over the real, live
+offline demo wood — the train runs, wildlife moves, and someone waves by the
+shelter — the same wood any "Just show me a wood" press drops you into, not
+a video or a screenshot of one.
+
 On load you get a **place picker**: name a real place — your own local wood,
 a nature reserve, dunes, a wetland — or pick one of several **known places**
 offered as one-tap buttons. Terrain comes from real elevation data and the

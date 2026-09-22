@@ -6,6 +6,13 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.101.7
+The start screen has a live backdrop now: a quadcopter circling slowly over
+the real, actually-running offline demo wood behind the place picker (and,
+once a place is picked, behind the loading screen) — the train runs, hares
+and squirrels move, and a figure waves by the shelter — the same idea as
+racing games' own "attract mode," not a video.
+
 ## v0.101.6
 Two more live-report fixes. Some of the mine's outcrop edges read as poorly
 joined — the rock face and the grassy mound over it disagreed on their

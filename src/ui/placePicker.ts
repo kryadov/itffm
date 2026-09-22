@@ -34,8 +34,12 @@ export function openPlacePicker(
   const overlay = document.createElement('div')
   overlay.id = 'place-picker'
   overlay.dataset.modal = 'true'
+  // Semi-transparent, not the flat fill it used to be: main.ts's own live
+  // demo-wood backdrop (ui/attractBackdrop.ts) sits behind this in `#app`,
+  // and a solid colour here would simply hide it. A dark wash is still
+  // enough to keep this screen's own text and controls readable over it.
   overlay.style.cssText =
-    'position:fixed;inset:0;background:#0f130e;pointer-events:auto;display:flex;flex-direction:column;' +
+    'position:fixed;inset:0;background:rgba(15,19,14,.55);pointer-events:auto;display:flex;flex-direction:column;' +
     'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee;gap:18px;padding:24px'
 
   const sizeOptions = WORLD_SIZES.map(
@@ -52,8 +56,8 @@ export function openPlacePicker(
       <button id="place-lang-en" style="${btnStyle(getLang() === 'en')}">EN</button>
       <button id="place-settings" title="${t('settingsTitle')}" style="${btnStyle(false)}">⚙</button>
     </div>
-    <h1 style="margin:0;font-size:28px">itffm</h1>
-    <p style="margin:0;opacity:.75;max-width:420px;text-align:center;line-height:1.5">${t('placeIntro')}</p>
+    <h1 style="margin:0;font-size:28px;text-shadow:0 1px 6px rgba(0,0,0,.8)">itffm</h1>
+    <p style="margin:0;opacity:.9;max-width:420px;text-align:center;line-height:1.5;text-shadow:0 1px 5px rgba(0,0,0,.8)">${t('placeIntro')}</p>
     <input id="place-input" type="text" placeholder="${t('placePlaceholder')}"
       style="width:min(420px,90vw);padding:11px 14px;font-size:16px;border-radius:8px;border:1px solid #444;background:#1a201a;color:#eee" />
     <label id="place-size-row" style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:.8">${t('placeSize')}
@@ -165,14 +169,17 @@ export function showLoading(message: string, fraction: number): { update(m: stri
   const overlay = document.createElement('div')
   overlay.id = 'loading'
   overlay.dataset.modal = 'true'
+  // Same reasoning as openPlacePicker's own overlay above: translucent, not a
+  // flat fill, so the live backdrop keeps showing through while the real
+  // wood loads over it.
   overlay.style.cssText =
-    'position:fixed;inset:0;background:#0f130e;pointer-events:auto;display:flex;flex-direction:column;' +
+    'position:fixed;inset:0;background:rgba(15,19,14,.55);pointer-events:auto;display:flex;flex-direction:column;' +
     'align-items:center;justify-content:center;font-family:system-ui,sans-serif;color:#eee;gap:16px'
 
   const canvasWrap = document.createElement('div')
   canvasWrap.style.cssText = 'width:140px;height:140px'
   const text = document.createElement('p')
-  text.style.cssText = 'opacity:.8;font-size:15px;margin:0'
+  text.style.cssText = 'opacity:.9;font-size:15px;margin:0;text-shadow:0 1px 5px rgba(0,0,0,.8)'
   text.textContent = message
   const barTrack = document.createElement('div')
   barTrack.style.cssText = 'width:220px;height:4px;border-radius:2px;background:#2a332a;overflow:hidden'
