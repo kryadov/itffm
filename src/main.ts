@@ -33,6 +33,7 @@ import { createBikeView } from './game/bikeView'
 import { easeToward, forwardSpeedOf } from './game/bikeSteer'
 import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
+import { createUpdateBanner } from './ui/updateBanner'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
 import { gameDaysElapsed, realMonthAt, DAYS_PER_MONTH } from './world/calendar'
 import { speciesById, loadSpecies } from './species/load'
@@ -69,14 +70,45 @@ declare global {
   interface Window { __READY?: boolean; __BOOTCHECK?: boolean; __trainAt?: (end: 0 | 1) => void }
 }
 
+/** How often a long-lived session asks the browser to check for a new
+ *  release, on top of whatever the browser already does on its own on
+ *  navigation — a session that never navigates (this game can run for
+ *  hours, real time) would otherwise not learn about a new deploy at all. */
+const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000
+
 // PWA: an icon on the home screen and a wood that still opens with no signal
 // once it has been visited once. Registered outside main() and unguarded by
 // __BOOTCHECK — this is independent of the game ever loading, and a failed
 // registration (an older browser, a disabled service worker) is silently
 // fine either way, the same as any other progressive enhancement.
+//
+// A new version showing up mid-play is told apart from the very first ever
+// visit the same way: `public/sw.js` calls `skipWaiting()`/`clients.claim()`,
+// so on a first visit too the registering worker ends up "controlling" the
+// page and fires `controllerchange` — but only an *update* replaces a worker
+// that was already controlling it. Capturing whether a controller already
+// existed at the moment a new worker starts installing (`updatefound`) is
+// what tells the two apart; a first visit's own `updatefound` sees no
+// controller yet, so its `controllerchange` is left unannounced.
+const updateBanner = createUpdateBanner(() => location.reload())
 if ('serviceWorker' in navigator) {
   addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {})
+    navigator.serviceWorker
+      .register('sw.js')
+      .then((reg) => {
+        let hadController = !!navigator.serviceWorker.controller
+        reg.addEventListener('updatefound', () => {
+          hadController = !!navigator.serviceWorker.controller
+        })
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (hadController) updateBanner.show()
+        })
+        setInterval(() => void reg.update().catch(() => {}), UPDATE_CHECK_INTERVAL_MS)
+        addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') void reg.update().catch(() => {})
+        })
+      })
+      .catch(() => {})
   })
 }
 

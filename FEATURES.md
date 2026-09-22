@@ -246,7 +246,9 @@ whether it's still out there, in your hands, or already home.
 No backend — everything runs in the browser and progress (discovered
 species, finds, quest state, notes, preferences) saves to IndexedDB.
 Works offline once loaded once, and installs to the home screen like an
-app on a phone or tablet.
+app on a phone or tablet. A long session gets told when a new version has
+shipped: a banner offers to reload now or later, rather than reloading on
+its own and dropping whatever you're doing.
 
 ---
 

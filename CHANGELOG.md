@@ -5,6 +5,11 @@
 игре сейчас — `FEATURES.md`. Релиз — тег `vX.Y.Z`, публикуется на
 [GitHub Pages](https://kryadov.github.io/itffm/) зелёной сборкой с `master`.
 
+## v0.101.4
+A long play session now learns when a new version has shipped: a banner
+offers to reload now or dismiss it, rather than the old build silently
+going stale until the player happens to refresh.
+
 ## v0.101.3
 Fading ground tracks: walking leaves footprints, riding the bicycle leaves a
 tyre track, and a fleeing hare, squirrel or snake leaves its own paw prints
