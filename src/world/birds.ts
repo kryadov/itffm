@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { TreePerch } from './trees'
 import type { ElevationProvider } from '../terrain/provider'
+import { ellipsoid, cone, merge } from './animalRigs'
 
 export interface Birds {
   update(dt: number, playerX: number, playerZ: number): void
@@ -124,7 +125,7 @@ const PERCH_SEARCH_RADIUS = 90
  */
 const CANOPY_R = 2.2
 /** Clearance above bare ground, so a grounded bird doesn't clip into it. */
-const GROUND_PERCH_H = 0.3
+const GROUND_PERCH_H = 0.12
 
 const FLAP_SPEED_MIN = 7 // rad/s
 const FLAP_SPEED_MAX = 11
@@ -140,20 +141,15 @@ const FLAP_AMPLITUDE = 0.85 // radians: a shallow shiver doesn't read as a flap
  * shared across the whole flock, so every difference from the flight shape
  * is a per-instance transform, not a second mesh.
  */
-const WING_FOLD = 0.7 // radians the wings tuck up against the body when grounded
-const GROUND_WING_SCALE = new THREE.Vector3(1, 1, 0.55) // span pulled in — a closed wing, not an open one
-const GROUND_BODY_SCALE = new THREE.Vector3(0.9, 1.35, 1.0) // shorter and rounder than the flight spindle
-// Head, neck and tail placement, in body-local metres — local +x is the way the
-// bird faces, +y is up.
-const HEAD_FWD = 1.05 // how far ahead of body-centre the head rests
-const HEAD_UP = 0.5 // how high it rides — the neck's worth of lift
-const NECK_LEN = 0.55
-const NECK_MID_FWD = 0.78 // the neck stub sits at the shoulder-to-head midpoint
-const NECK_MID_UP = 0.3
-const NECK_TILT = 0.9 // radians the neck leans forward, shoulder up to head
-const TAIL_BACK = 1.2 // how far behind body-centre the tail roots
-const TAIL_UP = 0.2
-const TAIL_TILT = 0.5 // radians the tail cocks up off flat
+const WING_FOLD = 0.35 // radians the folded wings lie tilted up against the body's sides
+const GROUND_WING_SCALE = new THREE.Vector3(1.15, 1, 0.3) // span pulled in — a closed wing along the body, not an open one
+const GROUND_BODY_SCALE = new THREE.Vector3(0.95, 1.2, 1.05) // a little plumper standing than in flight
+// Head placement, in body-local metres — local +x is the way the bird faces,
+// +y is up. In flight it rides low and forward, standing it is carried up.
+const HEAD_FLY_FWD = 0.2
+const HEAD_FLY_UP = 0.03
+const HEAD_FWD = 0.17
+const HEAD_UP = 0.1
 
 /**
  * Grounded motion. Small and slow on purpose — a bird pottering about, not a
@@ -166,12 +162,12 @@ const GROUND_TURN = 0.9 // radians the heading swings either side as it looks ab
 const GROUND_TURN_SLOW = 0.5 // rad/s of the main look-around
 const GROUND_TURN_FIDGET = 0.17 // rad/s of the smaller twitch over it — incommensurate, so it never just ticks to and fro
 const GAIT_SPEED = 2.0 // rad/s of the step-and-bob cycle
-const STEP_ROCK = 0.6 // metres the body shuffles forward along its facing and back — a step in place
-const HOP_HEIGHT = 0.35 // metres the body lifts on each step
+const STEP_ROCK = 0.1 // metres the body shuffles forward along its facing and back — a step in place
+const HOP_HEIGHT = 0.06 // metres the body lifts on each step
 const PECK_WINDOW = 0.35 // rad/s of the slow gate that opens now and then for a bout of pecking
 const PECK_RATE = 5 // rad/s of the quick head dips within a bout
-const PECK_DROP = 0.3 // metres the head drops at the bottom of a peck
-const PECK_REACH = 0.15 // metres the head reaches forward as it dips
+const PECK_DROP = 0.08 // metres the head drops at the bottom of a peck
+const PECK_REACH = 0.05 // metres the head reaches forward as it dips
 
 /**
  * A varied but natural flock palette — sparrows, starlings, crows and the
@@ -233,67 +229,86 @@ function findPerch(x: number, z: number, perches: TreePerch[]): TreePerch | null
   return best
 }
 
+/** A flat fan of triangles around `centre` through `rim` (x, z pairs, y = `y`),
+ *  with its own colour per rim point — a wing. Shaped like the other merged
+ *  parts (position, normal, colour), so it shares their material. */
+function fan(centre: [number, number], rim: [number, number, number][], y: number, flip: boolean): THREE.BufferGeometry {
+  const pos: number[] = []
+  const col: number[] = []
+  const c = new THREE.Color()
+  const push = (x: number, z: number, hex: number): void => {
+    pos.push(x, y, z)
+    c.setHex(hex)
+    col.push(c.r, c.g, c.b)
+  }
+  for (let k = 0; k < rim.length - 1; k++) {
+    const a = rim[k]
+    const b = rim[k + 1]
+    const [p, q] = flip ? [b, a] : [a, b]
+    push(centre[0], centre[1], WING_INNER)
+    push(p[0], p[1], p[2])
+    push(q[0], q[1], q[2])
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3))
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3))
+  geo.computeVertexNormals()
+  return geo
+}
+
+// Vertex colours multiply the bird's own plumage (its instance colour): white
+// keeps it, grey darkens it.
+const WING_INNER = 0xf2f2f2
+const WING_TIP = 0xa8a8a8
+const BACK = 0xd6d6d6
+const BELLY = 0xffffff
+const BEAK = 0x3a3733
+const BIRD_EYE = 0x0e0e0e
+
 /**
- * One triangle per wing, hinged at the shared root vertex (the body). Two of
- * these, instanced per bird and animated apart, is the cheapest shape that
- * still reads as a bird — a flat triangle is a glider, a hinge that opens and
- * closes is a wingbeat.
+ * A wing, hinged at the body along its root: a broad inner wing and the
+ * spread "fingers" of the long flight feathers at the tip, the outer half a
+ * shade darker. Real crow size (about 0.55 m root to tip). The first version
+ * was one triangle 1.2 m long on a 3 m bird.
  */
 function wingGeometry(mirror: 1 | -1): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry()
-  const tip: [number, number, number] = [-0.5, 0, mirror * 1.2]
-  const trail: [number, number, number] = [-1.0, 0, mirror * 0.35]
-  // Winding kept the same handedness on both the right wing and its mirror,
-  // or the left wing's face normal would point into the ground.
-  const verts = mirror > 0 ? [0, 0, 0, ...tip, ...trail] : [0, 0, 0, ...trail, ...tip]
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3))
-  geo.computeVertexNormals()
-  return geo
+  const rim: [number, number, number][] = [
+    [0.07, 0.03, WING_INNER],
+    [0.07, 0.24, WING_INNER],
+    [0.02, 0.44, WING_TIP],
+    [0.0, 0.55, WING_TIP],
+    [-0.04, 0.5, WING_TIP],
+    [-0.05, 0.57, WING_TIP],
+    [-0.09, 0.5, WING_TIP],
+    [-0.1, 0.55, WING_TIP],
+    [-0.13, 0.44, WING_TIP],
+    [-0.14, 0.26, WING_INNER],
+    [-0.1, 0.03, WING_INNER],
+  ]
+  const r = rim.map(([x, z, col]) => [x, z * mirror, col] as [number, number, number])
+  return fan([-0.03, 0.2 * mirror], r, 0.02, mirror < 0)
 }
 
 /**
- * The bird's body — a low-poly spindle the wings hinge on. Two flat triangles
- * with nothing between them read as a paper dart, not a bird; a body gives
- * them volume. A faceted octahedron stretched long and slim is symmetric
- * front-to-back and side-to-side, so it reads right whichever way heading
- * points it.
+ * The body and tail as one: a slim spindle, a paler breast under it and a
+ * flat, slightly fanned tail behind — a bird, not a paper dart.
  */
 function bodyGeometry(): THREE.BufferGeometry {
-  const geo = new THREE.OctahedronGeometry(1, 0)
-  geo.scale(1.5, 0.42, 0.42) // long along travel (x), slim in section — a body, not a ball
-  return geo
+  return merge([
+    ellipsoid([0, 0, 0], [0.17, 0.07, 0.075], BACK),
+    ellipsoid([0.04, -0.018, 0], [0.12, 0.058, 0.066], BELLY),
+    ellipsoid([-0.22, 0.005, 0], [0.13, 0.012, 0.06], BACK, [0, 0, 0.08], [7, 3]),
+  ])
 }
 
-/**
- * The head — a small, slightly squashed low-poly ball that rides up front on
- * the neck of a grounded bird, the detail a distant flying silhouette does
- * without.
- */
+/** The head: round, a stout dark beak, two eyes. */
 function headGeometry(): THREE.BufferGeometry {
-  const geo = new THREE.IcosahedronGeometry(0.45, 0)
-  geo.scale(0.95, 0.85, 0.85) // a touch longer than tall — a head, not a marble
-  return geo
-}
-
-/**
- * The neck — a short, thin stub that carries the head clear of the shoulders,
- * so a perched bird reads as head-up-on-a-neck rather than headless.
- */
-function neckGeometry(): THREE.BufferGeometry {
-  return new THREE.CylinderGeometry(0.13, 0.16, NECK_LEN, 5, 1)
-}
-
-/**
- * The tail — one flat triangle fanning out behind the body. A single
- * triangle is all a tail needs at this distance.
- */
-function tailGeometry(): THREE.BufferGeometry {
-  const geo = new THREE.BufferGeometry()
-  // Root at the body (origin), widening to a fork at the back — local -x is aft.
-  const verts = [0, 0, 0, -0.9, 0, 0.4, -0.9, 0, -0.4]
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3))
-  geo.computeVertexNormals()
-  return geo
+  return merge([
+    ellipsoid([0, 0, 0], [0.068, 0.058, 0.055], BACK),
+    cone([0.05, -0.006, 0], [0.14, -0.018, 0], 0.022, BEAK, 5),
+    ellipsoid([0.028, 0.018, 0.043], [0.012, 0.012, 0.008], BIRD_EYE),
+    ellipsoid([0.028, 0.018, -0.043], [0.012, 0.012, 0.008], BIRD_EYE),
+  ])
 }
 
 type State = 'perched' | 'takeoff' | 'cruise' | 'landing'
@@ -387,6 +402,7 @@ export function createBirds(
   scene.add(group)
 
   const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true,
     flatShading: true,
     side: THREE.DoubleSide, // seen from below as often as from above
     // A bird out near the leash edge is a thing in clear air, not haze in
@@ -397,12 +413,8 @@ export function createBirds(
   const body = new THREE.InstancedMesh(bodyGeometry(), mat, n)
   const rightWing = new THREE.InstancedMesh(wingGeometry(1), mat, n)
   const leftWing = new THREE.InstancedMesh(wingGeometry(-1), mat, n)
-  // Grounded-only detail: added after the body and wings so their child indices
-  // (0..2) stay put, and folded to a point (zero scale) whenever a bird is airborne.
   const head = new THREE.InstancedMesh(headGeometry(), mat, n)
-  const neck = new THREE.InstancedMesh(neckGeometry(), mat, n)
-  const tail = new THREE.InstancedMesh(tailGeometry(), mat, n)
-  group.add(body, rightWing, leftWing, head, neck, tail)
+  group.add(body, rightWing, leftWing, head)
   // The flock is always near the player and constantly moving, and three only
   // computes an InstancedMesh's bounding sphere once — so without this the
   // whole flock gets frustum-culled as one the moment it drifts from wherever
@@ -411,8 +423,6 @@ export function createBirds(
   rightWing.frustumCulled = false
   leftWing.frustumCulled = false
   head.frustumCulled = false
-  neck.frustumCulled = false
-  tail.frustumCulled = false
 
   const birds: Bird[] = []
   const col = new THREE.Color()
@@ -453,15 +463,11 @@ export function createBirds(
     rightWing.setColorAt(i, col)
     leftWing.setColorAt(i, col)
     head.setColorAt(i, col)
-    neck.setColorAt(i, col)
-    tail.setColorAt(i, col)
   }
   if (body.instanceColor) body.instanceColor.needsUpdate = true
   if (rightWing.instanceColor) rightWing.instanceColor.needsUpdate = true
   if (leftWing.instanceColor) leftWing.instanceColor.needsUpdate = true
   if (head.instanceColor) head.instanceColor.needsUpdate = true
-  if (neck.instanceColor) neck.instanceColor.needsUpdate = true
-  if (tail.instanceColor) tail.instanceColor.needsUpdate = true
 
   let time = 0
   let driftAngle = rand() * Math.PI * 2
@@ -491,14 +497,11 @@ export function createBirds(
   const yAxis = new THREE.Vector3(0, 1, 0)
   const xAxis = new THREE.Vector3(1, 0, 0)
   const zAxis = new THREE.Vector3(0, 0, 1)
-  // Fixed forward leans for the neck stub and the cocked-up tail, and scratch
-  // objects for placing the grounded head/neck/tail each frame.
-  const qNeckTilt = new THREE.Quaternion().setFromAxisAngle(zAxis, -NECK_TILT)
-  const qTailTilt = new THREE.Quaternion().setFromAxisAngle(zAxis, -TAIL_TILT)
+  // Scratch objects for placing the head each frame.
+  const qPeck = new THREE.Quaternion()
   const partQuat = new THREE.Quaternion()
   const off = new THREE.Vector3()
   const partPos = new THREE.Vector3()
-  const zeroScale = new THREE.Vector3(0, 0, 0)
 
   /**
    * A landing spot near (x, z): a nearby tree if one is close, else the
@@ -553,8 +556,6 @@ export function createBirds(
       rightWing.geometry.dispose()
       leftWing.geometry.dispose()
       head.geometry.dispose()
-      neck.geometry.dispose()
-      tail.geometry.dispose()
       mat.dispose()
       birds.length = 0
     },
@@ -714,11 +715,11 @@ export function createBirds(
               0.5 * Math.sin(time * GROUND_TURN_FIDGET + b.bobPhase)) *
               GROUND_TURN
           const gait = Math.sin(time * GAIT_SPEED + b.bobPhase)
-          // Step along the way the bird faces (heading turns local +x to
-          // (cos, -sin) in world), so it shuffles where it looks, not sideways.
+          // Step along the way the bird faces — (cos, sin) in world, the same
+          // as a flight leg — so it shuffles where it looks, not sideways.
           coreX = b.perchX + Math.cos(gh) * STEP_ROCK * gait
           coreY = b.perchY + (0.5 - 0.5 * Math.cos(time * GAIT_SPEED + b.bobPhase)) * HOP_HEIGHT
-          coreZ = b.perchZ - Math.sin(gh) * STEP_ROCK * gait
+          coreZ = b.perchZ + Math.sin(gh) * STEP_ROCK * gait
           // Peck: a slow gate opens now and then, and while it is open the
           // head dips a few quick times — a bout of feeding, not a metronome.
           const gate = Math.max(0, Math.sin(time * PECK_WINDOW + b.flapPhase))
@@ -763,22 +764,39 @@ export function createBirds(
           const ddx = b.toX - b.fromX
           const ddz = b.toZ - b.fromZ
           const runIn = Math.hypot(ddx, ddz) > 0.01 ? Math.atan2(ddz, ddx) : b.legHeading
-          // The gate: a point GLIDE_IN short of the perch, at cruising height.
-          const gateX = b.toX - Math.cos(runIn) * GLIDE_IN
-          const gateZ = b.toZ - Math.sin(runIn) * GLIDE_IN
+          // The gate: a point GLIDE_IN short of the perch, at cruising height —
+          // or halfway, on a short approach: a gate further off than the bird
+          // itself sat behind it, and the bird flew there tail-first.
+          const glide = Math.min(GLIDE_IN, Math.hypot(ddx, ddz) / 2)
+          const gateX = b.toX - Math.cos(runIn) * glide
+          const gateZ = b.toZ - Math.sin(runIn) * glide
           const TURN = 0.55 // share of the approach spent getting onto the run-in
           if (p < TURN) {
+            // Round onto the run-in along a curve that leaves the way the
+            // cruise was going and meets the gate already on the run-in — a
+            // straight line to the gate had the bird flip round in one frame,
+            // often a half turn, and fly its first metres of it tail-first.
             const q = p / TURN
-            coreX = lerp(b.fromX, gateX, q)
+            const outH = b.legHeading + b.legBend * 0.5 // where the cruise left it pointing
+            const reach = Math.min(25, Math.hypot(gateX - b.fromX, gateZ - b.fromZ) * 0.4)
+            const c1x = b.fromX + Math.cos(outH) * reach
+            const c1z = b.fromZ + Math.sin(outH) * reach
+            const c2x = gateX - Math.cos(runIn) * reach
+            const c2z = gateZ - Math.sin(runIn) * reach
+            const u = 1 - q
+            coreX = u * u * u * b.fromX + 3 * u * u * q * c1x + 3 * u * q * q * c2x + q * q * q * gateX
+            coreZ = u * u * u * b.fromZ + 3 * u * u * q * c1z + 3 * u * q * q * c2z + q * q * q * gateZ
             coreY = b.fromY
-            coreZ = lerp(b.fromZ, gateZ, q)
+            const tx = 3 * u * u * (c1x - b.fromX) + 6 * u * q * (c2x - c1x) + 3 * q * q * (gateX - c2x)
+            const tz = 3 * u * u * (c1z - b.fromZ) + 6 * u * q * (c2z - c1z) + 3 * q * q * (gateZ - c2z)
+            heading = Math.hypot(tx, tz) > 1e-6 ? Math.atan2(tz, tx) : runIn
           } else {
             const q = (p - TURN) / (1 - TURN)
             coreX = lerp(gateX, b.toX, q)
             coreY = lerp(b.fromY, b.toY, q * q) // shed height late: a flare, not a dive
             coreZ = lerp(gateZ, b.toZ, q)
+            heading = runIn
           }
-          heading = runIn
         }
 
         // The formation offset, reined in to whatever the perch supports:
@@ -793,7 +811,10 @@ export function createBirds(
         b.y = by
         b.z = bz
         const grounded = b.state === 'perched'
-        qHeading.setFromAxisAngle(yAxis, heading)
+        // Flight legs run along (cos, sin) of the heading, which is a NEGATIVE
+        // turn about y in three's frame. It used to be the positive one, and
+        // birds flew sideways or tail-first at most headings.
+        qHeading.setFromAxisAngle(yAxis, -heading)
         pos.set(bx, by, bz)
 
         // The body carries no flap — just heading. Grounded it stands
@@ -825,44 +846,21 @@ export function createBirds(
         m.compose(pos, qTotal, wingScale)
         leftWing.setMatrixAt(i, m)
 
-        // Head, neck and tail are a grounded bird's alone. In the air they
-        // fold away to a point (zero scale). Offsets are in the body's own
-        // frame, applied through qHeading, so a turn carries them along
-        // with it.
-        if (grounded) {
-          // Head: raised and forward on the neck, dropping and reaching a
-          // little on a peck.
-          off.set(HEAD_FWD + peck * PECK_REACH, HEAD_UP - peck * PECK_DROP, 0).applyQuaternion(qHeading)
-          partPos.copy(pos).add(off)
-          m.compose(partPos, qHeading, one)
-          head.setMatrixAt(i, m)
-
-          // Neck: a short stub at the shoulder-to-head midpoint, leaning forward.
-          off.set(NECK_MID_FWD, NECK_MID_UP, 0).applyQuaternion(qHeading)
-          partPos.copy(pos).add(off)
-          partQuat.copy(qHeading).multiply(qNeckTilt)
-          m.compose(partPos, partQuat, one)
-          neck.setMatrixAt(i, m)
-
-          // Tail: rooted behind the body and cocked up a touch off flat.
-          off.set(-TAIL_BACK, TAIL_UP, 0).applyQuaternion(qHeading)
-          partPos.copy(pos).add(off)
-          partQuat.copy(qHeading).multiply(qTailTilt)
-          m.compose(partPos, partQuat, one)
-          tail.setMatrixAt(i, m)
-        } else {
-          m.compose(pos, qHeading, zeroScale)
-          head.setMatrixAt(i, m)
-          neck.setMatrixAt(i, m)
-          tail.setMatrixAt(i, m)
-        }
+        // The head: low and forward in flight, carried up standing, dipping
+        // and reaching forward on a peck.
+        if (grounded) off.set(HEAD_FWD + peck * PECK_REACH, HEAD_UP - peck * PECK_DROP, 0)
+        else off.set(HEAD_FLY_FWD, HEAD_FLY_UP, 0)
+        off.applyQuaternion(qHeading)
+        partPos.copy(pos).add(off)
+        qPeck.setFromAxisAngle(zAxis, -peck * 0.9)
+        partQuat.copy(qHeading).multiply(qPeck)
+        m.compose(partPos, partQuat, one)
+        head.setMatrixAt(i, m)
       }
       body.instanceMatrix.needsUpdate = true
       rightWing.instanceMatrix.needsUpdate = true
       leftWing.instanceMatrix.needsUpdate = true
       head.instanceMatrix.needsUpdate = true
-      neck.instanceMatrix.needsUpdate = true
-      tail.instanceMatrix.needsUpdate = true
     },
   }
 }

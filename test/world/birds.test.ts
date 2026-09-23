@@ -76,6 +76,37 @@ describe('createBirds', () => {
     }
   })
 
+  it('flies head first — its body points the way it is going', () => {
+    // It used to be drawn facing (cos h, -sin h) while it flew (cos h, sin h):
+    // sideways or tail-first at most headings.
+    const { scene, birds } = build(4)
+    const body = scene.getObjectByName('birds')!.children[0] as THREE.InstancedMesh
+    const m = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const at = (i: number): THREE.Vector3 => {
+      body.getMatrixAt(i, m)
+      return new THREE.Vector3().setFromMatrixPosition(m)
+    }
+    birds.update(1 / 20, 0, 0) // the first frame places the flock
+    let prev = Array.from({ length: body.count }, (_, i) => at(i))
+    let checked = 0
+    for (let step = 0; step < 3000; step++) {
+      birds.update(1 / 20, 0, 0)
+      for (let i = 0; i < body.count; i++) {
+        const now = at(i)
+        const move = now.clone().sub(prev[i]).setY(0)
+        prev[i] = now
+        // Only a real flight step: a perched bird's shuffle rocks back and forth.
+        if (move.length() < 0.2) continue
+        m.decompose(new THREE.Vector3(), q, new THREE.Vector3())
+        const facing = new THREE.Vector3(1, 0, 0).applyQuaternion(q).setY(0).normalize()
+        expect(facing.dot(move.normalize())).toBeGreaterThan(0.8)
+        checked++
+      }
+    }
+    expect(checked).toBeGreaterThan(50)
+  })
+
   it('hides the flock when disabled', () => {
     const { scene, birds } = build(1)
     birds.setEnabled(false)
