@@ -6,6 +6,18 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.102.0
+The weather changes on its own now (a new "Auto" setting, the default): by
+day clear or rain, mornings and evenings fog or clear, nights clear or fog,
+each change rolling in over a few seconds with the sun dimming under it.
+Fog finally reads as fog (the sky goes with it) and rain is thick enough to
+see. New animals: moose (bulls with palmate antlers), a brown bear at the
+thickest berries and mushrooms, a sounder of wild boar, and beavers gnawing
+trees by the water. Every animal, old and new, has a real body with legs
+that walk and run in step and a head it lowers to eat, and they wander
+their own patch between scares. Animals and birds no longer run or fly
+sideways and tail-first, and birds are now bird-sized.
+
 ## v0.101.8
 The bicycle's front wheel in your view now stands straight in line with the
 frame while the bar is centred, instead of being permanently cocked to one
