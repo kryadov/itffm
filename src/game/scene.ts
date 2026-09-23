@@ -2,7 +2,10 @@ import * as THREE from 'three'
 import { buildGround } from '../world/ground'
 import { buildTreeMeshes, treePerches, type Tree } from '../world/trees'
 import { createBirds } from '../world/birds'
-import { createHares, createSquirrels, createSnakes, placeCritterHomes } from '../world/critters'
+import {
+  createHares, createSquirrels, createSnakes, createMoose, createBears, createBoars, createBeavers,
+  placeCritterHomes, placeBearHomes, placeBeaverHomes, familyHomes, type CritterGroup,
+} from '../world/critters'
 import { createTrackFx, type FootSide } from '../world/tracks'
 import { placeHive, hiveObstacle, buildHiveMesh } from '../world/hive'
 import { createBees, createDragonflies } from '../world/insects'
@@ -631,10 +634,32 @@ export function createForest(
   // count order of magnitude smaller than hares/squirrels.
   const snakeHomes = placeCritterHomes(staticGround, halfSize, seed + 24, 2, [...treeCircles, ...extraObstacles])
   const snakes = createSnakes(scene, mulberry32(seed + 25), 2, staticGround, snakeHomes, onSnakeStep)
+  // The big animals join this list further down, once the food they live by
+  // (the bear's berries and mushrooms) has been placed.
+  const critterGroups: CritterGroup[] = [hares, squirrels, snakes]
   const updateCritters = (dt: number, playerX: number, playerZ: number): void => {
-    hares.update(dt, playerX, playerZ)
-    squirrels.update(dt, playerX, playerZ)
-    snakes.update(dt, playerX, playerZ)
+    for (const g of critterGroups) g.update(dt, playerX, playerZ)
+  }
+  // Moose, a few to a wood, on open ground with room for their size.
+  const mooseHomes = placeCritterHomes(staticGround, halfSize, seed + 50, 3, [...treeCircles, ...extraObstacles], 3)
+  critterGroups.push(createMoose(scene, mulberry32(seed + 51), 3, staticGround, mooseHomes))
+  // One sounder of boar, keeping together.
+  const boarCentre = placeCritterHomes(staticGround, halfSize, seed + 52, 1, [...treeCircles, ...extraObstacles], 3)[0]
+  const boarRand = mulberry32(seed + 53)
+  critterGroups.push(createBoars(scene, boarRand, 4, staticGround, familyHomes(boarCentre, 4, boarRand, staticGround)))
+  // Beavers only where there is water, gnawing a tree near it. Pond and stream
+  // outlines can be a few corners far apart, so the edges are filled in first.
+  const waterPoints = (source.water ?? []).flatMap((ring) =>
+    ring.flatMap((a, k) => {
+      const b = ring[(k + 1) % ring.length]
+      const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 3))
+      return Array.from({ length: steps }, (_, t) => ({ x: a.x + ((b.x - a.x) * t) / steps, z: a.z + ((b.z - a.z) * t) / steps }))
+    }),
+  )
+  const beaverRand = mulberry32(seed + 54)
+  const beaverHomes = placeBeaverHomes(woodTrees, waterPoints, 2, beaverRand, staticGround)
+  if (beaverHomes.length > 0) {
+    critterGroups.push(createBeavers(scene, beaverRand, beaverHomes.length, staticGround, beaverHomes, waterPoints))
   }
 
   // Insects: ambient, no state machine — see docs/superpowers/specs/
@@ -676,6 +701,13 @@ export function createForest(
   const placements = spawnMushrooms(allSpecies, sites, spawnCtx).filter((p) => !reserved(p.x, p.z))
   // Fish are not sites on the land at all: they swim in the wood's own water.
   placements.push(...spawnFish(allSpecies, source.water ?? [], source.ground, spawnCtx))
+
+  // The bear lives where the berries and mushrooms are thickest.
+  const kindOf = new Map(allSpecies.map((sp) => [sp.id, sp.kind]))
+  const food = placements.filter((p) => kindOf.get(p.speciesId) === 'berry' || kindOf.get(p.speciesId) === 'mushroom')
+  const bearRand = mulberry32(seed + 55)
+  const bearHomes = placeBearHomes(food, 1, bearRand, staticGround)
+  if (bearHomes.length > 0) critterGroups.push(createBears(scene, bearRand, 1, staticGround, bearHomes))
 
   for (const marker of fairyRingMarkers(placements)) {
     scene.add(buildFairyRingMesh(marker, staticGround))

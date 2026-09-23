@@ -131,9 +131,17 @@ today, each with real field marks, edibility and season.
   real time, so a single play session moves through real seasons instead of
   staying stuck on the day you started, driving what's in season and how
   long it's been since rain.
-- **Wildlife**: birds nesting and flying between the trees, hares and
-  squirrels that bolt when you get close, snakes that quietly slip away,
-  bees around a wild hive, dragonflies over the water.
+- **Wildlife**, each animal with legs that walk and run in step, a head it
+  lowers to eat, and its own colouring: **moose** (bulls with broad palmate
+  antlers, cows without) browsing and wandering slowly, trotting off if you
+  come close; a **brown bear** living by the thickest patch of berries and
+  mushrooms, head down eating them, moving off at a walk when it notices you;
+  a sounder of **wild boar** rooting about together; **beavers** gnawing a
+  tree by the water (only where the wood has water), fleeing into it; **hares**
+  that bound away, **red squirrels** that make for a tree, **adders** with a
+  dark zigzag that slide slowly off. Between scares they graze, stroll about
+  their own patch and wander back to it. Birds nest and fly between the trees,
+  bees work a wild hive, dragonflies hover over the water.
 - **Fading tracks** (on by default, opt-out in settings): footprints trail
   behind you as you walk, a thin tyre track behind the bicycle, and paw
   prints or a sinuous trail behind a fleeing hare, squirrel or snake — pressed

@@ -2,14 +2,30 @@ import * as THREE from 'three'
 import type { ElevationProvider } from '../terrain/provider'
 import { mulberry32 } from '../util/rng'
 import { findOpenSpot, type Circle } from '../util/openSpot'
+import {
+  HARE_RIG, SQUIRREL_RIG, SNAKE_RIG, MOOSE_RIG, BEAR_RIG, BOAR_RIG, BEAVER_RIG, type Rig,
+} from './animalRigs'
 
 /**
- * Shared ground-fauna behaviour for hare, squirrel and snake — see
- * docs/superpowers/specs/2026-09-10-wildlife-design.md. One state machine,
- * not five ad hoc ones: a species is a config plus a geometry, not its own
- * file with its own copy of this cycle.
+ * Shared ground-fauna behaviour — hare, squirrel, snake, moose, bear, boar,
+ * beaver — see docs/superpowers/specs/2026-09-10-wildlife-design.md. One
+ * state machine, not seven ad hoc ones: a species is a config plus a rig
+ * (`world/animalRigs.ts`, what it looks like and how its legs move), not its
+ * own file with its own copy of this cycle.
  */
 export type CritterState = 'idle' | 'alert' | 'flee' | 'resting'
+
+/** How an idle animal gets about: it stands (grazing) for a while, then walks
+ *  to another spot near its home, and so on. */
+export interface WanderSpec {
+  /** How far from home it strays, metres. 0 keeps it on its home spot. */
+  radius: number
+  /** m/s at a walk. */
+  speed: number
+  /** Seconds it stands between walks. */
+  pauseMin: number
+  pauseMax: number
+}
 
 export interface CritterSpecies {
   /** Player distance, metres, that trips idle/resting → alert. */
@@ -23,6 +39,8 @@ export interface CritterSpecies {
   fleeDur: number
   restMin: number
   restMax: number
+  /** Leave it out and an idle animal stays exactly where it is. */
+  wander?: WanderSpec
 }
 
 export interface Critter {
@@ -35,6 +53,18 @@ export interface Critter {
   fleeHeading: number
   /** This cycle's rest length, rolled once flee ends. */
   restDur: number
+  /** Where it lives: an idle animal wanders around here, and walks back here
+   *  after it has fled. Defaults to where it first stood. */
+  homeX?: number
+  homeZ?: number
+  /** Where an idle animal is walking to, or null while it stands. */
+  walkTo?: { x: number; z: number } | null
+  /** Seconds left standing before the next walk. */
+  pause?: number
+  /** Seconds left turning toward `walkTo` before it sets off. */
+  turning?: number
+  /** The way it last moved, radians (the same sense as `fleeHeading`). */
+  heading?: number
 }
 
 /**
@@ -56,15 +86,23 @@ export function stepCritter(
   findFleeTarget?: (x: number, z: number) => { x: number; y: number; z: number } | null,
 ): void {
   c.stateT += dt
+  if (c.homeX === undefined || c.homeZ === undefined) {
+    c.homeX = c.x
+    c.homeZ = c.z
+  }
 
   if (c.state === 'idle' || c.state === 'resting') {
     const d2 = (c.x - playerX) ** 2 + (c.z - playerZ) ** 2
     if (d2 < species.fleeRadius * species.fleeRadius) {
       c.state = 'alert'
       c.stateT = 0
+      c.walkTo = null
     } else if (c.state === 'resting' && c.stateT >= c.restDur) {
       c.state = 'idle'
       c.stateT = 0
+      c.pause = 0
+    } else if (c.state === 'idle' && species.wander) {
+      wanderStep(c, dt, species.wander, rand, ground)
     }
     return
   }
@@ -75,6 +113,7 @@ export function stepCritter(
       c.fleeHeading = target
         ? Math.atan2(target.z - c.z, target.x - c.x)
         : Math.atan2(c.z - playerZ, c.x - playerX)
+      c.heading = c.fleeHeading
       c.state = 'flee'
       c.stateT = 0
     }
@@ -93,11 +132,58 @@ export function stepCritter(
   }
 }
 
+/** An idle animal's own slow round: stand a while, walk to another spot near
+ *  home, stand again. Its home stays put, so one that fled walks back. */
+function wanderStep(c: Critter, dt: number, w: WanderSpec, rand: () => number, ground: ElevationProvider): void {
+  if (c.walkTo) {
+    const dx = c.walkTo.x - c.x
+    const dz = c.walkTo.z - c.z
+    const d = Math.hypot(dx, dz)
+    const step = w.speed * dt
+    if (d > 1e-6) c.heading = Math.atan2(dz, dx)
+    // Turn first, then walk: setting straight off while still facing the old
+    // way reads as sliding sideways.
+    if ((c.turning ?? 0) > 0) {
+      c.turning! -= dt
+      return
+    }
+    if (d <= step) {
+      c.x = c.walkTo.x
+      c.z = c.walkTo.z
+      c.walkTo = null
+      c.pause = w.pauseMin + rand() * (w.pauseMax - w.pauseMin)
+    } else {
+      c.x += (dx / d) * step
+      c.z += (dz / d) * step
+    }
+    c.y = ground.heightAt(c.x, c.z)
+    return
+  }
+  c.pause = (c.pause ?? 0) - dt
+  if (c.pause > 0) return
+  const a = rand() * Math.PI * 2
+  const r = w.radius * Math.sqrt(rand())
+  const tx = c.homeX! + Math.cos(a) * r
+  const tz = c.homeZ! + Math.sin(a) * r
+  if (Math.hypot(tx - c.x, tz - c.z) < 0.05) {
+    // Already there (a spot with no room to wander): just keep standing.
+    c.pause = w.pauseMin + rand() * (w.pauseMax - w.pauseMin)
+    return
+  }
+  c.walkTo = { x: tx, z: tz }
+  c.turning = TURN_FIRST
+}
+
+/** Seconds an animal spends turning toward where it is going before it walks. */
+const TURN_FIRST = 0.7
+
 /** A candidate resting/idle spot for a critter — open ground or a tree base. */
 export interface HomeSpot {
   x: number
   y: number
   z: number
+  /** The way to face while standing at home — a beaver at its trunk. */
+  face?: number
 }
 
 /**
@@ -158,20 +244,26 @@ export interface CritterGroup {
   dispose(): void
 }
 
-/** Cosmetic-only wander around a home point while idle — never touches the
- *  critter's real x/z, exactly the way a perched bird's gait offset does. */
-const WANDER_RADIUS = 0.5
-const WANDER_SPEED = 0.6
+/** How fast the drawn heading swings round to the real one, per second: a
+ *  turn, not a snap. Faster when bolting. */
+const TURN_RATE = 4
+const TURN_RATE_FLEE = 12
+/** How fast the head goes down to the food and comes up again, per second. */
+const GRAZE_RATE = 2.5
+
+function wrapAngle(a: number): number {
+  return Math.atan2(Math.sin(a), Math.cos(a))
+}
 
 /**
  * The generic ground-critter renderer: steps every critter's state machine
- * and drives a set of InstancedMeshes from it. A species supplies its own
- * geometry and per-instance pose (`buildParts`/`pose`) — the state machine
- * and the render loop around it are shared.
+ * and poses its rig's InstancedMeshes from it. The rig supplies the shapes
+ * and how legs and head move (`world/animalRigs.ts`); this supplies where the
+ * animal is, which way it faces, how fast it goes and whether its head is
+ * down at the food.
  *
  * @param homes one spot per critter (cycled if shorter than `count`) — where
- *   it idles and rests. `world/scene.ts` decides what "open" means (
- *   `findOpenSpot` for ground, `treePerches` bases for a squirrel).
+ *   it idles and rests.
  * @param findFleeTarget see `stepCritter` — squirrels flee toward a tree.
  */
 export function createCritterGroup(
@@ -182,23 +274,11 @@ export function createCritterGroup(
   species: CritterSpecies,
   provider: ElevationProvider,
   homes: HomeSpot[],
-  buildParts: (mat: THREE.Material, n: number) => THREE.InstancedMesh[],
-  pose: (
-    parts: THREE.InstancedMesh[],
-    i: number,
-    coreX: number,
-    coreY: number,
-    coreZ: number,
-    heading: number,
-    wanderPhase: number,
-    time: number,
-  ) => void,
-  color: number,
+  rig: Rig,
   findFleeTarget?: (x: number, z: number) => { x: number; y: number; z: number } | null,
   /** Called roughly every `trackSpacing` metres a fleeing critter actually
-   *  covers — its own footprints/paw marks (`world/tracks.ts`), never
-   *  during idle wander, which never moves `c.x`/`c.z` for real. Omit to
-   *  leave a species trackless (nothing calls this for birds, say). */
+   *  covers — its own footprints/paw marks (`world/tracks.ts`). Omit to
+   *  leave a species trackless. */
   onStep?: (x: number, z: number, heading: number) => void,
   trackSpacing = 0.35,
 ): CritterGroup {
@@ -206,16 +286,23 @@ export function createCritterGroup(
   group.name = name
   scene.add(group)
 
-  const mat = new THREE.MeshStandardMaterial({ color, flatShading: true, side: THREE.DoubleSide })
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.9 })
   const n = Math.max(1, count)
-  const parts = buildParts(mat, n)
+  const parts = rig.build(mat, n)
   group.add(...parts)
   for (const p of parts) p.frustumCulled = false
 
   const critters: Critter[] = []
-  const wanderPhases: number[] = []
+  const variants: number[] = []
+  const drawnHeading: number[] = []
+  const gait: number[] = []
+  const graze: number[] = []
+  const prevX: number[] = []
+  const prevZ: number[] = []
+  const shade = new THREE.Color()
   for (let i = 0; i < n; i++) {
     const home = homes.length > 0 ? homes[i % homes.length] : { x: 0, y: provider.heightAt(0, 0), z: 0 }
+    const facing = home.face ?? rand() * Math.PI * 2
     critters.push({
       state: 'idle',
       stateT: rand() * 5,
@@ -224,15 +311,31 @@ export function createCritterGroup(
       z: home.z,
       fleeHeading: 0,
       restDur: 0,
+      homeX: home.x,
+      homeZ: home.z,
+      walkTo: null,
+      pause: species.wander ? rand() * species.wander.pauseMax : 0,
+      heading: facing,
     })
-    wanderPhases.push(rand() * Math.PI * 2)
+    variants.push(rand())
+    drawnHeading.push(facing)
+    gait.push(rand() * Math.PI * 2)
+    graze.push(1)
+    prevX.push(home.x)
+    prevZ.push(home.z)
+    // No two quite the same coat: a small brightness spread per animal.
+    const b = 0.88 + rand() * 0.24
+    shade.setRGB(b, b, b)
+    for (const p of parts) p.setColorAt(i, shade)
   }
+  for (const p of parts) if (p.instanceColor) p.instanceColor.needsUpdate = true
 
   let time = 0
   // Last spot each critter actually left a mark at, in flee-distance terms —
   // reset to null so the very first flee step always lays one.
   const lastTrackX: (number | null)[] = new Array(n).fill(null)
   const lastTrackZ: (number | null)[] = new Array(n).fill(null)
+  const heightAt = (x: number, z: number): number => provider.heightAt(x, z)
 
   return {
     setEnabled(on) {
@@ -240,7 +343,8 @@ export function createCritterGroup(
     },
     dispose() {
       scene.remove(group)
-      for (const p of parts) p.geometry.dispose()
+      const geos = new Set(parts.map((p) => p.geometry))
+      for (const g of geos) g.dispose()
       mat.dispose()
       critters.length = 0
     },
@@ -250,36 +354,52 @@ export function createCritterGroup(
         const c = critters[i]
         stepCritter(c, dt, playerX, playerZ, species, rand, provider, findFleeTarget)
 
-        let coreX: number, coreY: number, coreZ: number, heading: number
-        if (c.state === 'flee') {
-          coreX = c.x
-          coreY = c.y
-          coreZ = c.z
-          heading = c.fleeHeading
-          if (onStep) {
-            const lx = lastTrackX[i]
-            const lz = lastTrackZ[i]
-            if (lx === null || Math.hypot(coreX - lx, coreZ - lz!) >= trackSpacing) {
-              onStep(coreX, coreZ, heading)
-              lastTrackX[i] = coreX
-              lastTrackZ[i] = coreZ
-            }
+        const moved = Math.hypot(c.x - prevX[i], c.z - prevZ[i])
+        prevX[i] = c.x
+        prevZ[i] = c.z
+        // A jump bigger than any animal runs in a frame is a teleport (a
+        // fresh chunk, a reset), not a stride.
+        const stepped = moved < 2 ? moved : 0
+        const speed = dt > 0 ? stepped / dt : 0
+        gait[i] = (gait[i] + (stepped / rig.stride) * Math.PI * 2) % (Math.PI * 64)
+
+        // Which way it faces: the way it moves; toward the player while it
+        // stands frozen, watching; its home's own facing while it stands
+        // there (a beaver at its trunk).
+        let want = c.heading ?? drawnHeading[i]
+        if (c.state === 'alert') want = Math.atan2(playerZ - c.z, playerX - c.x)
+        else if (c.state === 'idle' && !c.walkTo) {
+          const home = homes.length > 0 ? homes[i % homes.length] : undefined
+          if (home?.face !== undefined && Math.hypot(c.x - home.x, c.z - home.z) < 0.3) want = home.face
+        }
+        const rate = c.state === 'flee' ? TURN_RATE_FLEE : TURN_RATE
+        drawnHeading[i] += wrapAngle(want - drawnHeading[i]) * (1 - Math.exp(-rate * dt))
+
+        const grazing = (c.state === 'idle' && !c.walkTo) || (c.state === 'resting' && c.stateT > 1.5)
+        graze[i] += ((grazing ? 1 : 0) - graze[i]) * (1 - Math.exp(-GRAZE_RATE * dt))
+
+        if (c.state === 'flee' && onStep) {
+          const lx = lastTrackX[i]
+          const lz = lastTrackZ[i]
+          if (lx === null || Math.hypot(c.x - lx, c.z - lz!) >= trackSpacing) {
+            onStep(c.x, c.z, c.fleeHeading)
+            lastTrackX[i] = c.x
+            lastTrackZ[i] = c.z
           }
-        } else if (c.state === 'alert') {
-          coreX = c.x
-          coreY = c.y
-          coreZ = c.z
-          heading = Math.atan2(c.z - playerZ, c.x - playerX)
-        } else {
-          const wp = wanderPhases[i]
-          const wobble = Math.sin(time * WANDER_SPEED + wp)
-          coreX = c.x + Math.cos(wp) * WANDER_RADIUS * wobble
-          coreZ = c.z + Math.sin(wp) * WANDER_RADIUS * wobble
-          coreY = provider.heightAt(coreX, coreZ)
-          heading = wp + Math.sin(time * WANDER_SPEED * 0.4 + wp) * 0.8
         }
 
-        pose(parts, i, coreX, coreY, coreZ, heading, wanderPhases[i], time)
+        rig.pose(parts, i, {
+          x: c.x,
+          y: provider.heightAt(c.x, c.z),
+          z: c.z,
+          heading: drawnHeading[i],
+          speed,
+          gait: gait[i],
+          graze: graze[i],
+          time,
+          variant: variants[i],
+          heightAt,
+        })
       }
       for (const p of parts) p.instanceMatrix.needsUpdate = true
     },
@@ -287,47 +407,10 @@ export function createCritterGroup(
 }
 
 // ---------------------------------------------------------------------------
-// Species: hare and squirrel. Snake follows separately (its pose is a curve,
-// not a heading — different enough to earn its own species module later).
+// Species.
 // ---------------------------------------------------------------------------
 
-const m = new THREE.Matrix4()
-const q = new THREE.Quaternion()
-const pos = new THREE.Vector3()
-const one = new THREE.Vector3(1, 1, 1)
-const yAxis = new THREE.Vector3(0, 1, 0)
-const zAxis = new THREE.Vector3(0, 0, 1)
-const off = new THREE.Vector3()
-
-function bodyGeometry(sx: number, sy: number, sz: number): THREE.BufferGeometry {
-  const geo = new THREE.OctahedronGeometry(1, 0)
-  geo.scale(sx, sy, sz)
-  return geo
-}
-
-function earGeometry(len: number): THREE.BufferGeometry {
-  return new THREE.ConeGeometry(0.08, len, 5)
-}
-
-/** A small head, distinct from the body — without one, both the hare and
- *  the squirrel read as a legless lump with ears glued straight onto it
- *  rather than an animal (live feedback, 2026-09-10). */
-function headGeometry(r: number): THREE.BufferGeometry {
-  const geo = new THREE.IcosahedronGeometry(r, 0)
-  geo.scale(1.1, 0.95, 0.9) // a touch longer than round — a muzzle, not a marble
-  return geo
-}
-
-function tailNubGeometry(r: number): THREE.BufferGeometry {
-  return new THREE.IcosahedronGeometry(r, 0)
-}
-
-/** A fixed lean, reused for an ear or a tail hinging back off its own root —
- *  the same fixed-tilt-through-a-quaternion trick `world/birds.ts` already
- *  uses for a grounded bird's neck/tail. */
-function tiltQuat(axis: THREE.Vector3, angle: number): THREE.Quaternion {
-  return new THREE.Quaternion().setFromAxisAngle(axis, angle)
-}
+type OnStep = (x: number, z: number, heading: number) => void
 
 const HARE_SPECIES: CritterSpecies = {
   fleeRadius: 9,
@@ -336,78 +419,20 @@ const HARE_SPECIES: CritterSpecies = {
   fleeDur: 2.5,
   restMin: 6,
   restMax: 16,
+  wander: { radius: 2.5, speed: 0.9, pauseMin: 3, pauseMax: 9 },
 }
 
-const HARE_EAR_TILT = tiltQuat(zAxis, -0.3) // leaning back off the head, not straight up
-const HARE_HEAD_Y = 0.08 // above body centre, in body-local metres
-const HARE_HEAD_FWD = 0.5
-
-/**
- * A hare: an elongated body, a distinct head carrying long ears leant back
- * and a tail nub at the rear — a head glued straight onto a body with no
- * neck read as a legless lump, not an animal (live feedback, 2026-09-10).
- * Ground-only — no flee target, it just bolts away from the player in a
- * straight line.
- */
+/** A hare: long ears, long hind feet, big haunches, a white scut. Ground-only
+ *  — it bolts away from the player in a straight line, in bounds. */
 export function createHares(
   scene: THREE.Scene,
   rand: () => number,
   count: number,
   provider: ElevationProvider,
   homes: HomeSpot[],
-  onStep?: (x: number, z: number, heading: number) => void,
+  onStep?: OnStep,
 ): CritterGroup {
-  return createCritterGroup(
-    scene,
-    'hares',
-    rand,
-    count,
-    HARE_SPECIES,
-    provider,
-    homes,
-    (mat, n) => {
-      const body = new THREE.InstancedMesh(bodyGeometry(0.42, 0.24, 0.28), mat, n)
-      const head = new THREE.InstancedMesh(headGeometry(0.2), mat, n)
-      const earL = new THREE.InstancedMesh(earGeometry(0.58), mat, n)
-      const earR = new THREE.InstancedMesh(earGeometry(0.58), mat, n)
-      const tail = new THREE.InstancedMesh(tailNubGeometry(0.11), mat, n)
-      return [body, head, earL, earR, tail]
-    },
-    ([body, head, earL, earR, tail], i, x, y, z, heading) => {
-      q.setFromAxisAngle(yAxis, heading)
-      const bodyY = y + 0.26
-      pos.set(x, bodyY, z)
-      m.compose(pos, q, one)
-      body.setMatrixAt(i, m)
-
-      off.set(HARE_HEAD_FWD, HARE_HEAD_Y, 0).applyAxisAngle(yAxis, heading)
-      const headX = x + off.x
-      const headY = bodyY + off.y
-      const headZ = z + off.z
-      pos.set(headX, headY, headZ)
-      m.compose(pos, q, one)
-      head.setMatrixAt(i, m)
-
-      const qEar = q.clone().multiply(HARE_EAR_TILT)
-      off.set(0.05, 0.28, 0.08).applyAxisAngle(yAxis, heading)
-      pos.set(headX + off.x, headY + off.y, headZ + off.z)
-      m.compose(pos, qEar, one)
-      earL.setMatrixAt(i, m)
-
-      off.set(0.05, 0.28, -0.08).applyAxisAngle(yAxis, heading)
-      pos.set(headX + off.x, headY + off.y, headZ + off.z)
-      m.compose(pos, qEar, one)
-      earR.setMatrixAt(i, m)
-
-      off.set(-0.42, 0.02, 0).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, bodyY + off.y, z + off.z)
-      m.compose(pos, q, one)
-      tail.setMatrixAt(i, m)
-    },
-    0x9a8468, // sandy grey-brown fur
-    undefined,
-    onStep,
-  )
+  return createCritterGroup(scene, 'hares', rand, count, HARE_SPECIES, provider, homes, HARE_RIG, undefined, onStep)
 }
 
 const SQUIRREL_SPECIES: CritterSpecies = {
@@ -417,16 +442,13 @@ const SQUIRREL_SPECIES: CritterSpecies = {
   fleeDur: 2,
   restMin: 8,
   restMax: 20,
+  wander: { radius: 1.5, speed: 1.2, pauseMin: 2, pauseMax: 6 },
 }
 
-const SQUIRREL_TAIL_TILT = tiltQuat(zAxis, -1.3)
-const SQUIRREL_HEAD_Y = 0.06
-const SQUIRREL_HEAD_FWD = 0.34
-
 /**
- * A squirrel: a small body, a distinct head carrying short upright ears, one
- * bushy tail arched up over the back. Flees to the nearest tree perch when
- * one is close enough, else bolts across the ground like a hare.
+ * A red squirrel: tufted ears, a bushy tail in an S over its back. Flees to
+ * the nearest tree perch when one is close enough, else bolts across the
+ * ground like a hare.
  */
 export function createSquirrels(
   scene: THREE.Scene,
@@ -436,58 +458,10 @@ export function createSquirrels(
   homes: HomeSpot[],
   perches: HomeSpot[],
   perchSearchRadius = 20,
-  onStep?: (x: number, z: number, heading: number) => void,
+  onStep?: OnStep,
 ): CritterGroup {
   return createCritterGroup(
-    scene,
-    'squirrels',
-    rand,
-    count,
-    SQUIRREL_SPECIES,
-    provider,
-    homes,
-    (mat, n) => {
-      const body = new THREE.InstancedMesh(bodyGeometry(0.32, 0.2, 0.22), mat, n)
-      const head = new THREE.InstancedMesh(headGeometry(0.15), mat, n)
-      const earL = new THREE.InstancedMesh(earGeometry(0.2), mat, n)
-      const earR = new THREE.InstancedMesh(earGeometry(0.2), mat, n)
-      const tail = new THREE.InstancedMesh(new THREE.ConeGeometry(0.1, 0.42, 6), mat, n)
-      return [body, head, earL, earR, tail]
-    },
-    ([body, head, earL, earR, tail], i, x, y, z, heading) => {
-      q.setFromAxisAngle(yAxis, heading)
-      const bodyY = y + 0.2
-      pos.set(x, bodyY, z)
-      m.compose(pos, q, one)
-      body.setMatrixAt(i, m)
-
-      off.set(SQUIRREL_HEAD_FWD, SQUIRREL_HEAD_Y, 0).applyAxisAngle(yAxis, heading)
-      const headX = x + off.x
-      const headY = bodyY + off.y
-      const headZ = z + off.z
-      pos.set(headX, headY, headZ)
-      m.compose(pos, q, one)
-      head.setMatrixAt(i, m)
-
-      off.set(0.04, 0.16, 0.06).applyAxisAngle(yAxis, heading)
-      pos.set(headX + off.x, headY + off.y, headZ + off.z)
-      m.compose(pos, q, one)
-      earL.setMatrixAt(i, m)
-
-      off.set(0.04, 0.16, -0.06).applyAxisAngle(yAxis, heading)
-      pos.set(headX + off.x, headY + off.y, headZ + off.z)
-      m.compose(pos, q, one)
-      earR.setMatrixAt(i, m)
-
-      // The tail arches up and back over the body — a fixed local offset and
-      // tilt, carried along by heading the same way a bird's own tail is.
-      off.set(-0.3, 0.42, 0).applyAxisAngle(yAxis, heading)
-      pos.set(x + off.x, bodyY + off.y, z + off.z)
-      const qTail = q.clone().multiply(SQUIRREL_TAIL_TILT)
-      m.compose(pos, qTail, one)
-      tail.setMatrixAt(i, m)
-    },
-    0xa8542e, // rust-red fur
+    scene, 'squirrels', rand, count, SQUIRREL_SPECIES, provider, homes, SQUIRREL_RIG,
     (x, z) => nearestPoint(x, z, perches, perchSearchRadius),
     onStep,
   )
@@ -504,22 +478,13 @@ const SNAKE_SPECIES: CritterSpecies = {
   fleeDur: 3.5,
   restMin: 15,
   restMax: 40,
+  wander: { radius: 1.2, speed: 0.25, pauseMin: 10, pauseMax: 30 },
 }
 
-/** Head to tail, metres — each bead a touch slimmer than the last. */
-const SNAKE_RADII = [0.09, 0.08, 0.07, 0.055, 0.04]
-const SNAKE_SPACING = 0.22
-const SNAKE_UNDULATE_SPEED = 3.5
-const SNAKE_UNDULATE_AMPLITUDE = 0.11
-const SNAKE_PHASE_STEP = 1.1
-
 /**
- * A snake: a beaded chain of shrinking segments behind the head, with a
- * standing sine wave along its length running in time — a cheap slither that
- * needs no path history, just the head's own current position and heading,
- * unlike a hare or squirrel's single-body pose. No flee target: it doesn't
- * climb or bolt, it just creeps (SNAKE_SPECIES's low fleeSpeed) away in a
- * straight line, same as a hare with the numbers turned down.
+ * An adder: a broad flat head, a body thickest a third of the way down,
+ * a dark zigzag along its back, lying along a wave that slides along itself
+ * as it moves. It creeps away slowly rather than bolting.
  */
 export function createSnakes(
   scene: THREE.Scene,
@@ -527,42 +492,192 @@ export function createSnakes(
   count: number,
   provider: ElevationProvider,
   homes: HomeSpot[],
-  onStep?: (x: number, z: number, heading: number) => void,
+  onStep?: OnStep,
 ): CritterGroup {
   return createCritterGroup(
-    scene,
-    'snakes',
-    rand,
-    count,
-    SNAKE_SPECIES,
-    provider,
-    homes,
-    (mat, n) => SNAKE_RADII.map((r) => new THREE.InstancedMesh(new THREE.IcosahedronGeometry(r, 0), mat, n)),
-    (parts, i, x, _y, z, heading, _wanderPhase, time) => {
-      for (let k = 0; k < parts.length; k++) {
-        // Each bead trails straight back from the head along `heading`, with
-        // a side-to-side wiggle that grows toward the tail (a real snake's
-        // head tracks nearly straight; the whip is in the back half) and
-        // runs with time rather than distance travelled, so it animates even
-        // while the snake is otherwise still.
-        const back = -k * SNAKE_SPACING
-        const wiggle =
-          Math.sin(time * SNAKE_UNDULATE_SPEED - k * SNAKE_PHASE_STEP) *
-          SNAKE_UNDULATE_AMPLITUDE *
-          (k / (parts.length - 1))
-        off.set(back, 0, wiggle).applyAxisAngle(yAxis, heading)
-        const sx = x + off.x
-        const sz = z + off.z
-        const sy = provider.heightAt(sx, sz) + SNAKE_RADII[k] * 0.6
-        q.setFromAxisAngle(yAxis, heading)
-        pos.set(sx, sy, sz)
-        m.compose(pos, q, one)
-        parts[k].setMatrixAt(i, m)
-      }
-    },
-    0x5a6b3c, // olive-green scales
-    undefined,
-    onStep,
+    scene, 'snakes', rand, count, SNAKE_SPECIES, provider, homes, SNAKE_RIG, undefined, onStep,
     0.15, // closer spacing than hare/squirrel — a sinuous trail, not two dots
   )
+}
+
+const MOOSE_SPECIES: CritterSpecies = {
+  // Big and unhurried: it lets you come fairly close, then trots off rather
+  // than bolting, and does not go far.
+  fleeRadius: 15,
+  alertDur: 1.5,
+  fleeSpeed: 3.8,
+  fleeDur: 6,
+  restMin: 8,
+  restMax: 20,
+  wander: { radius: 7, speed: 0.9, pauseMin: 6, pauseMax: 16 },
+}
+
+/** A moose: long pale legs, a hump over the shoulders, a heavy overhanging
+ *  muzzle and a bell under the throat. Bulls carry broad palmate antlers,
+ *  cows none. It browses, wanders slowly, and trots off if you come close. */
+export function createMoose(
+  scene: THREE.Scene,
+  rand: () => number,
+  count: number,
+  provider: ElevationProvider,
+  homes: HomeSpot[],
+  onStep?: OnStep,
+): CritterGroup {
+  return createCritterGroup(scene, 'moose', rand, count, MOOSE_SPECIES, provider, homes, MOOSE_RIG, undefined, onStep, 1.1)
+}
+
+const BEAR_SPECIES: CritterSpecies = {
+  // Wary of people, as a wild brown bear is: it moves off at a walk rather
+  // than a run once you are close.
+  fleeRadius: 14,
+  alertDur: 1.2,
+  fleeSpeed: 2.6,
+  fleeDur: 7,
+  restMin: 10,
+  restMax: 25,
+  wander: { radius: 4, speed: 0.7, pauseMin: 8, pauseMax: 20 },
+}
+
+/** A brown bear: a shoulder hump, a broad head with small round ears and a
+ *  paler muzzle. It lives by the berries and mushrooms (its homes are where
+ *  they grow — `game/scene.ts`) and spends most of its time head down,
+ *  eating them. */
+export function createBears(
+  scene: THREE.Scene,
+  rand: () => number,
+  count: number,
+  provider: ElevationProvider,
+  homes: HomeSpot[],
+  onStep?: OnStep,
+): CritterGroup {
+  return createCritterGroup(scene, 'bears', rand, count, BEAR_SPECIES, provider, homes, BEAR_RIG, undefined, onStep, 0.8)
+}
+
+const BOAR_SPECIES: CritterSpecies = {
+  fleeRadius: 11,
+  alertDur: 0.6,
+  fleeSpeed: 5,
+  fleeDur: 4,
+  restMin: 6,
+  restMax: 15,
+  wander: { radius: 5, speed: 0.8, pauseMin: 3, pauseMax: 10 },
+}
+
+/** A wild boar: a wedge of a body high at the shoulders with a bristly crest,
+ *  a long snout, small tusks. It roots about, nose to the ground, and runs
+ *  off if you come close. */
+export function createBoars(
+  scene: THREE.Scene,
+  rand: () => number,
+  count: number,
+  provider: ElevationProvider,
+  homes: HomeSpot[],
+  onStep?: OnStep,
+): CritterGroup {
+  return createCritterGroup(scene, 'boars', rand, count, BOAR_SPECIES, provider, homes, BOAR_RIG, undefined, onStep, 0.5)
+}
+
+const BEAVER_SPECIES: CritterSpecies = {
+  fleeRadius: 6,
+  alertDur: 0.5,
+  fleeSpeed: 2.2,
+  fleeDur: 3,
+  restMin: 10,
+  restMax: 25,
+  // It stays at its tree, gnawing; after a scare it waddles back to it.
+  wander: { radius: 0, speed: 0.5, pauseMin: 20, pauseMax: 40 },
+}
+
+/**
+ * A beaver: low and heavy, a flat scaly tail, orange front teeth. Its home is
+ * the foot of a tree, facing the trunk (`HomeSpot.face`), where it gnaws. It
+ * flees to the nearest water when there is some within reach, else away from
+ * the player.
+ */
+export function createBeavers(
+  scene: THREE.Scene,
+  rand: () => number,
+  count: number,
+  provider: ElevationProvider,
+  homes: HomeSpot[],
+  water: { x: number; z: number }[] = [],
+): CritterGroup {
+  return createCritterGroup(
+    scene, 'beavers', rand, count, BEAVER_SPECIES, provider, homes, BEAVER_RIG,
+    (x, z) => {
+      const p = nearestPoint(x, z, water, 40)
+      return p ? { x: p.x, y: provider.heightAt(p.x, p.z), z: p.z } : null
+    },
+  )
+}
+
+/**
+ * Where a bear lives: at the richest patch of food (berries and mushrooms) —
+ * of a sample of food spots, the ones with the most others close around them,
+ * kept well apart from each other. Empty when there is no food at all.
+ */
+export function placeBearHomes(
+  food: { x: number; z: number }[],
+  count: number,
+  rand: () => number,
+  ground: ElevationProvider,
+  apart = 40,
+): HomeSpot[] {
+  if (food.length === 0 || count <= 0) return []
+  const sample = Array.from({ length: Math.min(60, food.length) }, () => food[Math.floor(rand() * food.length)])
+  const scored = sample.map((p) => ({
+    p,
+    n: food.reduce((acc, f) => acc + ((f.x - p.x) ** 2 + (f.z - p.z) ** 2 < 64 ? 1 : 0), 0),
+  }))
+  scored.sort((a, b) => b.n - a.n)
+  const homes: HomeSpot[] = []
+  for (const { p } of scored) {
+    if (homes.length >= count) break
+    if (homes.some((h) => Math.hypot(h.x - p.x, h.z - p.z) < apart)) continue
+    homes.push({ x: p.x, y: ground.heightAt(p.x, p.z), z: p.z })
+  }
+  return homes
+}
+
+/**
+ * Where a beaver lives: at the foot of a tree near water, on the water's side
+ * of the trunk, facing it (`face`) — that is the tree it is gnawing. Empty
+ * when the wood has no water, or no tree near it: no beaver is better than a
+ * beaver in the middle of a dry pine wood.
+ */
+export function placeBeaverHomes(
+  trees: { x: number; z: number; radius: number }[],
+  water: { x: number; z: number }[],
+  count: number,
+  rand: () => number,
+  ground: ElevationProvider,
+  maxFromWater = 25,
+): HomeSpot[] {
+  if (water.length === 0 || count <= 0) return []
+  const near = trees
+    .map((t) => ({ t, w: nearestPoint(t.x, t.z, water, maxFromWater) }))
+    .filter((c): c is { t: (typeof trees)[number]; w: { x: number; z: number } } => c.w !== null)
+  const homes: HomeSpot[] = []
+  for (let k = 0; k < count && near.length > 0; k++) {
+    const { t, w } = near.splice(Math.floor(rand() * near.length), 1)[0]
+    const d = Math.hypot(w.x - t.x, w.z - t.z) || 1
+    const off = t.radius + 0.3
+    const x = t.x + ((w.x - t.x) / d) * off
+    const z = t.z + ((w.z - t.z) / d) * off
+    homes.push({ x, y: ground.heightAt(x, z), z, face: Math.atan2(t.z - z, t.x - x) })
+  }
+  return homes
+}
+
+/** `count` homes in a loose group around `centre` — a sounder of boar keeps
+ *  together. */
+export function familyHomes(centre: HomeSpot, count: number, rand: () => number, ground: ElevationProvider, spread = 3): HomeSpot[] {
+  return Array.from({ length: count }, (_, k) => {
+    if (k === 0) return centre
+    const a = rand() * Math.PI * 2
+    const r = spread * (0.5 + rand() * 0.5)
+    const x = centre.x + Math.cos(a) * r
+    const z = centre.z + Math.sin(a) * r
+    return { x, y: ground.heightAt(x, z), z }
+  })
 }
