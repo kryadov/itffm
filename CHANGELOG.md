@@ -6,6 +6,11 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.101.8
+The bicycle's front wheel in your view now stands straight in line with the
+frame while the bar is centred, instead of being permanently cocked to one
+side; it only turns when you turn.
+
 ## v0.101.7
 The start screen has a live backdrop now: a quadcopter circling slowly over
 the real, actually-running offline demo wood behind the place picker (and,
