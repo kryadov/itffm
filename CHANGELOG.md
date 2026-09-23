@@ -6,6 +6,12 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.102.1
+The bicycle you carry sits low in the view now, the top of its tyre ahead of
+the bar and the rest running out past the bottom of the screen, instead of
+floating just under the horizon and filling half of it. Its tread is shaded
+in soft sections, so you can see the wheel roll even riding straight.
+
 ## v0.102.0
 The weather changes on its own now (a new "Auto" setting, the default): by
 day clear or rain, mornings and evenings fog or clear, nights clear or fog,
