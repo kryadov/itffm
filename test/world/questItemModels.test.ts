@@ -103,6 +103,18 @@ describe('buildBikeCockpitModel', () => {
     expect(barAxis().distanceTo(straightAxis)).toBeLessThan(1e-6)
   })
 
+  it('stands the front wheel straight in line with the frame when the bar is centred', () => {
+    // Twice it had a fixed extra turn for the view's sake, and twice it read
+    // as a wheel cocked to one side (live reports, 2026-09-22 and -23). Straight,
+    // it spans across the bike (z) only as wide as its own tyre.
+    const { group, steer } = buildBikeCockpitModel()
+    steer(0)
+    group.updateMatrixWorld(true)
+    const size = bounds(group.getObjectByName('wheel')!).getSize(new THREE.Vector3())
+    expect(size.z).toBeLessThan(0.09)
+    expect(size.x).toBeGreaterThan(0.6)
+  })
+
   it('steers opposite ways for opposite angles', () => {
     const { group, steer } = buildBikeCockpitModel()
     const bar = group.getObjectByName('handlebar')!
@@ -185,13 +197,8 @@ describe('the bicycle wheel turns, and you can see it turn', () => {
   const wheelOf = (g: THREE.Object3D) => g.getObjectByName('wheel')!
 
   it('the cockpit can spin its front wheel about its own axle, leaving it where it is', () => {
-    // The wheel sits inside its own extra `wheelTilt` turn (see
-    // buildBikeCockpitModel) so it opens toward the camera instead of
-    // showing edge-on as a flat line — a live report, 2026-09-22, "this
-    // doesn't look like a bicycle at all". `spin()` still only ever sets the
-    // wheel's OWN rotation.z, so it keeps turning cleanly about its own
-    // (now tilted) axle; its axis-aligned box can and does wiggle a little
-    // as it turns, same as any tilted disc's world-axis-aligned box does.
+    // `spin()` only ever sets the wheel's OWN rotation.z: it turns about its
+    // own axle and stays where it is.
     const { group, spin } = buildBikeCockpitModel()
     group.updateMatrixWorld(true)
     const before = wheelOf(group).getWorldPosition(new THREE.Vector3())

@@ -320,32 +320,12 @@ export function buildBikeCockpitModel(): {
   const topTubeEnd = new THREE.Vector3(BIKE_HEAD_TOP.x - 0.38, BIKE_HEAD_TOP.y - 0.18, 0)
   group.add(tube(BIKE_HEAD_TOP, topTubeEnd, BIKE_FRAME_RADIUS, m.frame))
 
-  // The wheel, viewed dead ahead (its axle running straight across the bike,
-  // the same direction the camera is looking), is seen edge-on: a flat line,
-  // no different from the fork tube beside it — nothing at all read as a
-  // wheel, tread and spokes included (a live report, 2026-09-22: "this
-  // doesn't look like a bicycle at all"). Wrapping it in its own extra turn
-  // about the vertical opens the rim toward the camera into a visible ellipse,
-  // without touching how `buildBikeModel` stands the same wheel flush in the
-  // frame — this rotation exists only here, once, outside `buildBikeWheel`
-  // and `buildBikeSteering`, both shared with the parked bike. It sits
-  // OUTSIDE the wheel's own spin, so a rolling wheel still turns cleanly
-  // about its own (now tilted) axle rather than wobbling: `spin()` below
-  // keeps setting `wheel.rotation.z`, unchanged, as it always has. The first
-  // attempt at this (0.55 rad, ~31.5°) overshot — a live report the same day
-  // called it a strongly canted oval rather than a wheel seen at an angle;
-  // this is a little over half that, enough to open the rim into a visible
-  // ellipse without reading as a permanent, unnatural cant.
-  const WHEEL_VIEW_TURN = 0.3
+  // The wheel stands straight in line with the frame, the way a real one does
+  // when the bar is centred: it only turns when `steer()` turns the whole front
+  // end. Two earlier versions gave it a fixed extra turn about the vertical
+  // (0.55, then 0.3 rad) so the rim would open into an ellipse — both read as a
+  // wheel permanently cocked to one side (live reports, 2026-09-22 and -23).
   const wheel = steering.getObjectByName('wheel')!
-  const wheelTilt = new THREE.Group()
-  wheelTilt.name = 'wheelTilt'
-  wheelTilt.position.copy(wheel.position)
-  wheelTilt.rotation.y = WHEEL_VIEW_TURN
-  wheel.position.set(0, 0, 0)
-  steering.remove(wheel)
-  wheelTilt.add(wheel)
-  steering.add(wheelTilt)
 
   const axis = BIKE_HEAD_TOP.clone().sub(BIKE_FRONT_AXLE).normalize()
   return {
