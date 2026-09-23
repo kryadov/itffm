@@ -177,7 +177,9 @@ export interface Forest {
   /** Drifts the cloud layer with the camera — call every frame. */
   updateClouds: (camPos: THREE.Vector3, dt: number) => void
   /** Switches between clear/rain/snow/fog — cheap, call only on change. */
-  setWeather: (w: Weather) => void
+  /** `instant` (the default) snaps to it; otherwise it blends in over a few
+   *  seconds — what the auto weather's changes use. */
+  setWeather: (w: Weather, instant?: boolean) => void
   /** Animates rain/snow and keeps them centred on the camera — call every frame. */
   updateWeather: (camPos: THREE.Vector3, dt: number) => void
   /** Toggles the flashlight — cheap, call only on change (the `F` key). */
@@ -336,6 +338,7 @@ export function createForest(
   // The mine's own group, set once it is built below — updateDayNight (defined
   // first) feeds it how much daylight spills in at the mouth.
   let mineGroup: THREE.Group | null = null
+  let weatherFx: ReturnType<typeof buildWeather> | null = null
   const updateDayNight = (t: number, camPos: THREE.Vector3): void => {
     const sample = sampleDayNight(t)
     const elevation = sunElevation(t)
@@ -347,8 +350,12 @@ export function createForest(
     )
     sun.position.copy(sunPosition)
     sun.color.setHex(sample.sun)
-    sun.intensity = sample.sunI
-    hemi.intensity = sample.ambI
+    // A closed-over sky (rain, fog) takes the edge off the sun and some of the
+    // sky light: rain under a noon-bright sun with sharp shadows reads as a
+    // mistake. `weather` is built just below, so the first call (at load) has none.
+    const overcast = weatherFx?.overcast() ?? 0
+    sun.intensity = sample.sunI * (1 - 0.65 * overcast)
+    hemi.intensity = sample.ambI * (1 - 0.25 * overcast)
     if (scene.fog) (scene.fog as THREE.Fog).color.setHex(sample.sky)
     // The disc fades out the instant the sun dips below the horizon; the
     // star field and moon fade in over the same stretch, not instantly —
@@ -372,8 +379,9 @@ export function createForest(
 
   const weather = buildWeather(seed + 13, scene.fog as THREE.Fog)
   scene.add(weather.group)
-  const setWeather = (w: Weather): void => {
-    weather.setWeather(w)
+  weatherFx = weather
+  const setWeather = (w: Weather, instant = true): void => {
+    weather.setWeather(w, instant)
     clouds.setCover(w === 'clear' ? 0 : w === 'fog' ? 0.4 : 1)
   }
   const updateWeather = (camPos: THREE.Vector3, dt: number): void => {

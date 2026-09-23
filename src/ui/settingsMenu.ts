@@ -1,6 +1,6 @@
 import { t, getLang, setLang, type Lang } from '../i18n/i18n'
 import { TIME_MODES, type TimeMode } from '../world/daynight'
-import { WEATHERS, type Weather } from '../world/weather'
+import { WEATHER_MODES, type WeatherMode } from '../world/weather'
 import type { Prefs } from '../save/store'
 
 const TIME_MODE_KEY: Record<TimeMode, 'timeCycle' | 'timeDay' | 'timeNight'> = {
@@ -9,7 +9,8 @@ const TIME_MODE_KEY: Record<TimeMode, 'timeCycle' | 'timeDay' | 'timeNight'> = {
   night: 'timeNight',
 }
 
-const WEATHER_KEY: Record<Weather, 'weatherClear' | 'weatherRain' | 'weatherSnow' | 'weatherFog'> = {
+const WEATHER_KEY: Record<WeatherMode, 'weatherAuto' | 'weatherClear' | 'weatherRain' | 'weatherSnow' | 'weatherFog'> = {
+  auto: 'weatherAuto',
   clear: 'weatherClear',
   rain: 'weatherRain',
   snow: 'weatherSnow',
@@ -192,16 +193,16 @@ export function openSettingsMenu(prefs: Prefs, cb: SettingsCallbacks): void {
   const weatherLabel = document.createElement('span')
   label(weatherLabel, 'settingsWeather')
   const weatherButtons = document.createElement('div')
-  weatherButtons.style.cssText = 'display:flex;gap:8px'
-  const weatherBtns = new Map<Weather, HTMLButtonElement>()
+  weatherButtons.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap'
+  const weatherBtns = new Map<WeatherMode, HTMLButtonElement>()
   const paintWeather = (): void => {
-    for (const [w, btn] of weatherBtns) btn.style.cssText = btnStyle(w === live.weather)
+    for (const [w, btn] of weatherBtns) btn.style.cssText = btnStyle(w === live.weatherMode)
   }
-  for (const w of WEATHERS) {
+  for (const w of WEATHER_MODES) {
     const btn = document.createElement('button')
     label(btn, WEATHER_KEY[w])
     btn.addEventListener('click', () => {
-      live = { ...live, weather: w }
+      live = { ...live, weatherMode: w }
       cb.onPrefsChange(live)
       paintWeather()
     })

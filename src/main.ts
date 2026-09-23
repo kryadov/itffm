@@ -36,6 +36,7 @@ import { renderCollectiblePreview } from './ui/preview'
 import { openSettingsMenu } from './ui/settingsMenu'
 import { createUpdateBanner } from './ui/updateBanner'
 import { timeFor, nightFactor, DAY_TIME } from './world/daynight'
+import { autoWeather, WEATHER_SPELL_SECONDS, type Weather } from './world/weather'
 import { gameDaysElapsed, realMonthAt, DAYS_PER_MONTH } from './world/calendar'
 import { speciesById, loadSpecies } from './species/load'
 import { HITBOX_RADIUS } from './collectible/build'
@@ -342,7 +343,15 @@ async function main(): Promise<void> {
   }
   // The loading screen is closed by the render loop, after the first frame
   // has actually been drawn (see `loadingOpen` below) — not here.
-  forest.setWeather(save.prefs.weather)
+  // What the sky is actually doing: the fixed pick, or the auto weather's
+  // current draw (see the render loop).
+  const weatherNow = (clockT: number): Weather =>
+    save.prefs.weatherMode === 'auto'
+      ? autoWeather(seed, Math.floor(weatherClock / WEATHER_SPELL_SECONDS), clockT)
+      : save.prefs.weatherMode
+  let weatherClock = 0
+  let shownWeather = weatherNow(timeFor(save.prefs.timeMode, DAY_TIME))
+  forest.setWeather(shownWeather)
   forest.setTracksEnabled(save.prefs.groundTracks)
   // Infinite wilderness beyond the home plot — the demo wood only
   // (fellBackTo === 'demo' covers both a deliberate "just show the forest"
@@ -1007,6 +1016,7 @@ async function main(): Promise<void> {
 
     debugEl.textContent = [
       `aimed: ${aimed ? aimed.userData.placement.speciesId : 'none'}`,
+      `weather: ${shownWeather} (${save.prefs.weatherMode}, spell ${Math.floor(weatherClock / WEATHER_SPELL_SECONDS)})`,
       `player pos: ${player.x.toFixed(2)}, ${player.z.toFixed(2)} (ground y: ${forest.ground.heightAt(player.x, player.z).toFixed(2)})`,
       `camera pos: ${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)}`,
       `camera dir: ${debugCamDir.x.toFixed(3)}, ${debugCamDir.y.toFixed(3)}, ${debugCamDir.z.toFixed(3)}`,
@@ -1194,7 +1204,8 @@ async function main(): Promise<void> {
         audio.setVolume(prefs.soundVolume)
         audio.setMusicVolume(prefs.musicVolume)
         audio.setFootstepVolume(prefs.footstepVolume)
-        forest.setWeather(prefs.weather)
+        shownWeather = weatherNow(timeFor(prefs.timeMode, cycleT))
+        forest.setWeather(shownWeather)
         minimap.setVisible(prefs.minimap)
         forest.setTracksEnabled(prefs.groundTracks)
         void persistSave(save)
@@ -1570,6 +1581,12 @@ async function main(): Promise<void> {
     const distToFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z)
     audio.updateMusic(nightFactor(clockT), campfireGain(distToFire, CAMPFIRE_MUSIC_RADIUS))
     forest.updateClouds(camera.position, dt)
+    weatherClock += dt
+    const weatherWanted = weatherNow(clockT)
+    if (weatherWanted !== shownWeather) {
+      shownWeather = weatherWanted
+      forest.setWeather(shownWeather, false)
+    }
     forest.updateWeather(camera.position, dt)
     forest.updateShelter(dt)
     forest.updateCampfire(dt)

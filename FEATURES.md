@@ -121,8 +121,12 @@ today, each with real field marks, edibility and season.
   light after dark. The platform is a step you simply walk onto; the shelter's
   posts, the bench, the lamp posts and the tunnel mounds are solid, and nothing
   grows there.
-- **Weather** (clear, rain, snow, fog) and a **day/night cycle** with a real
-  sun and moon, changeable in settings or left on a self-running cycle.
+- **Changing weather** by default: by day it turns between clear and rain,
+  mornings and evenings bring fog or clear, and a night is clear or foggy —
+  each change rolling in over a few seconds, the sun dimming under rain and
+  fog. Any one weather (clear, rain, snow, fog) can be pinned in settings
+  instead. A **day/night cycle** with a real sun and moon, changeable in
+  settings or left on a self-running cycle.
 - A **self-running accelerated calendar**: the game clock runs faster than
   real time, so a single play session moves through real seasons instead of
   staying stuck on the day you started, driving what's in season and how
@@ -233,7 +237,8 @@ whether it's still out there, in your hands, or already home.
 - **Mushroom draw distance**.
 - **Sound, music and footstep volume**, independently.
 - **Time of day** — a self-running cycle, or pinned to day/night.
-- **Weather** — clear, rain, snow, fog.
+- **Weather** — auto (changes on its own, the default), or pinned to clear,
+  rain, snow or fog.
 - **Minimap** on/off, plus a separate **quest items on the map** on/off,
   and **invert look** on/off.
 - **Ground tracks** on/off — footprints, tyre and animal tracks (on by

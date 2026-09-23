@@ -1,6 +1,6 @@
 import type { Lang } from '../i18n/i18n'
 import type { TimeMode } from '../world/daynight'
-import type { Weather } from '../world/weather'
+import type { WeatherMode } from '../world/weather'
 import type { Quest } from '../quest/state'
 import type { QuestItemId } from '../quest/types'
 import { SHELTER_WALLS, type BikeSpot } from '../world/shelter'
@@ -27,8 +27,11 @@ export interface Prefs {
   drawDistance: number
   /** 'cycle' runs a full day/night loop; 'day'/'night' lock the clock. */
   timeMode: TimeMode
-  /** A fixed weather — there is no forecast, only what the player picks. */
-  weather: Weather
+  /** 'auto' lets the wood's weather change on its own (`world/weather.ts`'s
+   *  `autoWeather`); anything else holds that one weather. Named apart from
+   *  the old fixed-only `weather` field on purpose: every save that had it
+   *  starts on 'auto' instead of the 'clear' it defaulted to. */
+  weatherMode: WeatherMode
   /** Off by default — see ui/compass.ts and ui/minimap.ts for why. */
   minimap: boolean
   /** Off by default, independent of `minimap` above — whether the four
@@ -127,7 +130,7 @@ export function defaultPrefs(): Prefs {
     walkSpeedMultiplier: 1,
     drawDistance: 45,
     timeMode: 'day',
-    weather: 'clear',
+    weatherMode: 'auto',
     minimap: false,
     minimapQuestHints: false,
     soundVolume: 0.7,
@@ -147,7 +150,10 @@ export function defaultPrefs(): Prefs {
  * rather than only the field it actually specifies.
  */
 export function mergeSave(stored: Partial<SaveData> | undefined): SaveData {
-  return { ...emptySave(), ...stored, prefs: { ...defaultPrefs(), ...stored?.prefs } }
+  const prefs: Prefs & { weather?: unknown } = { ...defaultPrefs(), ...stored?.prefs }
+  // Superseded by `weatherMode` (see there) — dropped, not carried along.
+  delete prefs.weather
+  return { ...emptySave(), ...stored, prefs }
 }
 
 const DB_NAME = 'itffm'

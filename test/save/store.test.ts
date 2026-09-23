@@ -77,6 +77,18 @@ describe('mergeSave', () => {
     expect(Math.abs(merged.calendarStart - Date.now())).toBeLessThan(5000)
   })
 
+  it('puts a save from before auto weather on auto, dropping its old fixed pick', () => {
+    const old = { prefs: { ...defaultPrefs(), weather: 'clear' } } as unknown as Partial<SaveData>
+    delete (old.prefs as Partial<SaveData['prefs']>).weatherMode
+    const merged = mergeSave(old)
+    expect(merged.prefs.weatherMode).toBe('auto')
+    expect('weather' in merged.prefs).toBe(false)
+  })
+
+  it('keeps a weather the player picked themselves', () => {
+    expect(mergeSave({ prefs: { ...defaultPrefs(), weatherMode: 'snow' } }).prefs.weatherMode).toBe('snow')
+  })
+
   it('takes top-level fields from a stored save', () => {
     const s = mergeSave({ lang: 'en' })
     expect(s.lang).toBe('en')
