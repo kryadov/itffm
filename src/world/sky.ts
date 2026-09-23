@@ -14,6 +14,9 @@ export interface Sky {
     sunVis: number,
     night: number,
     moonPhase: number,
+    /** 0..1, how much fog or rain hides the sky: the dome goes over to the
+     *  horizon colour (the fog's own), and the sun, moon and stars fade. */
+    haze?: number,
   ): void
 }
 
@@ -42,6 +45,7 @@ export function buildSky(): Sky {
       uSunVis: { value: 1 },
       uNight: { value: 0 },
       uMoonPhase: { value: 0.5 },
+      uHaze: { value: 0 },
     },
     vertexShader: `
       varying vec3 vDir;
@@ -57,6 +61,7 @@ export function buildSky(): Sky {
       uniform float uSunVis;
       uniform float uNight;
       uniform float uMoonPhase;
+      uniform float uHaze;
       varying vec3 vDir;
 
       float hash13(vec3 p) {
@@ -115,6 +120,13 @@ export function buildSky(): Sky {
         float disc = smoothstep(0.9986, 0.9994, d);
         float glow = pow(d, 220.0) + pow(d, 8.0) * 0.12;
         sky += uSun * (disc + glow) * uSunVis;
+        // In fog the whole dome is the fog: fully fogged tree crowns stood out
+        // as flat pale cut-outs against a darker zenith. The fog colour the
+        // lit materials end on has been through the output colour conversion,
+        // which this shader's own colours never go through — so the haze
+        // takes the converted one, or the dome stays a shade darker than the
+        // fog it is meant to be.
+        sky = mix(sky, linearToOutputTexel(vec4(uHorizon, 1.0)).rgb, uHaze);
         gl_FragColor = vec4(sky, 1.0);
       }
     `,
@@ -126,7 +138,8 @@ export function buildSky(): Sky {
 
   return {
     mesh,
-    update(camPos, horizon, sunColor, sunDir, sunVis, night, moonPhase) {
+    update(camPos, horizon, sunColor, sunDir, sunVis, night, moonPhase, haze = 0) {
+      mat.uniforms.uHaze.value = haze
       mesh.position.copy(camPos)
       ;(mat.uniforms.uHorizon.value as THREE.Color).setHex(horizon)
       ;(mat.uniforms.uSun.value as THREE.Color).setHex(sunColor)

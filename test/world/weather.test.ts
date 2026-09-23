@@ -120,7 +120,7 @@ describe('buildWeather blending', () => {
     weather.update(new THREE.Vector3(), 0.5)
     const rain = weather.group.children[0] as THREE.LineSegments
     expect(rain.visible).toBe(true)
-    expect((rain.material as THREE.LineBasicMaterial).opacity).toBeLessThan(0.4)
+    expect((rain.material as THREE.LineBasicMaterial).opacity).toBeLessThan(0.25)
     for (let i = 0; i < 60; i++) weather.update(new THREE.Vector3(), 1)
     expect(weather.overcast()).toBe(1)
   })

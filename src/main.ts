@@ -69,7 +69,12 @@ declare global {
   // picker and the network entirely and goes straight to the offline demo
   // wood, so the check never depends on Overpass, Nominatim or tile servers
   // being reachable from wherever it runs.
-  interface Window { __READY?: boolean; __BOOTCHECK?: boolean; __trainAt?: (end: 0 | 1) => void }
+  interface Window {
+    __READY?: boolean
+    __BOOTCHECK?: boolean
+    __trainAt?: (end: 0 | 1) => void
+    __animals?: () => { kind: string; x: number; z: number }[]
+  }
 }
 
 /** How often a long-lived session asks the browser to check for a new
@@ -153,6 +158,8 @@ const WATER_AMBIENCE_RADIUS = 45
 const CAMPFIRE_MUSIC_RADIUS = 8
 /** Real seconds for one full day/night loop in 'cycle' mode. */
 const DAY_LENGTH_SECONDS = 600
+/** The home plot's ground-animal groups, by their scene names (world/critters.ts). */
+const ANIMAL_GROUPS = new Set(['moose', 'bears', 'boars', 'beavers', 'hares', 'squirrels', 'snakes'])
 /** Seed offset for the wood's four quest items (world/railway.ts's own
  *  RAIL_SEED_OFFSET is 29, game/scene.ts's train sits at seed + 30 — this is
  *  the next free slot, so quest placement never draws from the same stream
@@ -571,6 +578,36 @@ async function main(): Promise<void> {
       if (portalTp) {
         const site = portalSites(forest.railLine)[Number(portalTp[1])]
         player = { ...player, x: site.x - site.ox * (4 + (Number(q.get('back')) || 0)), z: site.z - site.oz * (4 + (Number(q.get('back')) || 0)), yaw: Math.atan2(-site.ox, -site.oz) }
+      }
+      // window.__animals() lists where every ground animal of the home plot is;
+      // tp=animal:moose (or bears, boars, beavers, hares, squirrels, snakes)
+      // stands back= metres (default 20) south of the first of that kind, facing it.
+      const animals = (): { kind: string; x: number; z: number }[] => {
+        const out: { kind: string; x: number; z: number }[] = []
+        const m = new THREE.Matrix4()
+        for (const g of forest.scene.children) {
+          const torso = g.children[0]
+          if (!ANIMAL_GROUPS.has(g.name) || !(torso instanceof THREE.InstancedMesh)) continue
+          for (let i = 0; i < torso.count; i++) {
+            torso.getMatrixAt(i, m)
+            out.push({ kind: g.name, x: m.elements[12], z: m.elements[14] })
+          }
+        }
+        return out
+      }
+      window.__animals = animals
+      const animalTp = /^animal:(\w+)$/.exec(q.get('tp') ?? '')
+      if (animalTp) {
+        forest.updateCritters(1 / 30, 1e6, 1e6) // pose them once, far from anyone
+        const a = animals().find((x) => x.kind === animalTp[1])
+        if (a) player = { ...player, x: a.x, z: a.z + (Number(q.get('back')) || 20), yaw: 0 }
+      }
+      // weather=rain (or clear, snow, fog): this session only, not saved — to look at one.
+      const wq = q.get('weather')
+      if (wq === 'clear' || wq === 'rain' || wq === 'snow' || wq === 'fog') {
+        save = { ...save, prefs: { ...save.prefs, weatherMode: wq } }
+        shownWeather = wq
+        forest.setWeather(wq)
       }
       const yawDeg = Number(q.get('yaw'))
       if (q.has('yaw') && Number.isFinite(yawDeg)) player = { ...player, yaw: (yawDeg * Math.PI) / 180 }

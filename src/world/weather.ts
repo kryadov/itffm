@@ -53,11 +53,16 @@ export function autoWeather(seed: number, spell: number, t: number): Weather {
 const AREA = 40
 const TOP = 30
 const BOT = -15
-const RAIN_N = 500
+/** Rain keeps to a tighter box than snow: a 1-pixel streak far off is
+ *  invisible, so the drops are packed where they can be seen. The first
+ *  version spread 500 over the whole snow box and a rainy wood showed one or
+ *  two streaks on screen. */
+const RAIN_AREA = 18
+const RAIN_N = 1400
 const SNOW_N = 700
 /** Rain-drop streak length, metres. */
 const STREAK = 1.2
-const RAIN_OPACITY = 0.4
+const RAIN_OPACITY = 0.5
 const SNOW_OPACITY = 0.8
 /** Fog distances in thick fog, metres. */
 const FOG_NEAR = 6
@@ -77,6 +82,8 @@ export interface WeatherFx {
   /** 0 under a clear sky, up to 1 in full rain: how much the sky is closed
    *  over, for dimming the sun. */
   overcast(): number
+  /** 0 under a clear sky, 1 in thick fog: how much of the sky itself is hidden. */
+  haze(): number
 }
 
 /**
@@ -97,8 +104,8 @@ export function buildWeather(seed: number, fog: THREE.Fog): WeatherFx {
   const rainPos = new Float32Array(RAIN_N * 6)
   const rainSpeed = new Float32Array(RAIN_N)
   for (let i = 0; i < RAIN_N; i++) {
-    const x = rnd() * AREA
-    const z = rnd() * AREA
+    const x = rnd() * RAIN_AREA
+    const z = rnd() * RAIN_AREA
     const y = rng() * (TOP - BOT) + BOT
     rainSpeed[i] = 25 + rng() * 18
     rainPos.set([x, y, z, x, y - STREAK, z], i * 6)
@@ -161,6 +168,7 @@ export function buildWeather(seed: number, fog: THREE.Fog): WeatherFx {
       }
     },
     overcast: () => Math.min(1, amount.rain + amount.snow * 0.7 + amount.fog * 0.5),
+    haze: () => Math.min(1, amount.fog + amount.rain * 0.5 + amount.snow * 0.5),
     update(cam, dt) {
       t += dt
       if (amount.rain !== target.rain || amount.snow !== target.snow || amount.fog !== target.fog) {
@@ -179,8 +187,8 @@ export function buildWeather(seed: number, fog: THREE.Fog): WeatherFx {
           rainPos[j + 1] -= d
           rainPos[j + 4] -= d
           if (rainPos[j + 1] < BOT) {
-            const x = rnd() * AREA
-            const z = rnd() * AREA
+            const x = rnd() * RAIN_AREA
+            const z = rnd() * RAIN_AREA
             rainPos.set([x, TOP, z, x, TOP - STREAK, z], j)
           }
         }

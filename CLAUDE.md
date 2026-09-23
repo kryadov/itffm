@@ -69,6 +69,10 @@ stand at a platform with the train in instead of waiting minutes of game time.
 track, and &trainAt=0|1 runs the train until it stands there; with &back=metres
 and &along=metres to step off the platform for a view of the whole train, and
 &yaw=degrees to turn. `window.__trainAt(end)` does the same on demand.
+&tp=animal:moose (or bears, boars, beavers, hares, squirrels, snakes) stands
+&back= metres (default 20) south of the first of that kind, facing it, and
+`window.__animals()` lists where every ground animal is. &weather=rain (or clear,
+snow, fog) pins the weather for that session without saving it.
 
 ## Architecture
 

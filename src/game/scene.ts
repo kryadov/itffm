@@ -365,7 +365,7 @@ export function createForest(
     // dusk should read as a gradient, not a light switch.
     const sunVis = Math.max(0, elevation)
     const night = nightFactor(t)
-    sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow)
+    sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow, weatherFx?.haze() ?? 0)
     shelterFx?.setNight(night)
     trainFx?.setNight(night)
     stationFx?.setNight(night)
@@ -385,7 +385,9 @@ export function createForest(
   weatherFx = weather
   const setWeather = (w: Weather, instant = true): void => {
     weather.setWeather(w, instant)
-    clouds.setCover(w === 'clear' ? 0 : w === 'fog' ? 0.4 : 1)
+    // None in fog: fully fogged, a cloud is a flat pale cut-out against the
+    // sky dome (which the fog does not touch), not a cloud.
+    clouds.setCover(w === 'clear' || w === 'fog' ? 0 : 1)
   }
   const updateWeather = (camPos: THREE.Vector3, dt: number): void => {
     weather.update(camPos, dt)
