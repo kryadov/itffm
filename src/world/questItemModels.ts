@@ -138,6 +138,16 @@ type BikeMaterials = ReturnType<typeof bikeMaterials>
 const BIKE_TYRE_WIDENING = 1.2
 /** How many proud blocks the tread is built from. */
 export const TREAD_BLOCKS = 6
+/** How many times the tread goes from its darker to its lighter shade and back
+ *  round the wheel — the sections that let you see it turn. */
+export const TREAD_SECTIONS = 6
+/** The tread's two shades: close, both dark rubber, blending smoothly into each
+ *  other. Ridden straight, the wheel is seen edge-on from above, and a tread of
+ *  one colour gave no sign of turning at all (a live report, 2026-09-24); the
+ *  hard light/dark "barcode" before that glittered and distracted (a live
+ *  report, 2026-09-22). */
+const TREAD_DARK = 0x1c1c1a
+const TREAD_LIGHT = 0x48453f
 
 function buildBikeWheel(m: BikeMaterials): THREE.Group {
   const wheel = new THREE.Group()
@@ -145,11 +155,8 @@ function buildBikeWheel(m: BikeMaterials): THREE.Group {
   const tyre = new THREE.Mesh(new THREE.TorusGeometry(BIKE_WHEEL_RADIUS, BIKE_TIRE_RADIUS, 8, 24), m.tire)
   tyre.scale.z = BIKE_TYRE_WIDENING
   wheel.add(tyre)
-  // Tread: TREAD_BLOCKS proud blocks all the way round the rim, in one matte
-  // shade a touch lighter than the tyre itself — the raised, jointed geometry
-  // gives the tread its own rhythm under the light, without the alternating
-  // light/dark "barcode" round the rim that read as a sticker rather than
-  // rubber (a live report, 2026-09-22). The blocks run edge to edge (no gaps),
+  // Tread: TREAD_BLOCKS proud blocks all the way round the rim, shaded in
+  // TREAD_SECTIONS soft sections (see there). The blocks run edge to edge (no gaps),
   // so the tread stays a true circle and the wheel still sits exactly on
   // BIKE_AXLE_Y all the way round.
   const blockGeos: THREE.BufferGeometry[] = []
@@ -161,9 +168,23 @@ function buildBikeWheel(m: BikeMaterials): THREE.Group {
     block.rotateZ((i * Math.PI * 2) / TREAD_BLOCKS)
     blockGeos.push(block)
   }
+  const treadGeo = mergeGeometries(blockGeos, false)
+  // Sections: the shade follows the angle round the axle as a smooth wave, so
+  // each section fades into the next with no edge to glitter.
+  const dark = new THREE.Color(TREAD_DARK)
+  const light = new THREE.Color(TREAD_LIGHT)
+  const shade = new THREE.Color()
+  const treadPos = treadGeo.getAttribute('position')
+  const treadCol = new Float32Array(treadPos.count * 3)
+  for (let i = 0; i < treadPos.count; i++) {
+    const angle = Math.atan2(treadPos.getY(i), treadPos.getX(i))
+    shade.copy(dark).lerp(light, 0.5 + 0.5 * Math.cos(TREAD_SECTIONS * angle))
+    treadCol.set([shade.r, shade.g, shade.b], i * 3)
+  }
+  treadGeo.setAttribute('color', new THREE.BufferAttribute(treadCol, 3))
   const tread = new THREE.Mesh(
-    mergeGeometries(blockGeos, false),
-    new THREE.MeshStandardMaterial({ color: 0x262624, roughness: 0.95 }),
+    treadGeo,
+    new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.95 }),
   )
   tread.name = 'tread'
   wheel.add(tread)

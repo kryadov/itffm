@@ -186,7 +186,9 @@ clustering in whichever one the dice happened to favour:
 - **Bicycle** — while you carry it you are riding it: 1.6 times faster
   everywhere, path or not; the view stops swaying like a walk and there are no
   footsteps; its handlebar and front wheel show low in your view, the wheel standing
-  straight in line with the frame, and turn as you turn; the wheel
+  straight in line with the frame and running out past the bottom of the
+  screen, and turn as you turn; its tread is shaded in soft sections, so you
+  can see it roll even riding straight; the wheel
   spins with the speed you ride, its spokes visibly sweeping round as it does
   (it runs backward when you back up and stops when you do). You leave it against whichever wall of the hut you are standing at when
   you press `E` (any of the four — not only by the door), where it stands on

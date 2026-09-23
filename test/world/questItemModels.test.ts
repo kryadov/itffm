@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {
   buildAxeModel, buildLampModel, buildRodModel, buildBikeModel, buildBikeCockpitModel,
-  buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH, BIKE_WHEEL_RADIUS,
+  buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH, BIKE_WHEEL_RADIUS, TREAD_SECTIONS,
 } from '../../src/world/questItemModels'
 import { ROLLING_RADIUS } from '../../src/game/bikeSteer'
 
@@ -208,22 +208,49 @@ describe('the bicycle wheel turns, and you can see it turn', () => {
     expect(wheelOf(group).getWorldPosition(new THREE.Vector3()).distanceTo(before)).toBeLessThan(1e-9)
   })
 
-  it('has a modest tyre with a tread of studs in one matte shade, not a barcode of alternating colours', () => {
-    // From behind the bar the front wheel is seen edge-on, as a strip of tyre: it
-    // has to read as rubber, not as a striped decal (a live report, 2026-09-22).
+  it('has a modest tyre whose tread shades softly round in sections, so its turn shows without glittering', () => {
+    // Ridden straight the wheel is seen edge-on from above: a tread of one
+    // colour showed no turning at all (a live report, 2026-09-24), and the hard
+    // light/dark barcode before it glittered (2026-09-22). Now: a few sections,
+    // both shades dark rubber, fading smoothly into each other.
     const wheel = wheelOf(buildBikeCockpitModel().group)
     const size = new THREE.Box3().setFromObject(wheel).getSize(new THREE.Vector3())
     expect(size.z).toBeGreaterThan(0.05) // a tyre you can see, not a wire
     expect(size.z).toBeLessThan(0.09) // but a bicycle tyre, not an offroad one
     const treads: THREE.Mesh[] = []
     wheel.traverse((o) => { if (o.name === 'tread' && o instanceof THREE.Mesh) treads.push(o) })
-    expect(treads.length).toBe(1) // one mesh, the studs are geometry, not colour
-    const tireColour = (wheel.children.find((c) => c instanceof THREE.Mesh) as THREE.Mesh).material as THREE.MeshStandardMaterial
-    const treadColour = treads[0].material as THREE.MeshStandardMaterial
-    expect(tireColour.color.getHex()).not.toBe(treadColour.color.getHex()) // still a shade apart, not identical
-    // ...but close: both dark, not a light/dark checkerboard.
-    const luma = (c: THREE.Color) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
-    expect(Math.abs(luma(tireColour.color) - luma(treadColour.color))).toBeLessThan(0.15)
+    expect(treads.length).toBe(1)
+    const geo = treads[0].geometry
+    const pos = geo.getAttribute('position')
+    const col = geo.getAttribute('color')
+    // Shade (sRGB luma) by angle round the axle.
+    const c = new THREE.Color()
+    const samples: { angle: number; luma: number }[] = []
+    for (let i = 0; i < pos.count; i++) {
+      c.setRGB(col.getX(i), col.getY(i), col.getZ(i))
+      const hex = c.getHex()
+      const luma = (0.2126 * ((hex >> 16) & 255) + 0.7152 * ((hex >> 8) & 255) + 0.0722 * (hex & 255)) / 255
+      samples.push({ angle: Math.atan2(pos.getY(i), pos.getX(i)), luma })
+    }
+    const lumas = samples.map((p) => p.luma)
+    const range = Math.max(...lumas) - Math.min(...lumas)
+    expect(range).toBeGreaterThan(0.1) // sections you can see
+    expect(Math.max(...lumas)).toBeLessThan(0.35) // but all of it dark rubber
+    // Smooth: two points close together round the wheel are close in shade.
+    samples.sort((p, q) => p.angle - q.angle)
+    for (let k = 1; k < samples.length; k++) {
+      if (samples[k].angle - samples[k - 1].angle < 0.05) {
+        expect(Math.abs(samples[k].luma - samples[k - 1].luma)).toBeLessThan(0.05)
+      }
+    }
+    // And more than one section — light, dark, light again round the way.
+    const at = (a: number): number => {
+      let best = samples[0]
+      for (const p of samples) if (Math.abs(p.angle - a) < Math.abs(best.angle - a)) best = p
+      return best.luma
+    }
+    expect(at(0)).toBeGreaterThan(at(Math.PI / TREAD_SECTIONS) + 0.08)
+    expect(at((2 * Math.PI) / TREAD_SECTIONS)).toBeGreaterThan(at(Math.PI / TREAD_SECTIONS) + 0.08)
   })
 
   it('has many spokes, so it reads as a wheel and not a few sticks', () => {

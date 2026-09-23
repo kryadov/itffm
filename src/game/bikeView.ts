@@ -34,13 +34,16 @@ export interface BikeView {
  *  front wheel still shows in the lower part of the view instead of falling out
  *  of the bottom of it. */
 const VIEW_SCALE = 0.75
-/** Where the bar's middle sits in the camera's own frame: centred, low, a
- *  little ahead of the eye. Higher than a rider's real bar, and the whole front
- *  end tipped up (`VIEW_TILT`), so the wheel — 0.6 m below the bar — comes up
- *  into the frame instead of sitting under its bottom edge: the wheel is the part
- *  that turns, and it has to be seen. */
-const BAR_IN_VIEW = new THREE.Vector3(0, -0.09, -0.62)
-/** How far the front end is tipped up about the bar, radians. */
+/** Where the bar's middle sits in the camera's own frame: centred, in the
+ *  lower part of the view, a little ahead of the eye. It used to sit just under
+ *  the horizon with the whole wheel hanging below it, which read as a bicycle
+ *  floating in the air and filled half the screen (a live report, 2026-09-24);
+ *  low like this, only the top of the tyre shows ahead of the bar and the rest
+ *  runs out past the bottom edge, where the ground would be. */
+const BAR_IN_VIEW = new THREE.Vector3(0, -0.27, -0.6)
+/** How far the front end is tipped up about the bar, radians: the view from
+ *  the saddle looks down on the bike far more steeply than the camera's own
+ *  level gaze, and without this the head tube hides the tyre completely. */
 const VIEW_TILT = 0.62
 /** The bar's own position in the model (see `buildBikeModel`). */
 const BAR_IN_MODEL = new THREE.Vector3(0.31, 0.92, 0)
