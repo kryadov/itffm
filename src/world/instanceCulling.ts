@@ -25,13 +25,13 @@ import * as THREE from 'three'
 
 /** Which top-level group names hold static (non-animated) instanced scatter
  *  built once and left alone — see world/trees.ts, boulders.ts, deadwood.ts,
- *  undergrowth.ts, flora.ts, grass.ts, each of which names its own
+ *  undergrowth.ts, flora.ts, grass.ts, reeds.ts, each of which names its own
  *  `THREE.Group` exactly this. Deliberately excludes birds/critters/insects
  *  — those are InstancedMesh too, but re-pose themselves every frame from
  *  their own animation state, and zeroing an instance's matrix here would
  *  just be overwritten (or fight) their own per-frame `setMatrixAt` calls. */
 export const STATIC_SCATTER_GROUP_NAMES: ReadonlySet<string> = new Set([
-  'trees', 'boulders', 'deadwood', 'leaning-trees', 'undergrowth', 'flora', 'grass',
+  'trees', 'boulders', 'deadwood', 'leaning-trees', 'undergrowth', 'flora', 'grass', 'reeds',
 ])
 
 const ZERO_SCALE = new THREE.Matrix4().makeScale(0, 0, 0)

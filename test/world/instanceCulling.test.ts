@@ -23,7 +23,7 @@ function instancedGroup(name: string, positions: [number, number][]): THREE.Grou
 
 describe('instanceCulling', () => {
   it('names the same static-scatter groups every builder actually uses', () => {
-    for (const name of ['trees', 'boulders', 'deadwood', 'leaning-trees', 'undergrowth', 'flora', 'grass']) {
+    for (const name of ['trees', 'boulders', 'deadwood', 'leaning-trees', 'undergrowth', 'flora', 'grass', 'reeds']) {
       expect(STATIC_SCATTER_GROUP_NAMES.has(name)).toBe(true)
     }
   })

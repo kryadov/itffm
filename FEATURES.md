@@ -91,6 +91,10 @@ today, each with real field marks, edibility and season.
   level on a slope, so the ground never comes up through its floor.
 - A **campfire** with a pot on a tripod and a bench, apart from the hut on
   its own clearing — its own place in the night's music, too.
+- **Reed beds** along the water: cattails with brown heads and long leaves in
+  thick stretches with bare bank between, standing in the shallows and on the
+  wet margin right at the waterline a pond actually shows, and along both
+  banks of a stream.
 - Where the wood actually has water, a **fisherman's hut and a boat** at the
   shore.
 - A **mine** you can walk into — a branching cave, not a single corridor: a

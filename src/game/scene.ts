@@ -56,6 +56,7 @@ import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { spawnFish } from '../world/fishSpawn'
 import { swimPose } from '../fish/swim'
+import { placeReeds, buildReedMesh } from '../world/reeds'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies } from '../species/load'
 import { buildPlacementObject } from '../collectible/placement'
@@ -527,6 +528,11 @@ export function createForest(
     scene.add(buildBoatMesh(fisherHut.boat))
     extraObstacles.push(fisherHutObstacle(fisherHut))
   }
+  // Reed beds along the banks, clear of the shack and its boat.
+  const reedKeepOut = fisherHut
+    ? [{ x: fisherHut.x, z: fisherHut.z, radius: 3 }, { x: fisherHut.boat.x, z: fisherHut.boat.z, radius: 2.5 }]
+    : []
+  scene.add(buildReedMesh(placeReeds(source.water ?? [], source.ground, seed + 61, reedKeepOut)))
 
   // A mine/cave interior — a real OSM cave/adit/mineshaft mouth wins when
   // this plot has one (world/mine.ts's own `mapped` filters it to this
