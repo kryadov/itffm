@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { puffTexture } from './puff'
 import { findOpenSpot, type Circle } from '../util/openSpot'
 import { mulberry32 } from '../util/rng'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
@@ -449,6 +450,8 @@ export interface ShelterFx {
   setDroneBoxPlaced(on: boolean): void
   /** Shows/hides the fishing rod, leaned against the wall by the table. */
   setRodPlaced(on: boolean): void
+  /** Shows/hides the bowl of ukha on the table (quest/soup.ts), steaming. */
+  setSoupPlaced(on: boolean): void
   /** Shows/hides the bicycle, parked outside against a wall — the one in
    *  `spot` (`DEFAULT_BIKE_SPOT` when none is given). */
   setBikePlaced(on: boolean, spot?: BikeSpot): void
@@ -731,6 +734,51 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
   droneBox.position.set(0.14, tableHeight + 0.02 + 0.04, 0.09)
   droneBox.visible = false
   table.add(droneBox)
+
+  // A bowl of ukha, brought in from the campfire: a turned wooden bowl, the
+  // golden broth with a piece of fish, potato and carrot in it, a spoon
+  // across the rim, and a little steam. Hidden until the soup quest delivers it.
+  const soupBowl = new THREE.Group()
+  soupBowl.name = 'soupBowl'
+  const bowlMat = new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.8, side: THREE.DoubleSide })
+  const bowlProfile = [
+    new THREE.Vector2(0, 0), new THREE.Vector2(0.03, 0), new THREE.Vector2(0.032, 0.004),
+    new THREE.Vector2(0.06, 0.02), new THREE.Vector2(0.075, 0.045), new THREE.Vector2(0.07, 0.047),
+    new THREE.Vector2(0.056, 0.024), new THREE.Vector2(0.0, 0.012),
+  ]
+  const bowlMesh = new THREE.Mesh(new THREE.LatheGeometry(bowlProfile, 16), bowlMat)
+  bowlMesh.name = 'bowl'
+  soupBowl.add(bowlMesh)
+  const broth = new THREE.Mesh(
+    new THREE.CircleGeometry(0.064, 16),
+    new THREE.MeshStandardMaterial({ color: 0xd6a24a, roughness: 0.3 }),
+  )
+  broth.rotation.x = -Math.PI / 2
+  broth.position.y = 0.036
+  soupBowl.add(broth)
+  const bits: [number, number, number, number][] = [
+    [0xf2eadc, 0.018, -0.012, 0.014], [0xe8d8a0, -0.02, 0.016, 0.011], [0xe07a2a, 0.012, 0.024, 0.008], [0xe07a2a, -0.024, -0.016, 0.007],
+  ]
+  for (const [color, bx, bz, r] of bits) {
+    const bit = new THREE.Mesh(new THREE.BoxGeometry(r * 2, r, r * 1.6), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }))
+    bit.position.set(bx, 0.038, bz)
+    bit.rotation.y = bx * 40
+    soupBowl.add(bit)
+  }
+  const spoon = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.006, 0.014), bowlMat)
+  spoon.position.set(0.03, 0.05, 0.02)
+  spoon.rotation.set(0, 0.5, 0.12)
+  soupBowl.add(spoon)
+  const bowlSteam: THREE.Sprite[] = []
+  for (let i = 0; i < 3; i++) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTexture(), color: 0xf4f4f0, transparent: true, opacity: 0, depthWrite: false }))
+    sprite.userData.phase = i / 3
+    soupBowl.add(sprite)
+    bowlSteam.push(sprite)
+  }
+  soupBowl.position.set(-0.12, tableHeight + 0.02, -0.15)
+  soupBowl.visible = false
+  table.add(soupBowl)
 
   table.position.set(TABLE_X, 0, TABLE_Z)
   group.add(table)
@@ -1024,7 +1072,7 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
   group.add(chimney)
 
   const SMOKE_N = 5
-  const smokeMat = new THREE.SpriteMaterial({ color: 0xcfcfcf, transparent: true, opacity: 0, depthWrite: false })
+  const smokeMat = new THREE.SpriteMaterial({ map: puffTexture(), color: 0xcfcfcf, transparent: true, opacity: 0, depthWrite: false })
   const smoke: THREE.Sprite[] = []
   for (let i = 0; i < SMOKE_N; i++) {
     const sprite = new THREE.Sprite(smokeMat.clone())
@@ -1053,6 +1101,14 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
     // whether the door is swinging fully open or just easing the last bit
     // shut, since this always closes a fraction of the remaining distance
     // rather than moving a fixed amount per frame.
+    if (soupBowl.visible) {
+      for (const sprite of bowlSteam) {
+        const t = (elapsed * 0.3 + sprite.userData.phase) % 1
+        sprite.position.set(Math.sin(t * 6 + sprite.userData.phase * 5) * 0.02, 0.05 + t * 0.25, 0)
+        sprite.scale.setScalar(0.03 + t * 0.08)
+        ;(sprite.material as THREE.SpriteMaterial).opacity = 0.35 * (1 - t) * Math.min(1, t * 6)
+      }
+    }
     doorAngle += (doorTargetAngle - doorAngle) * Math.min(1, dt * DOOR_SWING_RATE)
     doorHinge.rotation.y = doorAngle
   }
@@ -1080,6 +1136,9 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
     },
     setRodPlaced: (on: boolean) => {
       rod.visible = on
+    },
+    setSoupPlaced: (on: boolean) => {
+      soupBowl.visible = on
     },
     setBikePlaced: (on: boolean, spot?: BikeSpot) => {
       if (on) placeBike(spot ?? DEFAULT_BIKE_SPOT)

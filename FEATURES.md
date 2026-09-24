@@ -230,6 +230,15 @@ clustering in whichever one the dice happened to favour:
   the table gets it back in its pocket, to hand over. The empty drone box
   ends up on the hut's table once the quadcopter is yours.
 
+### Fish soup (ukha)
+
+Catch a fish, then press `E` at the campfire: it goes from your basket into
+the pot, a ladle appears in it and steam rises while the ukha simmers (twenty
+seconds of play). When it is ready (a toast says so, and the steam thickens)
+`E` takes it off the fire; carry it into the hut and `E` sets a steaming
+bowl of ukha — broth, a piece of fish, potato and carrot, a spoon — on the
+table. It shows in Rules & Quests with where it stands, and survives a reload.
+
 ### The quadcopter
 
 Once the diamond is with the conductor, the train pulls out within moments, and

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { puffTexture } from './puff'
 import { findOpenSpot, type Circle } from '../util/openSpot'
 import { mulberry32 } from '../util/rng'
 import { isClearing } from './clearings'
@@ -60,6 +61,9 @@ export interface CampfireFx {
   group: THREE.Group
   /** Drifts the smoke and flickers the embers — call every frame. */
   update(dt: number): void
+  /** The pot as the ukha cooks (quest/soup.ts): empty, simmering with a
+   *  ladle in it and steam rising, or ready — the steam thicker. */
+  setPot(state: 'empty' | 'cooking' | 'ready'): void
 }
 
 /** White-yellow-red, the coldest-to-hottest-reading embers a fire pit shows
@@ -140,6 +144,30 @@ export function buildCampfireMesh(c: Campfire): CampfireFx {
   const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.17, 0.2, 12), potMat)
   pot.position.set(0, apex.y - 0.28, 0)
   group.add(pot)
+  // A wooden ladle leaning in the pot while something is in it.
+  const ladle = new THREE.Group()
+  ladle.name = 'ladle'
+  const ladleHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.34, 5), woodMat)
+  ladleHandle.position.y = 0.17
+  const ladleBowl = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 5, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), woodMat)
+  ladle.add(ladleHandle, ladleBowl)
+  ladle.position.set(0.05, apex.y - 0.3, 0.03)
+  ladle.rotation.set(0.35, 0, -0.3)
+  ladle.visible = false
+  group.add(ladle)
+  // Steam off the pot — none until something cooks in it.
+  const potTop = apex.y - 0.28 + 0.1
+  const steamMat = new THREE.SpriteMaterial({ map: puffTexture(), color: 0xf2f2ee, transparent: true, opacity: 0, depthWrite: false })
+  const steam: THREE.Sprite[] = []
+  for (let i = 0; i < 5; i++) {
+    const sprite = new THREE.Sprite(steamMat.clone())
+    sprite.name = 'potSteam'
+    sprite.userData.phase = i / 5
+    sprite.position.y = potTop
+    group.add(sprite)
+    steam.push(sprite)
+  }
+  let steamLevel = 0
   const hookGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.14, 5)
   const hook = new THREE.Mesh(hookGeo, woodMat)
   hook.position.set(0, apex.y - 0.07, 0)
@@ -162,7 +190,7 @@ export function buildCampfireMesh(c: Campfire): CampfireFx {
   bench.rotation.y = Math.PI // face the fire
   group.add(bench)
 
-  const smokeMat = new THREE.SpriteMaterial({ color: 0xb8b8b0, transparent: true, opacity: 0, depthWrite: false })
+  const smokeMat = new THREE.SpriteMaterial({ map: puffTexture(), color: 0xb8b8b0, transparent: true, opacity: 0, depthWrite: false })
   const SMOKE_N = 4
   const smoke: THREE.Sprite[] = []
   for (let i = 0; i < SMOKE_N; i++) {
@@ -186,6 +214,12 @@ export function buildCampfireMesh(c: Campfire): CampfireFx {
     // A gentle two-frequency flicker — deterministic (no Math.random, see
     // CLAUDE.md's Conventions), reads as a live fire rather than a mechanical
     // pulse because the two periods drift in and out of phase with each other.
+    for (const sprite of steam) {
+      const t = (elapsed * 0.35 + sprite.userData.phase) % 1
+      sprite.position.set(Math.sin(t * 5 + sprite.userData.phase * 9) * 0.05, potTop + t * 0.55, Math.cos(t * 4) * 0.04)
+      sprite.scale.setScalar(0.14 + t * 0.45)
+      ;(sprite.material as THREE.SpriteMaterial).opacity = steamLevel * 0.85 * (1 - t) * Math.min(1, t * 6)
+    }
     fireLight.intensity = 14 + Math.sin(elapsed * 11) * 3 + Math.sin(elapsed * 3.7) * 2
     for (let i = 0; i < embers.length; i++) {
       const mat = embers[i].material as THREE.MeshStandardMaterial
@@ -195,5 +229,9 @@ export function buildCampfireMesh(c: Campfire): CampfireFx {
 
   group.position.set(c.x, c.y, c.z)
   group.rotation.y = c.rotationY
-  return { group, update }
+  const setPot = (state: 'empty' | 'cooking' | 'ready'): void => {
+    steamLevel = state === 'empty' ? 0 : state === 'cooking' ? 0.55 : 1
+    ladle.visible = state !== 'empty'
+  }
+  return { group, update, setPot }
 }

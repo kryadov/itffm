@@ -101,6 +101,28 @@ describe('placeMine keeps the whole system inside the plot', () => {
   })
 })
 
+describe('placeMine keeps its mound off the hut and the rest', () => {
+  // A live report (2026-09-24): once the mine grew into a maze, its mound
+  // swallowed the hut. Nothing in keepClear may end up under the mound or on
+  // the apron in front of the mouth.
+  it('never buries the hut, the campfire or the rails, on any seed', () => {
+    for (const half of [90, 150]) {
+      for (let seed = 1; seed <= 40; seed++) {
+        const keepClear = [
+          { x: 0, z: 0, radius: 2.5 },
+          { x: 14, z: -9, radius: 1.3 },
+          ...Array.from({ length: 30 }, (_, i) => ({ x: -half + i * (half / 15), z: half * 0.55, radius: 3 })),
+        ]
+        const m = placeMine(steep, half, seed, [], shelter, [], [], keepClear)
+        const terrain = createMineTerrain(m, steep, CELL)
+        for (const k of keepClear) {
+          expect(terrain.occupies(k.x, k.z, k.radius), `half ${half} seed ${seed} at ${k.x},${k.z}`).toBe(false)
+        }
+      }
+    }
+  })
+})
+
 describe('placeMine and the trails', () => {
   const trail = [{ x: -60, z: 0 }, { x: 60, z: 0 }]
 

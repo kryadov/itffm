@@ -110,6 +110,14 @@ const EDGE_MARGIN = 8
  *  (mineTerrain.ts), and this is a little over its usual reach. */
 const TRAIL_CLEARANCE = 6
 const TRAIL_SAMPLE = 2
+/** How far out from the tunnels the mound reaches, metres, for keeping the
+ *  hut and the rest out from under it — a little over the mound's own reach
+ *  on the usual terrain mesh (mineTerrain.ts's deckRadius, 3.6 cells). */
+const MOUND_REACH = 9
+/** Half the width of the levelled apron in front of the mouth, metres. */
+const APRON_HALF_WIDTH = 6
+/** Mouths tried round the shelter before settling for the least bad one. */
+const MOUTH_TRIES = 12
 
 /** Root segment: length of the entrance passage, metres. */
 const ROOT_LENGTH_RANGE: [number, number] = [6, 8]
@@ -332,6 +340,12 @@ export function placeMine(
    *  hillside allows, so a trail arrives at the doorway rather than at the
    *  back of the mound. */
   trails: Vec2[][] = [],
+  /** What the mound over the tunnels and the apron in front must never bury:
+   *  the hut, the campfire, the fishing shack, the platforms, the rails. A
+   *  mine is dozens of metres across (a live report, 2026-09-24: its mound
+   *  swallowed the hut once it grew), so keeping only the mouth clear of the
+   *  rest is not enough. */
+  keepClear: Circle[] = [],
 ): Mine {
   // The tunnels, the mound over them and the levelled apron in front must all
   // stand inside this plot: past its edge the ground is another chunk's
@@ -346,68 +360,87 @@ export function placeMine(
     ...graph.flatMap((s) => [Math.hypot(s.x0, s.z0) + s.width / 2, Math.hypot(s.x1, s.z1) + s.width / 2]),
   )
   const edge = halfSize - extent - EDGE_MARGIN
+  const trailPoints = trails.flatMap((t) => densify(t, TRAIL_SAMPLE))
+
+  interface Candidate { x: number; z: number; here: number; heading: number; rise: number; overshoot: number; buried: number; onTrail: number }
+
+  /** Every heading from one mouth, scored. */
+  const headingsAt = (x: number, z: number): Candidate[] => {
+    const here = ground.heightAt(x, z)
+    const out: Candidate[] = []
+    for (let i = 0; i < HEADING_CANDIDATES; i++) {
+      const heading = (i / HEADING_CANDIDATES) * Math.PI * 2
+      const rise = ground.heightAt(x + Math.cos(heading) * HEADING_SAMPLE_DIST, z + Math.sin(heading) * HEADING_SAMPLE_DIST) - here
+      let overshoot = 0
+      const cos = Math.cos(heading)
+      const sin = Math.sin(heading)
+      for (const s of graph) {
+        for (const [lx, lz] of [[s.x1, s.z1], [s.x0, s.z0]] as const) {
+          const r = s.width / 2 + EDGE_MARGIN
+          const wx = x + lx * cos - lz * sin
+          const wz = z + lx * sin + lz * cos
+          overshoot = Math.max(overshoot, Math.abs(wx) + r - halfSize, Math.abs(wz) + r - halfSize)
+        }
+      }
+      const fx = x - APRON_EXTENT * cos
+      const fz = z - APRON_EXTENT * sin
+      overshoot = Math.max(overshoot, Math.abs(fx) - halfSize, Math.abs(fz) - halfSize)
+      const probe: Mine = { x, z, y: here, heading, segments: graph, reach }
+      // Anything that must stay clear lying under the mound, or on the apron.
+      let buried = 0
+      for (const k of keepClear) {
+        const { lx, lz } = worldToLocal(probe, k.x, k.z)
+        const underMound = lx > -k.radius && caveSdf(probe, Math.max(0, lx), lz) < MOUND_REACH + k.radius
+        const onApron = lx <= 0 && lx > -APRON_EXTENT - k.radius && Math.abs(lz) < APRON_HALF_WIDTH + k.radius
+        if (underMound || onApron) buried++
+      }
+      // Trail points lying on the mound (behind the mouth's plane, within its
+      // radius of the tunnels): the trail would run into the back of the rock.
+      let onTrail = 0
+      for (const tp of trailPoints) {
+        const { lx, lz } = worldToLocal(probe, tp.x, tp.z)
+        if (lx > 1 && caveSdf(probe, lx, lz) < TRAIL_CLEARANCE) onTrail++
+      }
+      out.push({ x, z, here, heading, rise, overshoot: Math.max(0, overshoot), buried, onTrail })
+    }
+    return out
+  }
+
+  const better = (a: Candidate, b: Candidate): boolean => {
+    // Staying on the plot always wins; then burying nothing; then keeping off
+    // the trails; then the steepest climb into the hill.
+    if (Math.abs(a.overshoot - b.overshoot) > 1e-9) return a.overshoot < b.overshoot
+    if (a.buried !== b.buried) return a.buried < b.buried
+    if (a.onTrail !== b.onTrail) return a.onTrail < b.onTrail
+    return a.rise > b.rise
+  }
+  const bestOf = (cs: Candidate[]): Candidate => cs.reduce((best, c) => (better(c, best) ? c : best))
 
   const real = mapped.find((m) => Math.abs(m.x) <= halfSize && Math.abs(m.z) <= halfSize)
-  let x: number
-  let z: number
+  let best: Candidate
   if (real) {
-    x = real.x
-    z = real.z
+    best = bestOf(headingsAt(real.x, real.z))
   } else {
+    // A few mouths round the shelter, the first that fits the plot and buries
+    // nothing winning (the seed's own direction first, so a wood with room
+    // keeps the mine where it always was).
     const rng = mulberry32(seed)
     const angle = rng() * Math.PI * 2
     const dist = halfSize * (0.25 + rng() * 0.4)
     const limit = Math.max(0, edge)
     const clamp = (v: number): number => Math.max(-limit, Math.min(limit, v))
-    const origin = { x: clamp(shelterPos.x + Math.cos(angle) * dist), z: clamp(shelterPos.z + Math.sin(angle) * dist) }
-    ;({ x, z } = findOpenSpot(obstacles, limit, origin, MINE_CLEARANCE))
-  }
-
-  const here = ground.heightAt(x, z)
-  // Every candidate heading, best climb first. A mapped mouth can stand near
-  // the plot's edge; then the best heading that keeps the whole system inside
-  // wins over a slightly better hillside pointing off the plot.
-  const trailPoints = trails.flatMap((t) => densify(t, TRAIL_SAMPLE))
-  const candidates: { heading: number; rise: number; overshoot: number; onTrail: number }[] = []
-  for (let i = 0; i < HEADING_CANDIDATES; i++) {
-    const heading = (i / HEADING_CANDIDATES) * Math.PI * 2
-    const rise = ground.heightAt(x + Math.cos(heading) * HEADING_SAMPLE_DIST, z + Math.sin(heading) * HEADING_SAMPLE_DIST) - here
-    let overshoot = 0
-    const cos = Math.cos(heading)
-    const sin = Math.sin(heading)
-    for (const s of graph) {
-      for (const [lx, lz] of [[s.x1, s.z1], [s.x0, s.z0]] as const) {
-        const r = s.width / 2 + EDGE_MARGIN
-        const wx = x + lx * cos - lz * sin
-        const wz = z + lx * sin + lz * cos
-        overshoot = Math.max(overshoot, Math.abs(wx) + r - halfSize, Math.abs(wz) + r - halfSize)
-      }
+    best = null as unknown as Candidate
+    for (let k = 0; k < MOUTH_TRIES; k++) {
+      const a = angle + (k * Math.PI * 2 * 0.382)
+      const d = k === 0 ? dist : halfSize * (0.2 + ((k * 0.37) % 0.5))
+      const origin = { x: clamp(shelterPos.x + Math.cos(a) * d), z: clamp(shelterPos.z + Math.sin(a) * d) }
+      const { x, z } = findOpenSpot(obstacles, limit, origin, MINE_CLEARANCE)
+      const c = bestOf(headingsAt(x, z))
+      if (!best || better(c, best)) best = c
+      if (best.overshoot === 0 && best.buried === 0) break
     }
-    const fx = x - APRON_EXTENT * cos
-    const fz = z - APRON_EXTENT * sin
-    overshoot = Math.max(overshoot, Math.abs(fx) - halfSize, Math.abs(fz) - halfSize)
-    // Trail points lying on the mound (behind the mouth's plane, within its
-    // radius of the tunnels): the trail would run into the back of the rock.
-    let onTrail = 0
-    if (trailPoints.length > 0) {
-      const probe: Mine = { x, z, y: here, heading, segments: graph, reach }
-      for (const tp of trailPoints) {
-        const { lx, lz } = worldToLocal(probe, tp.x, tp.z)
-        if (lx > 1 && caveSdf(probe, lx, lz) < TRAIL_CLEARANCE) onTrail++
-      }
-    }
-    candidates.push({ heading, rise, overshoot: Math.max(0, overshoot), onTrail })
   }
-  let best = candidates[0]
-  const better = (a: (typeof candidates)[number], b: (typeof candidates)[number]): boolean => {
-    // Staying on the plot always wins; then keeping off the trails; then the
-    // steepest climb into the hill.
-    if (Math.abs(a.overshoot - b.overshoot) > 1e-9) return a.overshoot < b.overshoot
-    if (a.onTrail !== b.onTrail) return a.onTrail < b.onTrail
-    return a.rise > b.rise
-  }
-  for (const c of candidates) if (better(c, best)) best = c
-  return { x, z, y: here, heading: best.heading, segments: graph, reach }
+  return { x: best.x, z: best.z, y: best.here, heading: best.heading, segments: graph, reach }
 }
 
 /** A point `lx` deep and `lz` across from the entrance, in world metres. */

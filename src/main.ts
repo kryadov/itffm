@@ -1,3 +1,4 @@
+import { readSoup, soupAtFire, soupAtHut, tickSoup, type Soup, type SoupEvent } from './quest/soup'
 import * as THREE from 'three'
 import { createForest } from './game/scene'
 import { createWorldStream } from './game/worldStream'
@@ -176,6 +177,16 @@ const TRAIN_MARKER_COLOR = '#ffd45a'
 /** Fixed landmark colors — shelter keeps the minimap's original amber
  *  unchanged, mine and campfire get their own so the three are never
  *  confused for each other or for a quest-item hint. */
+/** How near the campfire `E` reaches its pot, metres — the fire ring and
+ *  the tripod stand in the way of going closer. */
+const CAMPFIRE_REACH = 2.2
+/** The toast for each thing an `E` did to the ukha. */
+const SOUP_TOAST = {
+  needFish: 'soupNeedFish', started: 'soupStarted', stillCooking: 'soupStillCooking', took: 'soupTook', delivered: 'soupDelivered',
+} as const
+const SOUP_STATE_KEY = {
+  none: 'soupStateNone', cooking: 'soupStateCooking', ready: 'soupStateReady', carrying: 'soupStateCarrying', done: 'soupStateDone',
+} as const
 const LANDMARK_COLOR = { shelter: '#d8a04a', mine: '#6f7f8f', campfire: '#e2564a', station: '#b0653a' }
 /** Which i18n key names each item's own completion message — see
  *  i18n/i18n.ts's questCompleteAxe/Lamp/Rod/Bike/Diamond. */
@@ -507,6 +518,13 @@ async function main(): Promise<void> {
     toast(t('questPromptDiamond'))
   }
 
+  // The fish-soup quest (quest/soup.ts): the pot over the campfire and the
+  // bowl on the hut's table show where it stands.
+  let soup: Soup = readSoup(save.soup)
+  const potFor = (s: Soup): 'empty' | 'cooking' | 'ready' => (s.stage === 'cooking' ? 'cooking' : s.stage === 'ready' ? 'ready' : 'empty')
+  forest.setPot(potFor(soup))
+  forest.setSoupPlaced(soup.stage === 'done')
+
   // The quadcopter the diamond earns (save.drone): handed to the train, then a
   // crate left at the other end of the line, then in your hands.
   let droneOrder: DroneOrder | undefined = readDrone(save.drone)
@@ -620,6 +638,10 @@ async function main(): Promise<void> {
         const hx = Math.cos(forest.mine.heading)
         const hz = Math.sin(forest.mine.heading)
         player = { ...player, x: forest.mine.x - hx * back, z: forest.mine.z - hz * back, yaw: Math.atan2(-hx, -hz) }
+      }
+      // tp=campfire: 1.8 m from the campfire, facing it.
+      if (q.get('tp') === 'campfire') {
+        player = { ...player, x: forest.campfire.x, z: forest.campfire.z + 1.8, yaw: 0 }
       }
       // tp=bats: in the mine, 2.5 m down the passage from the first bat colony, facing it.
       if (q.get('tp') === 'bats') {
@@ -869,6 +891,34 @@ async function main(): Promise<void> {
     }
     if (!changed) return false
     save = { ...save, quests }
+    void persistSave(save)
+    return true
+  }
+
+  /**
+   * `E` for the ukha: at the campfire, put a fish from the basket in the pot, or
+   * take the soup off when it is ready; in the hut (or at its door), set it on
+   * the table. Returns whether anything happened.
+   */
+  function trySoup(): boolean {
+    const atFire = Math.hypot(player.x - forest.campfire.x, player.z - forest.campfire.z) <= CAMPFIRE_REACH
+    let r: { soup: Soup; event: SoupEvent } | null = null
+    if (atFire) {
+      const fishAt = basket.items.findIndex((p) => speciesById(p.speciesId)?.kind === 'fish')
+      r = soupAtFire(soup, fishAt >= 0)
+      if (r.event === 'started') {
+        basket.items.splice(fishAt, 1)
+        hud.setBasket(basket.items.length, BASKET_CAPACITY)
+      }
+    } else if (soup.stage === 'carrying' && (forest.insideHut(player.x, player.z) || nearDoor)) {
+      r = soupAtHut(soup)
+    }
+    if (!r?.event) return false
+    soup = r.soup
+    toast(t(SOUP_TOAST[r.event]))
+    forest.setPot(potFor(soup))
+    forest.setSoupPlaced(soup.stage === 'done')
+    save = { ...save, soup }
     void persistSave(save)
     return true
   }
@@ -1472,7 +1522,9 @@ async function main(): Promise<void> {
     })
     el.querySelector('#pause-quests')!.addEventListener('click', () => {
       closeMenu()
-      openQuestGuide(quests)
+      openQuestGuide(quests, [
+        { name: t('soupName'), state: t(SOUP_STATE_KEY[soup.stage]), text: t('soupHow'), color: '#d6a24a' },
+      ])
     })
     el.querySelector('#pause-tally')!.addEventListener('click', () => {
       closeMenu()
@@ -1499,6 +1551,8 @@ async function main(): Promise<void> {
         // handled: picked up or delivered a quest item
       } else if (tryDroneCrate()) {
         // handled: took the quadcopter from its crate
+      } else if (trySoup()) {
+        // handled: the ukha — into the pot, off the fire, or onto the table
       } else if (tryChopScrub()) {
         // handled: chopped down a scrub object
       } else if (nearDoor) forest.toggleShelterDoor()
@@ -1627,7 +1681,7 @@ async function main(): Promise<void> {
         // A tap that missed every mushroom still tries the quest item/scrub/
         // door — touch has no separate `E` to reach any of those otherwise.
         if (target) examineTarget(target)
-        else if (!tryQuestInteract() && !tryDroneCrate() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
+        else if (!tryQuestInteract() && !tryDroneCrate() && !trySoup() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
       }
     }
 
@@ -1701,6 +1755,15 @@ async function main(): Promise<void> {
     forest.updateMushroomLod(camera)
     swimClock += dt
     forest.updateFish(swimClock)
+    if (soup.stage === 'cooking') {
+      soup = tickSoup(soup, dt)
+      if (soup.stage === 'ready') {
+        toast(t('soupReady'))
+        forest.setPot('ready')
+        save = { ...save, soup }
+        void persistSave(save)
+      }
+    }
     worldStream?.updateLod(camera)
     if (++scatterCullFrame >= SCATTER_CULL_INTERVAL_FRAMES) {
       scatterCullFrame = 0

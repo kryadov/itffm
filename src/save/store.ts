@@ -1,3 +1,4 @@
+import type { Soup } from '../quest/soup'
 import type { Lang } from '../i18n/i18n'
 import type { TimeMode } from '../world/daynight'
 import type { WeatherMode } from '../world/weather'
@@ -92,6 +93,9 @@ export interface SaveData {
    *  at the other end of the line, then in your hands. Absent until the diamond
    *  is handed in. Read it through `readDrone`, never raw. */
   drone?: DroneOrder
+  /** The fish-soup quest (quest/soup.ts). Absent until begun. Read it
+   *  through `readSoup`, never raw. */
+  soup?: Soup
 }
 
 export type DroneStage = 'ordered' | 'crate' | 'owned'
@@ -172,7 +176,7 @@ export function emptySave(): SaveData {
  * calendar all stay. Returns a new object and leaves the old one untouched.
  */
 export function resetQuests(save: SaveData): SaveData {
-  const { quests: _quests, bikeSpot: _bikeSpot, drone: _drone, ...rest } = save
+  const { quests: _quests, bikeSpot: _bikeSpot, drone: _drone, soup: _soup, ...rest } = save
   return rest
 }
 

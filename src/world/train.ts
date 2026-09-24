@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { puffTexture } from './puff'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { mulberry32, randRange } from '../util/rng'
 import {
@@ -242,7 +243,7 @@ function buildLocomotive(): {
   stack.position.copy(stackLocal)
   group.add(stack)
 
-  const smokeMat = new THREE.SpriteMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0, depthWrite: false })
+  const smokeMat = new THREE.SpriteMaterial({ map: puffTexture(), color: 0xd0d0d0, transparent: true, opacity: 0, depthWrite: false })
   const smoke: THREE.Sprite[] = []
   for (let i = 0; i < 4; i++) {
     const sprite = new THREE.Sprite(smokeMat.clone())

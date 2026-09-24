@@ -100,3 +100,32 @@ describe('buildCampfireMesh', () => {
     }
   })
 })
+
+describe('the pot as the ukha cooks', () => {
+  const c = { x: 0, z: 0, y: 0, rotationY: 0 }
+  const steamOpacity = (fx: ReturnType<typeof buildCampfireMesh>) => {
+    let sum = 0
+    fx.group.traverse((o) => {
+      if (o.name === 'potSteam') sum += ((o as THREE.Sprite).material as THREE.SpriteMaterial).opacity
+    })
+    return sum
+  }
+
+  it('shows no steam and no ladle while empty, steam once cooking, and more when ready', () => {
+    const fx = buildCampfireMesh(c)
+    fx.update(1.3)
+    expect(steamOpacity(fx)).toBe(0)
+    expect(fx.group.getObjectByName('ladle')!.visible).toBe(false)
+    fx.setPot('cooking')
+    fx.update(1.3)
+    const cooking = steamOpacity(fx)
+    expect(cooking).toBeGreaterThan(0)
+    expect(fx.group.getObjectByName('ladle')!.visible).toBe(true)
+    fx.setPot('ready')
+    fx.update(0.0001)
+    expect(steamOpacity(fx)).toBeGreaterThan(cooking)
+    fx.setPot('empty')
+    fx.update(0.1)
+    expect(steamOpacity(fx)).toBe(0)
+  })
+})

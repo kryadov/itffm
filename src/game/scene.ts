@@ -217,6 +217,10 @@ export interface Forest {
    *  outside — see world/shelter.ts's own setters. */
   setDroneBoxPlaced: (on: boolean) => void
   setRodPlaced: (on: boolean) => void
+  /** The bowl of ukha on the hut's table (quest/soup.ts). */
+  setSoupPlaced: (on: boolean) => void
+  /** The campfire's pot as the ukha cooks. */
+  setPot: (state: 'empty' | 'cooking' | 'ready') => void
   setBikePlaced: (on: boolean, spot?: BikeSpot) => void
   /** Which wall of the hut is nearest `p`, where along it, and the point on
    *  the hut's outline that is (for a range check) — where a bicycle handed
@@ -556,9 +560,17 @@ export function createForest(
   // world/shelter.ts's `mapped` already does), otherwise `placeMine` sites
   // one itself. Every wood gets a mine now — the diamond quest item needs
   // somewhere to be regardless of what OSM happened to survey here.
+  // Nothing built may end up under the mine's mound or on its apron.
+  const mineKeepClear = [
+    { ...shelterFootprint, radius: shelterFootprint.radius + 2 },
+    { ...campfireObstacle(campfire), radius: campfireObstacle(campfire).radius + 1.5 },
+    ...(fisherHut ? [{ ...fisherHutObstacle(fisherHut), radius: fisherHutObstacle(fisherHut).radius + 1.5 }] : []),
+    ...stations.map((st) => ({ x: st.cx, z: st.cz, radius: st.half + 4 })),
+    ...densify(railLine.points.map((p) => ({ x: p.x, z: p.z })), 4).map((p) => ({ x: p.x, z: p.z, radius: 3 })),
+  ]
   const mine: Mine = placeMine(
     source.ground, halfSize, seed + 32, [...treeCircles, ...extraObstacles, shelterFootprint], shelter,
-    source.caves ?? [], source.paths ?? [],
+    source.caves ?? [], source.paths ?? [], mineKeepClear,
   )
   const diamondSpot = diamondSpotInMine(mine)
 
@@ -831,6 +843,8 @@ export function createForest(
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
     setDroneBoxPlaced: (on: boolean) => shelterFx!.setDroneBoxPlaced(on),
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
+    setSoupPlaced: (on: boolean) => shelterFx!.setSoupPlaced(on),
+    setPot: (state: 'empty' | 'cooking' | 'ready') => campfireFx.setPot(state),
     setBikePlaced: (on: boolean, spot?: BikeSpot) => shelterFx!.setBikePlaced(on, spot),
     bikeSpotNear: (p: { x: number; z: number }) => nearestBikeSpot(shelter, p),
     homeSpot: (id: 'rod' | 'bike', bikeSpot?: BikeSpot) =>

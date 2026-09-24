@@ -36,7 +36,16 @@ const ITEM_COLOR: Record<(typeof ITEM_ORDER)[number], string> = { ...QUEST_MARKE
  *  loop works, and a read-only list of the five quest items with what each
  *  unlocks and its current state — pulled straight from the live `quests`
  *  record, no new save shape (see the 2026-09-15 addendum). */
-export function openQuestGuide(quests: Quests): void {
+/** A quest that is not one of the five lost items (the ukha, the honey):
+ *  its name, where it stands, and how it goes. */
+export interface ExtraQuestRow {
+  name: string
+  state: string
+  text: string
+  color: string
+}
+
+export function openQuestGuide(quests: Quests, extras: ExtraQuestRow[] = []): void {
   if (document.getElementById('questGuide')) return
   document.exitPointerLock()
 
@@ -74,13 +83,19 @@ export function openQuestGuide(quests: Quests): void {
 
   const list = document.createElement('div')
   list.style.cssText = 'display:flex;flex-direction:column;gap:10px'
-  for (const id of ITEM_ORDER) {
+  const rows = [
+    ...ITEM_ORDER.map((id) => ({
+      name: t(ITEM_NAME_KEY[id]), state: t(STATE_KEY[quests[id].state]), text: t(ITEM_ABILITY_KEY[id]), color: ITEM_COLOR[id],
+    })),
+    ...extras,
+  ]
+  for (const r of rows) {
     const row = document.createElement('div')
     row.style.cssText = 'display:flex;align-items:baseline;gap:10px'
 
     const dot = document.createElement('span')
     dot.style.cssText =
-      `width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${ITEM_COLOR[id]};` +
+      `width:10px;height:10px;border-radius:50%;flex-shrink:0;background:${r.color};` +
       'box-shadow:0 0 0 1.5px rgba(0,0,0,.6)'
     row.appendChild(dot)
 
@@ -89,14 +104,14 @@ export function openQuestGuide(quests: Quests): void {
     const name = document.createElement('div')
     name.style.cssText = 'font-size:14px;display:flex;gap:8px;align-items:baseline'
     const nameLabel = document.createElement('span')
-    nameLabel.textContent = t(ITEM_NAME_KEY[id])
+    nameLabel.textContent = r.name
     const state = document.createElement('span')
     state.style.cssText = 'opacity:.6;font-size:12px'
-    state.textContent = `— ${t(STATE_KEY[quests[id].state])}`
+    state.textContent = `— ${r.state}`
     name.append(nameLabel, state)
     const ability = document.createElement('div')
     ability.style.cssText = 'font-size:13px;opacity:.75;line-height:1.4'
-    ability.textContent = t(ITEM_ABILITY_KEY[id])
+    ability.textContent = r.text
     text.append(name, ability)
     row.appendChild(text)
     list.appendChild(row)

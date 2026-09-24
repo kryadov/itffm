@@ -74,7 +74,7 @@ opened), facing in, &back= metres further in. &tp=fish stands on the bank 2 m
 from the first fish, facing it. &sky=helicopter (or airliner, jet, turboprop,
 biplane, balloon) sends one over at once, flying east: look west and up.
 &tp=mine stands &back= metres (default 14) in front of the mine's mouth, facing it.
-&tp=bats stands inside the mine 2.5 m from the first bat colony, facing it (F for
+&tp=campfire stands 1.8 m south of the campfire, facing it. &tp=bats stands inside the mine 2.5 m from the first bat colony, facing it (F for
 the flashlight).
 &tp=animal:moose (or bears, boars, beavers, hares, squirrels, snakes) stands
 &back= metres (default 20) south of the first of that kind, facing it, and

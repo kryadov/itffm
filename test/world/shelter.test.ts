@@ -639,3 +639,17 @@ describe('onHutFootprint', () => {
     expect(onHutFootprint(s, 4 + 2.1, -2, 0.5)).toBe(true)
   })
 })
+
+describe('the bowl of ukha on the table', () => {
+  it('is hidden until the soup is brought in, then sits on the table top', () => {
+    const fx = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+    const bowl = fx.group.getObjectByName('soupBowl')!
+    expect(bowl.visible).toBe(false)
+    fx.setSoupPlaced(true)
+    expect(bowl.visible).toBe(true)
+    fx.group.updateMatrixWorld(true)
+    const top = new THREE.Box3().setFromObject(fx.group.getObjectByName('table')!.children[0]).max.y
+    const box = new THREE.Box3().setFromObject(bowl.getObjectByName('bowl')!)
+    expect(box.min.y).toBeCloseTo(top, 2)
+  })
+})

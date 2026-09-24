@@ -164,6 +164,7 @@ describe('resetQuests', () => {
       diamond: { position: { x: 5, y: 0, z: 6 }, state: 'done' },
     },
     bikeSpot: { wall: 'left', along: 0.4 },
+    soup: { stage: 'done', left: 0 },
   })
 
   it('forgets every quest and where the bicycle was left, so the next load starts them fresh', () => {
@@ -172,6 +173,7 @@ describe('resetQuests', () => {
     expect(reset.bikeSpot).toBeUndefined()
     expect('quests' in reset).toBe(false)
     expect('bikeSpot' in reset).toBe(false)
+    expect('soup' in reset).toBe(false)
   })
 
   it('leaves everything that is not a quest exactly as it was', () => {
