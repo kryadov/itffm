@@ -72,22 +72,65 @@ describe('buildFisherHutMesh', () => {
 })
 
 describe('buildBoatMesh', () => {
-  it('places the group at the boat position and builds a real hull', () => {
-    const boat = { x: 3, z: 5, y: 0, rotationY: 1.1 }
-    const group = buildBoatMesh(boat)
+  const build = () => {
+    const g = buildBoatMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+    g.updateMatrixWorld(true)
+    return g
+  }
+  const hullOf = (g: THREE.Group) => g.getObjectByName('hull') as THREE.Mesh
+
+  it('places the group at the boat position', () => {
+    const group = buildBoatMesh({ x: 3, z: 5, y: 0, rotationY: 1.1 })
     expect(group.position.x).toBe(3)
     expect(group.position.z).toBe(5)
-    const hull = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.ExtrudeGeometry)
-    expect(hull).toBeDefined()
+    expect(group.rotation.y).toBeCloseTo(1.1, 5)
   })
 
-  it('tapers to a point at both ends, unlike a plain box or a single cone', () => {
-    const group = buildBoatMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
-    const hull = group.children.find((c) => (c as THREE.Mesh).geometry instanceof THREE.ExtrudeGeometry) as THREE.Mesh
-    hull.geometry.computeBoundingBox()
-    const box = hull.geometry.boundingBox!
-    const size = box.getSize(new THREE.Vector3())
-    // The hull is longer than it is wide — a boat, not a barrel.
-    expect(size.x).toBeGreaterThan(size.z)
+  it('is a boat, not a barrel: longer than it is wide, and not tall', () => {
+    const size = new THREE.Box3().setFromObject(hullOf(build())).getSize(new THREE.Vector3())
+    expect(size.x).toBeGreaterThan(size.z * 2.2)
+    expect(size.y).toBeLessThan(size.z)
+  })
+
+  // A live request (2026-09-24): the boat was a solid pointed slab.
+  it('is hollow: from above, the middle shows a floor well below the gunwale', () => {
+    const g = build()
+    const hull = hullOf(g)
+    const top = new THREE.Box3().setFromObject(hull).max.y
+    const ray = new THREE.Raycaster(new THREE.Vector3(0.1, 5, 0), new THREE.Vector3(0, -1, 0))
+    const hit = ray.intersectObject(hull)[0]
+    expect(hit).toBeDefined()
+    expect(hit.point.y).toBeLessThan(top - 0.15)
+  })
+
+  it('rises at the bow and the stern, and comes to a point only at the bow', () => {
+    const hull = hullOf(build())
+    const pos = hull.geometry.getAttribute('position')
+    const box = new THREE.Box3().setFromObject(hull)
+    let bowTop = -Infinity, midTop = -Infinity, sternHalfWidth = 0, bowHalfWidth = 0
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = Math.abs(pos.getZ(i))
+      if (x > box.max.x - 0.05) { bowTop = Math.max(bowTop, y); bowHalfWidth = Math.max(bowHalfWidth, z) }
+      if (Math.abs(x) < 0.05) midTop = Math.max(midTop, y)
+      if (x < box.min.x + 0.02) sternHalfWidth = Math.max(sternHalfWidth, z)
+    }
+    expect(bowTop).toBeGreaterThan(midTop + 0.05)
+    expect(bowHalfWidth).toBeLessThan(0.06)
+    expect(sternHalfWidth).toBeGreaterThan(0.15) // a transom, not a second point
+  })
+
+  it('has painted planking outside, in more than one colour', () => {
+    const col = hullOf(build()).geometry.getAttribute('color')
+    const shades = new Set<string>()
+    for (let i = 0; i < col.count; i++) shades.add(col.getX(i).toFixed(2) + col.getY(i).toFixed(2))
+    expect(shades.size).toBeGreaterThan(3)
+  })
+
+  it('has thwarts to sit on and a pair of oars', () => {
+    const g = build()
+    const names: string[] = []
+    g.traverse((o) => names.push(o.name))
+    expect(names.filter((n) => n === 'thwart').length).toBeGreaterThanOrEqual(2)
+    expect(names.filter((n) => n === 'oar')).toHaveLength(2)
   })
 })

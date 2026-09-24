@@ -136,47 +136,203 @@ export function buildFisherHutMesh(h: FisherHut): THREE.Group {
   return group
 }
 
+const BOAT_LENGTH = 2.6
+/** Greatest half-beam, metres. */
+const BOAT_HALF_BEAM = 0.55
+/** Gunwale height amidships over the keel, metres. */
+const BOAT_DEPTH = 0.42
+/** Planking thickness, metres. */
+const BOAT_PLANK = 0.03
+
+/** Half-beam at u (stern 0, bow 1): a transom at the stern, widest a little
+ *  aft of the middle, drawn in to the stem at the bow. */
+function boatHalfBeam(u: number): number {
+  if (u < 0.4) return BOAT_HALF_BEAM * (0.62 + 0.38 * Math.sin(((u / 0.4) * Math.PI) / 2))
+  return BOAT_HALF_BEAM * (1 - Math.pow((u - 0.4) / 0.6, 1.8))
+}
+/** The keel line, lifting toward the bow (and a touch at the stern). */
+function boatKeel(u: number): number {
+  return 0.18 * Math.max(0, (u - 0.6) / 0.4) ** 2 + 0.04 * Math.max(0, (0.15 - u) / 0.15)
+}
+/** The sheer — the gunwale's line — sweeping up at the bow and the stern. */
+function boatSheer(u: number): number {
+  return BOAT_DEPTH + 0.16 * Math.max(0, (u - 0.55) / 0.45) ** 2 + 0.06 * Math.max(0, (0.2 - u) / 0.2)
+}
+
+/** The inside half-width at height y over station u — the planking curves in
+ *  toward the keel, so anything fitted inside must be narrower low down. */
+function boatInnerHalfWidth(u: number, y: number): number {
+  const keel = boatKeel(u) + BOAT_PLANK
+  const f = Math.min(1, Math.max(0, (y - keel) / (boatSheer(u) - keel)))
+  return Math.max(0, boatHalfBeam(u) - BOAT_PLANK) * Math.pow(f, 1 / 1.6)
+}
+
 /**
- * A rowboat's hull, extruded from a simple lens-shaped outline (pointed at
- * bow and stern, its widest point amidships) rather than a primitive box or
- * cone — neither tapers at both ends the way a real hull does. Left drawn
- * up on the bank beside the fishing shack, not out on the water.
+ * The hull as one mesh in baked vertex colours: tarred planking outside with
+ * a painted top strake, bare wood inside, a dark gunwale joining the two, and
+ * a flat transom at the stern.
+ */
+function buildBoatHull(): THREE.Mesh {
+  const N = 28
+  const STRAKES = 6
+  // Across the hull, gunwale to gunwale: each strake (plank) its own run of
+  // points, the rows at a seam doubled so every plank keeps its own colour
+  // and the seam shows as a fine crease in the light.
+  const across: { t: number; strake: number }[] = []
+  for (const side of [-1, 1]) {
+    const run: { t: number; strake: number }[] = []
+    for (let b = 0; b < STRAKES; b++) {
+      for (let k = 0; k <= 2; k++) {
+        const fr = (b + k / 2) / STRAKES
+        run.push({ t: side * Math.pow(fr, 1 / 1.6), strake: b })
+      }
+    }
+    across.push(...(side < 0 ? run.reverse() : run))
+  }
+  const M = across.length - 1
+  const positions: number[] = []
+  const colors: number[] = []
+  const index: number[] = []
+  const c = new THREE.Color()
+  const tar = new THREE.Color(0x5c4631)
+  const paint = new THREE.Color(0x5f7f6c)
+  const wood = new THREE.Color(0xa0805a)
+  const rail = new THREE.Color(0x4a3622)
+  const vert = (x: number, y: number, z: number, col: THREE.Color): number => {
+    positions.push(x, y, z)
+    colors.push(col.r, col.g, col.b)
+    return positions.length / 3 - 1
+  }
+  /** One skin of planking: stations along the boat × points across it. */
+  const surface = (inner: boolean): number[][] => {
+    const grid: number[][] = []
+    for (let i = 0; i <= N; i++) {
+      const u = i / N
+      const x = inner
+        ? -BOAT_LENGTH / 2 + BOAT_PLANK + (BOAT_LENGTH - 2.5 * BOAT_PLANK) * u
+        : -BOAT_LENGTH / 2 + BOAT_LENGTH * u
+      const w = Math.max(0, boatHalfBeam(u) - (inner ? BOAT_PLANK : 0))
+      const keel = boatKeel(u) + (inner ? BOAT_PLANK : 0)
+      const sheer = boatSheer(u)
+      const row: number[] = []
+      for (const { t, strake } of across) {
+        const f = Math.pow(Math.abs(t), 1.6)
+        const y = keel + (sheer - keel) * f
+        if (inner) c.copy(wood).multiplyScalar(0.9 + 0.1 * (strake % 2))
+        else c.copy(strake >= STRAKES - 2 ? paint : tar).multiplyScalar(0.84 + 0.16 * (strake % 2))
+        row.push(vert(x, y, w * t, c))
+      }
+      grid.push(row)
+    }
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < M; j++) {
+        const a = grid[i][j]
+        const b = grid[i + 1][j]
+        const d = grid[i][j + 1]
+        const e = grid[i + 1][j + 1]
+        index.push(a, b, d, b, e, d)
+      }
+    }
+    return grid
+  }
+  const outer = surface(false)
+  const inner = surface(true)
+  const at = (k: number) => [positions[k * 3], positions[k * 3 + 1], positions[k * 3 + 2]] as const
+
+  // The gunwale: a strip over the top of the planking on each side.
+  for (const j of [0, M]) {
+    for (let i = 0; i < N; i++) {
+      const p = [outer[i][j], outer[i + 1][j], inner[i][j], inner[i + 1][j]].map((k) => {
+        const [x, y, z] = at(k)
+        return vert(x, y + 0.012, z, rail)
+      })
+      index.push(p[0], p[1], p[2], p[1], p[3], p[2])
+    }
+  }
+  // The transom: the stern's flat board, painted outside, bare inside.
+  const board = (ring: number[], col: THREE.Color): void => {
+    let cy = 0
+    for (const k of ring) cy += at(k)[1]
+    const centre = vert(at(ring[0])[0], cy / ring.length + 0.05, 0, col)
+    const rim = ring.map((k) => {
+      const [x, y, z] = at(k)
+      return vert(x, y, z, col)
+    })
+    for (let j = 0; j < rim.length - 1; j++) index.push(centre, rim[j], rim[j + 1])
+    index.push(centre, rim[rim.length - 1], rim[0])
+  }
+  board(outer[0], paint)
+  board(inner[0], wood)
+
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geo.setIndex(index)
+  geo.computeVertexNormals()
+  const hull = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide }),
+  )
+  hull.name = 'hull'
+  hull.castShadow = true
+  hull.receiveShadow = true
+  return hull
+}
+
+/** One oar: a round loom, a flat blade and a grip. */
+function buildOar(mat: THREE.Material): THREE.Group {
+  const oar = new THREE.Group()
+  oar.name = 'oar'
+  const loom = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 1.7, 7), mat)
+  loom.rotation.z = Math.PI / 2
+  oar.add(loom)
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.012, 0.13), mat)
+  blade.position.x = 1.7 / 2 + 0.2
+  oar.add(blade)
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.14, 7), mat)
+  grip.rotation.z = Math.PI / 2
+  grip.position.x = -1.7 / 2 - 0.05
+  oar.add(grip)
+  return oar
+}
+
+/**
+ * A wooden rowing boat drawn up at the water's edge: a hollow planked hull
+ * whose sheer sweeps up to a pointed bow and a flat transom, three thwarts,
+ * floorboards, and a pair of oars laid in along its length. A live request
+ * (2026-09-24) — it used to be a solid pointed slab with two sticks on top.
  */
 export function buildBoatMesh(boat: Boat): THREE.Group {
   const group = new THREE.Group()
   group.name = 'boat'
+  // Resting on its keel, it leans a little onto one side.
+  const body = new THREE.Group()
+  body.rotation.x = 0.06
+  group.add(body)
+  body.add(buildBoatHull())
 
-  const hullLength = 2.2
-  const hullWidth = 0.8
-  const hullHeight = 0.32
-
-  const outline = new THREE.Shape()
-  const halfW = hullWidth / 2
-  outline.moveTo(-hullLength / 2, 0)
-  outline.quadraticCurveTo(-hullLength * 0.3, halfW, 0, halfW)
-  outline.quadraticCurveTo(hullLength * 0.35, halfW, hullLength / 2, 0)
-  outline.quadraticCurveTo(hullLength * 0.35, -halfW, 0, -halfW)
-  outline.quadraticCurveTo(-hullLength * 0.3, -halfW, -hullLength / 2, 0)
-
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0x6b4a30, roughness: 0.9 })
-  const hull = new THREE.Mesh(
-    new THREE.ExtrudeGeometry(outline, { depth: hullHeight, bevelEnabled: false }),
-    hullMat,
-  )
-  // ExtrudeGeometry extrudes the shape's own plane (XY) along +Z — rotated
-  // flat so that extrusion becomes the hull's height (Y) instead.
-  hull.rotation.x = -Math.PI / 2
-  hull.castShadow = true
-  group.add(hull)
-
-  // Two thwarts (cross-benches) — the detail that reads as "boat" rather
-  // than "hollowed log" at a glance, the same reasoning the door's grooves
-  // and the window's muntin bar already followed for their own objects.
-  const thwartMat = new THREE.MeshStandardMaterial({ color: 0x4a3420, roughness: 0.9 })
-  for (const lx of [-hullLength * 0.18, hullLength * 0.18]) {
-    const thwart = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, hullWidth * 0.75), thwartMat)
-    thwart.position.set(lx, hullHeight * 0.75, 0)
-    group.add(thwart)
+  const plankMat = new THREE.MeshStandardMaterial({ color: 0x8a6a46, roughness: 0.9 })
+  for (const u of [0.22, 0.48, 0.74]) {
+    const y = boatSheer(u) - 0.1
+    // Its narrower edge decides: a thwart is 0.2 m fore and aft.
+    const du = 0.1 / BOAT_LENGTH
+    const w = Math.min(boatInnerHalfWidth(u - du, y - 0.015), boatInnerHalfWidth(u + du, y - 0.015))
+    const thwart = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, w * 2), plankMat)
+    thwart.name = 'thwart'
+    thwart.position.set(-BOAT_LENGTH / 2 + BOAT_LENGTH * u, y, 0)
+    body.add(thwart)
+  }
+  for (const z of [-0.055, 0.055]) {
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(BOAT_LENGTH * 0.45, 0.015, 0.1), plankMat)
+    floor.position.set(-0.15, BOAT_PLANK + 0.07, z)
+    body.add(floor)
+  }
+  const oarMat = new THREE.MeshStandardMaterial({ color: 0xb08c5e, roughness: 0.8 })
+  for (const side of [-1, 1]) {
+    const oar = buildOar(oarMat)
+    oar.position.set(-0.3, boatSheer(0.48) - 0.07, side * 0.09)
+    oar.rotation.y = side * 0.03
+    body.add(oar)
   }
 
   group.position.set(boat.x, boat.y, boat.z)

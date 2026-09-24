@@ -97,7 +97,9 @@ today, each with real field marks, edibility and season.
   wet margin right at the waterline a pond actually shows, and along both
   banks of a stream.
 - Where the wood actually has water, a **fisherman's hut and a boat** at the
-  shore.
+  shore — a wooden rowing boat drawn up on the bank: a hollow planked hull,
+  tarred below and painted green above, its sheer sweeping up to a pointed
+  bow and a flat transom, with thwarts, floorboards and a pair of oars inside.
 - A **mine** you can walk into — a branching cave, not a single corridor: a
   wide, tall doorway set in a rock outcrop on the hillside, opening onto level
   ground where a trail arrives, leads into a handful of forks and dead ends, with
