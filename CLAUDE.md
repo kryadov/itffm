@@ -70,7 +70,8 @@ track, and &trainAt=0|1 runs the train until it stands there; with &back=metres
 and &along=metres to step off the platform for a view of the whole train, and
 &yaw=degrees to turn (&pitch=degrees to look up or down). `window.__trainAt(end)`
 does the same on demand. &tp=hut stands just inside the hut's doorway (door
-opened), facing in, &back= metres further in.
+opened), facing in, &back= metres further in. &tp=fish stands on the bank 2 m
+from the first fish, facing it.
 &tp=animal:moose (or bears, boars, beavers, hares, squirrels, snakes) stands
 &back= metres (default 20) south of the first of that kind, facing it, and
 `window.__animals()` lists where every ground animal is. &weather=rain (or clear,

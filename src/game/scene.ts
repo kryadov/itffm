@@ -55,6 +55,7 @@ import {
 import { buildSites } from '../ecology/sites'
 import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spawn'
 import { spawnFish } from '../world/fishSpawn'
+import { swimPose } from '../fish/swim'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies } from '../species/load'
 import { buildPlacementObject } from '../collectible/placement'
@@ -253,6 +254,9 @@ export interface Forest {
    *  camera — three.js's LOD does not do this on its own. Call every frame;
    *  cheap (one pass over the placements, no rebuilding). */
   updateMushroomLod: (camera: THREE.Camera) => void
+  /** Moves every fish still in the water along its own swim — call every
+   *  frame with the seconds since the wood was built. */
+  updateFish: (t: number) => void
   /** How many spawned finds still have no mesh — always 0 unless
    *  `createForest` was asked to defer them (see its `deferPlacements`). */
   pendingPlacements: () => number
@@ -727,6 +731,8 @@ export function createForest(
   // — three.js's LOD does not update itself, so updateMushroomLod below
   // needs the exact objects to call .update(camera) on every frame.
   const lods: THREE.LOD[] = []
+  // Fish, apart: they swim (updateFish).
+  const swimmers: { object: THREE.Object3D; p: Placement }[] = []
   let placementCursor = 0
   const pendingPlacements = (): number => placements.length - placementCursor
   const buildPlacements = (budgetMs: number): number => {
@@ -734,6 +740,8 @@ export function createForest(
     while (placementCursor < placements.length) {
       const built = buildPlacementObject(placements[placementCursor++], staticGround)
       if (built) {
+        const p = placements[placementCursor - 1]
+        if (p.roam !== undefined) swimmers.push({ object: built.object, p })
         lods.push(built.lod)
         scene.add(built.object)
         mushroomObjects.push(built.object)
@@ -743,6 +751,16 @@ export function createForest(
     return pendingPlacements()
   }
   if (!deferPlacements) buildPlacements(Infinity)
+  const updateFish = (t: number): void => {
+    for (const { object, p } of swimmers) {
+      if (!object.parent || !object.visible) continue // caught, or past the draw distance
+      const pose = swimPose({ x: p.x, z: p.z, roam: p.roam ?? 0, seed: p.seed }, t)
+      object.position.x = pose.x
+      object.position.z = pose.z
+      if (p.onStream) object.position.y = p.y + staticGround.heightAt(pose.x, pose.z) - staticGround.heightAt(p.x, p.z)
+      object.rotation.set(0, pose.heading, 0)
+    }
+  }
   const updateMushroomLod = (camera: THREE.Camera): void => {
     for (const lod of lods) lod.update(camera)
   }
@@ -786,6 +804,6 @@ export function createForest(
     layBikeTrack: (x: number, z: number, heading: number) => trackFx.layBike(staticGround, x, z, heading),
     setTracksEnabled: (on: boolean) => trackFx.setEnabled(on),
     updateTracks: (dt: number) => trackFx.update(dt),
-    updateMushroomLod, pendingPlacements, buildPlacements, updateScatterCulling,
+    updateMushroomLod, updateFish, pendingPlacements, buildPlacements, updateScatterCulling,
   }
 }

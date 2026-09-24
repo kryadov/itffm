@@ -16,6 +16,12 @@ export interface Placement {
    *  bodies share, so the wood can mark the ring itself, not just draw the
    *  mushrooms sitting on it. */
   ring?: { cx: number; cz: number; radius: number }
+  /** Set only for a fish: how far from (x, z) it may swim, metres, all of it
+   *  water (`world/fishSpawn.ts`, `fish/swim.ts`). */
+  roam?: number
+  /** Set only for a fish in a stream: its surface follows the ground down the
+   *  channel, so a swimming fish's height must too. */
+  onStream?: boolean
 }
 
 export interface SpawnContext {

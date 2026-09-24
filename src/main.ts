@@ -614,6 +614,22 @@ async function main(): Promise<void> {
         }
         if (!forest.isShelterDoorOpen()) forest.toggleShelterDoor()
       }
+      // tp=fish: on the bank 2 m from the first fish (the highest ground around it,
+      // which is the bank, not the pond bed), facing it.
+      if (q.get('tp') === 'fish') {
+        const fish = forest.placements.find((p) => p.roam !== undefined)
+        if (fish) {
+          let best = { x: fish.x, z: fish.z, h: -Infinity }
+          for (let k = 0; k < 16; k++) {
+            const a = (k / 16) * Math.PI * 2
+            const x = fish.x + Math.cos(a) * (2 + (Number(q.get('back')) || 0))
+            const z = fish.z + Math.sin(a) * (2 + (Number(q.get('back')) || 0))
+            const h = forest.ground.heightAt(x, z)
+            if (h > best.h) best = { x, z, h }
+          }
+          player = { ...player, x: best.x, z: best.z, yaw: Math.atan2(-(fish.x - best.x), -(fish.z - best.z)) }
+        }
+      }
       // weather=rain (or clear, snow, fog): this session only, not saved — to look at one.
       const wq = q.get('weather')
       if (wq === 'clear' || wq === 'rain' || wq === 'snow' || wq === 'fog') {
@@ -1489,6 +1505,8 @@ async function main(): Promise<void> {
   // Counts up every frame; scatter culling only sweeps every
   // SCATTER_CULL_INTERVAL_FRAMES-th one — see that constant's own comment.
   let scatterCullFrame = 0
+  // Seconds of play, for the fish swimming in the wood's water.
+  let swimClock = 0
   // Only read in 'cycle' mode — 'day' and 'night' hold their own fixed time
   // (see world/daynight.ts's timeFor), starting at noon so a first frame
   // rendered before this ever advances still matches the old fixed look.
@@ -1652,6 +1670,8 @@ async function main(): Promise<void> {
 
     cullDistantMushrooms()
     forest.updateMushroomLod(camera)
+    swimClock += dt
+    forest.updateFish(swimClock)
     worldStream?.updateLod(camera)
     if (++scatterCullFrame >= SCATTER_CULL_INTERVAL_FRAMES) {
       scatterCullFrame = 0

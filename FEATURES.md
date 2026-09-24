@@ -178,7 +178,10 @@ clustering in whichever one the dice happened to favour:
   after dark or inside the mine, with a manual `L` override on top.
 - **Fishing rod** — lets you catch fish while it is in your hands. Fish swim
   in the wood's own ponds and streams — in the shallows along the bank, on the
-  surface, where you can reach them — not on the land. Each fish is built
+  surface, where you can reach them — not on the land — and they really swim:
+  each loops its own patch of water head first, gliding, slowing almost to a
+  hover and picking up again, its body swinging with the tail beat, never
+  leaving the water or the reach of the bank. Each fish is built
   from its species like a real one: a dark back and pale belly, a forked tail,
   its dorsal, anal and paired fins, eyes, and the marks that tell them apart
   — the pike long with pale spots and its dorsal far back, the perch barred

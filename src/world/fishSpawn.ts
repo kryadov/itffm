@@ -7,6 +7,12 @@ import {
 import { mulberry32, pickWeighted } from '../util/rng'
 import { distanceToPolyline, pointInPolygon } from '../util/geometry'
 import { classifyWater, streamSurfaceAt, waterLevel, STREAM_WIDTH } from './water'
+import { SWIM_MAX_ROAM } from '../fish/swim'
+
+/** The room a fish is offered to swim in, largest first; it gets the first
+ *  whose whole circle is water (and, in a pond, within reach of the bank). */
+const ROAM_STEPS = [SWIM_MAX_ROAM, 1, 0.7, 0.45, 0.25]
+const ROAM_SAMPLES = 16
 
 /**
  * Where the wood's fish are: in its ponds and streams.
@@ -194,6 +200,14 @@ export function spawnFish(
         let x = centre.x + Math.cos(angle) * dist
         let z = centre.z + Math.sin(angle) * dist
         if (!inWater(x, z)) { x = centre.x; z = centre.z }
+        const roomFor = (r: number): boolean => {
+          for (let k = 0; k < ROAM_SAMPLES; k++) {
+            const a = (k / ROAM_SAMPLES) * Math.PI * 2
+            if (!inWater(x + Math.cos(a) * r, z + Math.sin(a) * r)) return false
+          }
+          return true
+        }
+        const roam = ROAM_STEPS.find(roomFor) ?? 0
         out.push({
           speciesId: chosen.id,
           x,
@@ -202,6 +216,8 @@ export function spawnFish(
           rotationY: rng() * Math.PI * 2,
           age: 0.25 + rng() * 0.75,
           seed: Math.floor(rng() * 0xffffff),
+          roam,
+          ...(isStream ? { onStream: true } : {}),
         })
       }
     }

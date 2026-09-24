@@ -1,4 +1,5 @@
 import { speciesScore } from '../../src/ecology/spawn'
+import { SWIM_MAX_ROAM } from '../../src/fish/swim'
 import type { Site } from '../../src/ecology/sites'
 import type { Species } from '../../src/species/schema'
 import { spawnFish, SHORE_BAND } from '../../src/world/fishSpawn'
@@ -87,6 +88,20 @@ describe('spawnFish in a pond', () => {
     }
   })
 
+  it('gives each fish room to swim that stays in the water and within reach', () => {
+    const p = place()
+    expect(p.some((f) => (f.roam ?? 0) > 0.3)).toBe(true)
+    for (const f of p) {
+      const r = f.roam ?? 0
+      expect(r).toBeGreaterThanOrEqual(0)
+      expect(r).toBeLessThanOrEqual(SWIM_MAX_ROAM)
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2
+        expect(pointInPolygon(f.x + Math.cos(a) * r, f.z + Math.sin(a) * r, pond)).toBe(true)
+      }
+    }
+  })
+
   it('scales with the water: a bigger pond holds more fish', () => {
     const big = spawnFish([roach], [square(0, 0, 40)], hill, ctx)
     const small = spawnFish([roach], [square(0, 0, 6)], hill, ctx)
@@ -101,6 +116,16 @@ describe('spawnFish in a stream', () => {
     const p = place()
     expect(p.length).toBeGreaterThan(1)
     for (const f of p) expect(distanceToPolyline(f.x, f.z, stream)).toBeLessThanOrEqual(STREAM_WIDTH / 2)
+  })
+
+  it('keeps the room each fish swims in inside the channel', () => {
+    for (const f of place()) {
+      const r = f.roam ?? 0
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2
+        expect(distanceToPolyline(f.x + Math.cos(a) * r, f.z + Math.sin(a) * r, stream)).toBeLessThanOrEqual(STREAM_WIDTH / 2 + 1e-9)
+      }
+    }
   })
 
   it('floats them on the stream surface, which follows the ground down the channel', () => {
