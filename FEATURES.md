@@ -85,9 +85,10 @@ today, each with real field marks, edibility and season.
 
 ## A wood, not just a spawn table
 
-- A **hut** with a working door: walk in, and there's a bed, a table with a
-  cup and a lit lamp, a painting on the wall, a firewood pile and a well
-  outside.
+- A **hut** with a working door: walk in, and there's a floor of worn pine
+  boards with a woven rag rug, a bed, a table with a cup and a lit lamp, a
+  painting on the wall, a firewood pile and a well outside. The hut stands
+  level on a slope, so the ground never comes up through its floor.
 - A **campfire** with a pot on a tripod and a bench, apart from the hut on
   its own clearing — its own place in the night's music, too.
 - Where the wood actually has water, a **fisherman's hut and a boat** at the

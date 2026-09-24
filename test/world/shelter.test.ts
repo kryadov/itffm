@@ -17,6 +17,9 @@ import {
   rodSpotWorld,
   bikeSpotWorld,
   insideHut,
+  onHutFootprint,
+  hutFloorY,
+  FLOOR_TOP,
   type ShelterWall,
 } from '../../src/world/shelter'
 import { proceduralTerrain } from '../../src/terrain/procedural'
@@ -34,9 +37,22 @@ describe('placeShelter', () => {
     expect(placeShelter(ground, 90, 1, []).x).not.toBe(placeShelter(ground, 90, 2, []).x)
   })
 
-  it('stands on the ground beneath it', () => {
-    const s = placeShelter(ground, 90, 3, [])
-    expect(s.y).toBeCloseTo(ground.heightAt(s.x, s.z), 5)
+  // A live report (2026-09-24): on a slope the ground and its grass came up
+  // through the floor, because the hut stood on one sample at its centre.
+  it('stands on the highest ground under its footprint, so none shows through the floor', () => {
+    const slope = { heightAt: (x: number, z: number) => 0.2 * x + 0.1 * z }
+    const s = placeShelter(slope, 90, 3, [])
+    expect(s.y).toBeGreaterThan(slope.heightAt(s.x, s.z) + 0.1)
+    for (let i = 0; i <= 20; i++) {
+      for (let j = 0; j <= 20; j++) {
+        const x = s.x - 2 + (4 * i) / 20
+        const z = s.z - 2 + (4 * j) / 20
+        if (insideHut(s, x, z)) expect(hutFloorY(s)).toBeGreaterThanOrEqual(slope.heightAt(x, z))
+      }
+    }
+    const flat = placeShelter(ground, 90, 3, [])
+    expect(flat.y).toBeGreaterThanOrEqual(ground.heightAt(flat.x, flat.z))
+    expect(flat.y).toBeLessThan(ground.heightAt(flat.x, flat.z) + 0.5)
   })
 
   it('stays clear of existing obstacles by more than a player would need', () => {
@@ -55,7 +71,7 @@ describe('placeShelter', () => {
     const s = placeShelter(ground, 90, 3, [], [{ x: 12, z: -7 }])
     expect(s.x).toBe(12)
     expect(s.z).toBe(-7)
-    expect(s.y).toBeCloseTo(ground.heightAt(12, -7), 5)
+    expect(s.y).toBeGreaterThanOrEqual(ground.heightAt(12, -7))
   })
 
   it('ignores a mapped hut that falls outside this plot', () => {
@@ -389,6 +405,27 @@ describe('buildShelterMesh — door state', () => {
     expect(new THREE.Box3().setFromObject(floor).min.y).toBeLessThanOrEqual(-FOUNDATION_DEPTH + 0.01)
   })
 
+  it('lays a floor of separate boards in more than one shade, its top at FLOOR_TOP', () => {
+    const { group } = buildShelterMesh(s)
+    const boards = group.getObjectByName('floorBoards') as THREE.Mesh
+    expect(boards).toBeTruthy()
+    const box = new THREE.Box3().setFromObject(boards)
+    expect(box.max.y).toBeCloseTo(FLOOR_TOP, 3)
+    const colors = boards.geometry.getAttribute('color')
+    const shades = new Set<string>()
+    for (let i = 0; i < colors.count; i++) shades.add(colors.getX(i).toFixed(3))
+    expect(shades.size).toBeGreaterThan(4)
+  })
+
+  it('puts a rug on the floor, on top of the boards', () => {
+    const { group } = buildShelterMesh(s)
+    const rug = group.getObjectByName('rug')!
+    expect(rug).toBeTruthy()
+    const box = new THREE.Box3().setFromObject(rug)
+    expect(box.min.y).toBeGreaterThanOrEqual(FLOOR_TOP - 1e-6)
+    expect(box.max.y).toBeLessThan(FLOOR_TOP + 0.02)
+  })
+
   it('shows a handle and plank grooves on both faces, not just the inside', () => {
     // Live report: the original relief (grooves + handle) sat only at
     // positive-z offsets — the hut-interior face of the door slab — so the
@@ -589,5 +626,16 @@ describe('where the rod and the bicycle wait at home', () => {
     expect(insideHut(hut, 5, 5)).toBe(true)
     expect(insideHut(hut, 5 + 6, 5)).toBe(false)
     expect(insideHut(hut, 5, 5 + 6)).toBe(false)
+  })
+})
+
+describe('onHutFootprint', () => {
+  const s = { x: 4, z: -2, y: 0, rotationY: 0.5 }
+  it('covers the whole hut including its walls, and a margin past them', () => {
+    expect(onHutFootprint(s, 4, -2)).toBe(true)
+    const wall = doorPosition(s) // on the front wall's line
+    expect(onHutFootprint(s, wall.x, wall.z)).toBe(true)
+    expect(onHutFootprint(s, 4 + 3, -2)).toBe(false)
+    expect(onHutFootprint(s, 4 + 2.1, -2, 0.5)).toBe(true)
   })
 })

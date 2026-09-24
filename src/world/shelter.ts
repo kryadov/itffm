@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { findOpenSpot, type Circle } from '../util/openSpot'
 import { mulberry32 } from '../util/rng'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { ElevationProvider } from '../terrain/provider'
 import type { Vec2 } from '../geo/types'
 import { buildRodModel, buildBikeModel } from './questItemModels'
@@ -124,7 +125,35 @@ export function placeShelter(
     ;({ x, z } = findOpenSpot(obstacles, halfSize, origin, SHELTER_CLEARANCE))
   }
   const rotationY = rng() * Math.PI * 2
-  return { x, z, y: ground.heightAt(x, z), rotationY }
+  return { x, z, y: footprintTop(ground, x, z, rotationY), rotationY }
+}
+
+/** The top of the floor boards above the hut's own origin, metres. */
+export const FLOOR_TOP = 0.04
+
+/** The highest ground anywhere under the hut's footprint — where it stands,
+ *  so no ground (and no grass) comes up through the floor on a slope (a live
+ *  report, 2026-09-24). The low side is covered by the walls' own skirt
+ *  (`FOUNDATION_DEPTH`). */
+function footprintTop(ground: ElevationProvider, x: number, z: number, rotationY: number): number {
+  const c = Math.cos(rotationY)
+  const sn = Math.sin(rotationY)
+  const n = 6
+  let top = -Infinity
+  for (let i = 0; i <= n; i++) {
+    for (let j = 0; j <= n; j++) {
+      const lx = (i / n - 0.5) * WIDTH
+      const lz = (j / n - 0.5) * DEPTH
+      // THREE's rotation about +y: x' = x cos + z sin, z' = -x sin + z cos.
+      top = Math.max(top, ground.heightAt(x + lx * c + lz * sn, z - lx * sn + lz * c))
+    }
+  }
+  return top
+}
+
+/** The height a player walks at on the hut's floor, world metres. */
+export function hutFloorY(s: Shelter): number {
+  return s.y + FLOOR_TOP
 }
 
 /** The shelter's whole footprint, for siting anything ELSE (the campfire)
@@ -290,6 +319,13 @@ export function insideHut(s: Shelter, x: number, z: number): boolean {
   return Math.abs(local.x) < WIDTH / 2 - WALL_THICKNESS && Math.abs(local.z) < DEPTH / 2 - WALL_THICKNESS
 }
 
+/** Whether (x, z) is under the hut, walls included, or within `margin`
+ *  metres of it — for keeping grass and finds from growing through it. */
+export function onHutFootprint(s: Shelter, x: number, z: number, margin = 0): boolean {
+  const local = new THREE.Vector3(x - s.x, 0, z - s.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), -s.rotationY)
+  return Math.abs(local.x) <= WIDTH / 2 + margin && Math.abs(local.z) <= DEPTH / 2 + margin
+}
+
 /** Where the fishing rod waits once delivered — leaned against the wall by the
  *  table — in world metres. */
 export function rodSpotWorld(s: Shelter): { x: number; z: number } {
@@ -418,6 +454,86 @@ export interface ShelterFx {
   setBikePlaced(on: boolean, spot?: BikeSpot): void
 }
 
+const BOARD_THICKNESS = 0.03
+const BOARD_WIDTH = 0.16
+/** Between two boards, metres — a dark line of foundation shows through. */
+const BOARD_GAP = 0.006
+
+/**
+ * Floor boards running front to back, each in its own shade of the same
+ * worn pine and cut into lengths with staggered butt joints — one merged
+ * mesh in baked vertex colours, since a floor of separate meshes would be
+ * dozens of draw calls for one room. Deterministic, like everything else.
+ */
+function buildFloorBoards(innerWidth: number, innerDepth: number): THREE.Mesh {
+  const rng = mulberry32(0xf100d)
+  const parts: THREE.BufferGeometry[] = []
+  const base = new THREE.Color(0x9a7048)
+  const paint = (geo: THREE.BufferGeometry, color: THREE.Color): THREE.BufferGeometry => {
+    const n = geo.getAttribute('position').count
+    const colors = new Float32Array(n * 3)
+    for (let i = 0; i < n; i++) colors.set([color.r, color.g, color.b], i * 3)
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    return geo
+  }
+  const count = Math.floor(innerWidth / BOARD_WIDTH)
+  const pitch = innerWidth / count
+  for (let b = 0; b < count; b++) {
+    const cx = -innerWidth / 2 + pitch * (b + 0.5)
+    // Where this row's joint falls — staggered from one row to the next.
+    const cuts = [-innerDepth / 2]
+    let at = -innerDepth / 2 + (0.3 + rng() * 0.9)
+    while (at < innerDepth / 2 - 0.3) {
+      cuts.push(at)
+      at += 1.1 + rng() * 0.8
+    }
+    cuts.push(innerDepth / 2)
+    for (let k = 0; k < cuts.length - 1; k++) {
+      const len = cuts[k + 1] - cuts[k] - BOARD_GAP
+      const geo = new THREE.BoxGeometry(pitch - BOARD_GAP, BOARD_THICKNESS, len)
+      geo.translate(cx, FLOOR_TOP - BOARD_THICKNESS / 2, (cuts[k] + cuts[k + 1]) / 2)
+      const shade = base.clone().offsetHSL((rng() - 0.5) * 0.02, (rng() - 0.5) * 0.05, (rng() - 0.5) * 0.08)
+      parts.push(paint(geo, shade))
+    }
+  }
+  const mesh = new THREE.Mesh(
+    mergeGeometries(parts, false),
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }),
+  )
+  mesh.name = 'floorBoards'
+  mesh.receiveShadow = true
+  return mesh
+}
+
+/** A woven rag rug: coloured bands in a rounded rectangle, lying flat. */
+function buildRug(): THREE.Group {
+  const rug = new THREE.Group()
+  rug.name = 'rug'
+  const bands = [0x8a3a2a, 0xd8c79a, 0x3f5a6a, 0xd8c79a, 0x8a3a2a]
+  const w = 1.1
+  const d = 0.75
+  bands.forEach((color, i) => {
+    const inset = i * 0.07
+    const shape = new THREE.Shape()
+    const x0 = -w / 2 + inset, x1 = w / 2 - inset, y0 = -d / 2 + inset, y1 = d / 2 - inset
+    const r = Math.min(0.12, (y1 - y0) / 2 - 0.01)
+    shape.moveTo(x0 + r, y0)
+    shape.lineTo(x1 - r, y0); shape.quadraticCurveTo(x1, y0, x1, y0 + r)
+    shape.lineTo(x1, y1 - r); shape.quadraticCurveTo(x1, y1, x1 - r, y1)
+    shape.lineTo(x0 + r, y1); shape.quadraticCurveTo(x0, y1, x0, y1 - r)
+    shape.lineTo(x0, y0 + r); shape.quadraticCurveTo(x0, y0, x0 + r, y0)
+    const band = new THREE.Mesh(
+      new THREE.ShapeGeometry(shape, 4),
+      new THREE.MeshStandardMaterial({ color, roughness: 1 }),
+    )
+    band.rotation.x = -Math.PI / 2
+    band.position.y = 0.002 + i * 0.001
+    band.receiveShadow = true
+    rug.add(band)
+  })
+  return rug
+}
+
 /**
  * A small log cabin: a hollow box for the walls (not solid — see
  * Architecture in CLAUDE.md on why the two forms of a mushroom differ; the
@@ -489,16 +605,23 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
   // slab left the same open-bottomed gap under uneven terrain the walls did,
   // and closing only the walls' own skirt without deepening the floor too
   // would still have left a flat horizontal seam for light to leak through.
-  const floorMat = new THREE.MeshStandardMaterial({ color: 0x4a3624, roughness: 1 })
-  const floorThickness = FOUNDATION_DEPTH + 0.04
+  // The foundation under the boards: dark, and only its hairline gaps
+  // between boards ever show.
+  const floorMat = new THREE.MeshStandardMaterial({ color: 0x2a1d12, roughness: 1 })
+  const floorThickness = FOUNDATION_DEPTH + FLOOR_TOP - BOARD_THICKNESS
   const floor = new THREE.Mesh(
     new THREE.BoxGeometry(width - WALL_THICKNESS * 2, floorThickness, depth - WALL_THICKNESS * 2),
     floorMat,
   )
-  floor.position.y = 0.04 - floorThickness / 2
+  floor.position.y = FLOOR_TOP - BOARD_THICKNESS - floorThickness / 2
   floor.castShadow = true
   floor.receiveShadow = true
   group.add(floor)
+  const boards = buildFloorBoards(width - WALL_THICKNESS * 2, depth - WALL_THICKNESS * 2)
+  group.add(boards)
+  const rug = buildRug()
+  rug.position.set(-0.25, FLOOR_TOP, -0.35)
+  group.add(rug)
 
   // A bed, a table with a cup on it, and a painting on the back wall — the
   // first look inside now that a player can actually walk in (a live

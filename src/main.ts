@@ -602,6 +602,18 @@ async function main(): Promise<void> {
         const a = animals().find((x) => x.kind === animalTp[1])
         if (a) player = { ...player, x: a.x, z: a.z + (Number(q.get('back')) || 20), yaw: 0 }
       }
+      // tp=hut: just inside the doorway (back= metres further in), facing the back wall.
+      if (q.get('tp') === 'hut') {
+        const door = forest.shelterDoor
+        const inward = { x: forest.shelter.x - door.x, z: forest.shelter.z - door.z }
+        const len = Math.hypot(inward.x, inward.z) || 1
+        const step = 0.5 + (Number(q.get('back')) || 0)
+        player = {
+          ...player, x: door.x + (inward.x / len) * step, z: door.z + (inward.z / len) * step,
+          yaw: Math.atan2(-inward.x, -inward.z),
+        }
+        if (!forest.isShelterDoorOpen()) forest.toggleShelterDoor()
+      }
       // weather=rain (or clear, snow, fog): this session only, not saved — to look at one.
       const wq = q.get('weather')
       if (wq === 'clear' || wq === 'rain' || wq === 'snow' || wq === 'fog') {
@@ -610,6 +622,8 @@ async function main(): Promise<void> {
         forest.setWeather(wq)
       }
       const yawDeg = Number(q.get('yaw'))
+      const pitchDeg = Number(q.get('pitch'))
+      if (q.has('pitch') && Number.isFinite(pitchDeg)) player = { ...player, pitch: (pitchDeg * Math.PI) / 180 }
       if (q.has('yaw') && Number.isFinite(yawDeg)) player = { ...player, yaw: (yawDeg * Math.PI) / 180 }
       const ahead = Number(q.get('train'))
       if (Number.isFinite(ahead) && ahead > 0) for (let i = 0; i < Math.min(ahead, 6000); i++) forest.updateTrain(1)

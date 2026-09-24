@@ -26,7 +26,7 @@ import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import {
   placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, interiorObstacles, doorPosition,
-  nearestBikeSpot, rodSpotWorld, bikeSpotWorld, insideHut as insideHutAt, type ShelterFx, type BikeSpot,
+  nearestBikeSpot, rodSpotWorld, bikeSpotWorld, insideHut as insideHutAt, onHutFootprint, hutFloorY, type ShelterFx, type BikeSpot,
 } from '../world/shelter'
 import { collectScatterCullers, sweepAll, STATIC_SCATTER_GROUP_NAMES } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
@@ -543,7 +543,10 @@ export function createForest(
   // trail ribbons stand on — and, being in this file's `Forest.ground`, what
   // every other consumer of the ground reads too, so they all agree.
   const mineTerrain = createMineTerrain(mine, source.ground, (2 * halfSize) / groundCells)
-  const groundWithMine: ElevationProvider = mineTerrain.surface
+  // Inside the hut the player walks on its boards, not on the ground under them.
+  const groundWithMine: ElevationProvider = {
+    heightAt: (x, z) => insideHutAt(shelter, x, z) ? hutFloorY(shelter) : mineTerrain.surface.heightAt(x, z),
+  }
   // What things laid on the hill stand on (mushrooms, animals): the same surface,
   // but not switching with where the player is — see MineTerrain.outsideSurface.
   const staticGround: ElevationProvider = mineTerrain.outsideSurface
@@ -578,7 +581,9 @@ export function createForest(
   const reserved = (x: number, z: number, margin = 0): boolean =>
     mineTerrain.occupies(x, z, margin) || stationOccupies(stations, x, z, margin) || portalOccupies(railLine, x, z, margin)
   for (const child of scene.children) {
-    if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) clearScatterOnMine(child, (x, z) => reserved(x, z))
+    if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) {
+      clearScatterOnMine(child, (x, z) => reserved(x, z) || onHutFootprint(shelter, x, z, 0.3))
+    }
   }
   for (let i = extraObstacles.length - 1; i >= 0; i--) {
     if (!waterCircles.includes(extraObstacles[i]) && reserved(extraObstacles[i].x, extraObstacles[i].z)) {
@@ -700,7 +705,8 @@ export function createForest(
   const allSpecies = loadSpecies()
   const spawnCtx = { month, seed: seed + 3, daysSinceRain: daysSinceRain(seed + 3, gameDays) }
   // Nothing grows on the mine's rock mound or its levelled doorstep, or on a platform.
-  const placements = spawnMushrooms(allSpecies, sites, spawnCtx).filter((p) => !reserved(p.x, p.z))
+  const placements = spawnMushrooms(allSpecies, sites, spawnCtx)
+    .filter((p) => !reserved(p.x, p.z) && !onHutFootprint(shelter, p.x, p.z, 0.3))
   // Fish are not sites on the land at all: they swim in the wood's own water.
   placements.push(...spawnFish(allSpecies, source.water ?? [], source.ground, spawnCtx))
 

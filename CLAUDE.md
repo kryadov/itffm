@@ -68,7 +68,9 @@ stand at a platform with the train in instead of waiting minutes of game time.
 &tp=station0 (or station1, or portal0/portal1) stands on that platform, facing the
 track, and &trainAt=0|1 runs the train until it stands there; with &back=metres
 and &along=metres to step off the platform for a view of the whole train, and
-&yaw=degrees to turn. `window.__trainAt(end)` does the same on demand.
+&yaw=degrees to turn (&pitch=degrees to look up or down). `window.__trainAt(end)`
+does the same on demand. &tp=hut stands just inside the hut's doorway (door
+opened), facing in, &back= metres further in.
 &tp=animal:moose (or bears, boars, beavers, hares, squirrels, snakes) stands
 &back= metres (default 20) south of the first of that kind, facing it, and
 `window.__animals()` lists where every ground animal is. &weather=rain (or clear,
