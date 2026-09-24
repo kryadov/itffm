@@ -17,6 +17,7 @@ import {
   rodSpotWorld,
   bikeSpotWorld,
   insideHut,
+  jarSpotWorld,
   onHutFootprint,
   hutFloorY,
   FLOOR_TOP,
@@ -651,5 +652,32 @@ describe('the bowl of ukha on the table', () => {
     const top = new THREE.Box3().setFromObject(fx.group.getObjectByName('table')!.children[0]).max.y
     const box = new THREE.Box3().setFromObject(bowl.getObjectByName('bowl')!)
     expect(box.min.y).toBeCloseTo(top, 2)
+  })
+})
+
+describe('the shelf with the honey jar', () => {
+  it('holds an empty jar on the back wall by default, and can show it empty, full or not at all', () => {
+    const fx = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+    const shelf = fx.group.getObjectByName('jarShelf')!
+    expect(shelf).toBeTruthy()
+    const jar = shelf.getObjectByName('honeyJar')!
+    expect(jar.visible).toBe(true)
+    expect(jar.getObjectByName('honey')!.visible).toBe(false)
+    fx.setJar('none')
+    expect(jar.visible).toBe(false)
+    fx.setJar('full')
+    expect(jar.visible).toBe(true)
+    expect(jar.getObjectByName('honey')!.visible).toBe(true)
+  })
+
+  it('stands the jar on the shelf board, up on the wall, inside the hut', () => {
+    const fx = buildShelterMesh({ x: 0, z: 0, y: 0, rotationY: 0 })
+    fx.group.updateMatrixWorld(true)
+    const board = new THREE.Box3().setFromObject(fx.group.getObjectByName('shelfBoard')!)
+    const jar = new THREE.Box3().setFromObject(fx.group.getObjectByName('honeyJar')!.getObjectByName('jarGlass')!)
+    expect(jar.min.y).toBeCloseTo(board.max.y, 2)
+    expect(board.min.y).toBeGreaterThan(1.1)
+    const spot = jarSpotWorld({ x: 0, z: 0, y: 0, rotationY: 0 })
+    expect(insideHut({ x: 0, z: 0, y: 0, rotationY: 0 }, spot.x, spot.z)).toBe(true)
   })
 })

@@ -1,3 +1,4 @@
+import * as THREE from 'three'
 import { placeHive, hiveObstacle, buildHiveMesh } from '../../src/world/hive'
 import type { Tree } from '../../src/world/trees'
 
@@ -49,5 +50,38 @@ describe('buildHiveMesh', () => {
     expect(group.position.x).toBe(4)
     expect(group.position.y).toBe(5)
     expect(group.position.z).toBe(-2)
+  })
+})
+
+describe('buildHiveMesh — a skep that reads as a beehive', () => {
+  // A live request (2026-09-24): the hive was a plain straw cone on a board.
+  const hive = { x: 0, y: 0, z: 0, rotationY: 0 }
+  const names = (): string[] => {
+    const out: string[] = []
+    buildHiveMesh(hive).traverse((o) => out.push(o.name))
+    return out
+  }
+
+  it('is coiled straw: several rings, in more than one shade', () => {
+    const g = buildHiveMesh(hive)
+    const coils: THREE.Mesh[] = []
+    g.traverse((o) => { if (o.name === 'coil') coils.push(o as THREE.Mesh) })
+    expect(coils.length).toBeGreaterThanOrEqual(5)
+    const shades = new Set(coils.map((c) => (c.material as THREE.MeshStandardMaterial).color.getHex()))
+    expect(shades.size).toBeGreaterThan(1)
+  })
+
+  it('has an entrance, a little roof, brackets under its shelf and honey at the door', () => {
+    const n = names()
+    for (const want of ['entrance', 'roof', 'bracket', 'honeyDrip']) expect(n).toContain(want)
+  })
+
+  it('narrows to the top like a skep', () => {
+    const g = buildHiveMesh(hive)
+    const coils: THREE.Mesh[] = []
+    g.traverse((o) => { if (o.name === 'coil') coils.push(o as THREE.Mesh) })
+    const sorted = [...coils].sort((a, b) => a.position.y - b.position.y)
+    const r = (m: THREE.Mesh) => (m.geometry as THREE.TorusGeometry).parameters.radius * m.scale.x
+    expect(r(sorted[sorted.length - 1])).toBeLessThan(r(sorted[0]) * 0.6)
   })
 })

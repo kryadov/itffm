@@ -1,3 +1,5 @@
+import { readHoney, honeyAtShelf, honeyOnLaunch, honeyInFlight, honeyOnLand, jarInHand, jarOnDrone, BEES_REACH, type Honey, type HoneyEvent } from './quest/honey'
+import { createHeldView } from './game/heldView'
 import { readSoup, soupAtFire, soupAtHut, tickSoup, type Soup, type SoupEvent } from './quest/soup'
 import * as THREE from 'three'
 import { createForest } from './game/scene'
@@ -75,6 +77,7 @@ declare global {
     __BOOTCHECK?: boolean
     __trainAt?: (end: 0 | 1) => void
     __animals?: () => { kind: string; x: number; z: number }[]
+    __droneToHive?: () => boolean
   }
 }
 
@@ -183,6 +186,16 @@ const CAMPFIRE_REACH = 2.2
 /** The toast for each thing an `E` did to the ukha. */
 const SOUP_TOAST = {
   needFish: 'soupNeedFish', started: 'soupStarted', stillCooking: 'soupStillCooking', took: 'soupTook', delivered: 'soupDelivered',
+} as const
+/** How near the jar's shelf `E` reaches it, metres. */
+const JAR_REACH = 1.6
+const HIVE_MARKER_COLOR = '#e0a020'
+const HONEY_TOAST = {
+  tookJar: 'honeyTookJar', needDrone: 'honeyNeedDrone', launched: 'honeyLaunched', byHive: 'honeyByHive',
+  filled: 'honeyFilled', backEmpty: 'honeyBackEmpty', backFull: 'honeyBackFull', delivered: 'honeyDelivered',
+} as const
+const HONEY_STATE_KEY = {
+  shelf: 'honeyStateShelf', jar: 'honeyStateJar', drone: 'honeyStateDrone', filled: 'honeyStateFilled', full: 'honeyStateFull', done: 'honeyStateDone',
 } as const
 const SOUP_STATE_KEY = {
   none: 'soupStateNone', cooking: 'soupStateCooking', ready: 'soupStateReady', carrying: 'soupStateCarrying', done: 'soupStateDone',
@@ -524,6 +537,24 @@ async function main(): Promise<void> {
   const potFor = (s: Soup): 'empty' | 'cooking' | 'ready' => (s.stage === 'cooking' ? 'cooking' : s.stage === 'ready' ? 'ready' : 'empty')
   forest.setPot(potFor(soup))
   forest.setSoupPlaced(soup.stage === 'done')
+  // The honey quest (quest/honey.ts): the jar on the hut's shelf, in hand, or
+  // under the quadcopter.
+  let honey: Honey = readHoney(save.honey)
+  const shelfJar = (h: Honey): 'empty' | 'full' | 'none' => (h.stage === 'shelf' ? 'empty' : h.stage === 'done' ? 'full' : 'none')
+  forest.setJar(shelfJar(honey))
+  let beesToastAt = -Infinity
+  const heldView = createHeldView(forest.scene)
+  /** Applies a honey step: always the new state (the fill counts up between
+   *  events), and on an event its toast, the shelf and the save. */
+  const applyHoney = (r: { honey: Honey; event: HoneyEvent }): boolean => {
+    honey = r.honey
+    if (!r.event) return false
+    toast(t(HONEY_TOAST[r.event]))
+    forest.setJar(shelfJar(honey))
+    save = { ...save, honey }
+    void persistSave(save)
+    return true
+  }
 
   // The quadcopter the diamond earns (save.drone): handed to the train, then a
   // crate left at the other end of the line, then in your hands.
@@ -638,6 +669,16 @@ async function main(): Promise<void> {
         const hx = Math.cos(forest.mine.heading)
         const hz = Math.sin(forest.mine.heading)
         player = { ...player, x: forest.mine.x - hx * back, z: forest.mine.z - hz * back, yaw: Math.atan2(-hx, -hz) }
+      }
+      // tp=hive: 4.5 m east of the wild hive, facing it (it is high up its tree).
+      if (q.get('tp') === 'hive' && forest.hive) {
+        player = { ...player, x: forest.hive.x + 4.5, z: forest.hive.z, yaw: Math.PI / 2 }
+      }
+      // window.__droneToHive(): puts the flying quadcopter right by the hive.
+      window.__droneToHive = () => {
+        if (!flight || !forest.hive) return false
+        flight = { ...flight, x: forest.hive.x + 1.2, y: forest.hive.y + 0.3, z: forest.hive.z, vx: 0, vy: 0, vz: 0 }
+        return true
       }
       // tp=campfire: 1.8 m from the campfire, facing it.
       if (q.get('tp') === 'campfire') {
@@ -923,6 +964,13 @@ async function main(): Promise<void> {
     return true
   }
 
+  /** `E` at the jar's shelf in the hut: take the empty jar, or set the honey down. */
+  function tryHoney(): boolean {
+    if (!forest.insideHut(player.x, player.z)) return false
+    if (Math.hypot(player.x - forest.jarSpot.x, player.z - forest.jarSpot.z) > JAR_REACH) return false
+    return applyHoney(honeyAtShelf(honey, droneOrder?.stage === 'owned'))
+  }
+
   /** `E` at the crate the train left on the platform: the quadcopter is yours. */
   function tryDroneCrate(): boolean {
     if (droneOrder?.stage !== 'crate') return false
@@ -999,6 +1047,7 @@ async function main(): Promise<void> {
     const cross = document.getElementById('crosshair')
     if (cross) cross.style.display = 'none'
     hud.setTarget(null)
+    applyHoney(honeyOnLaunch(honey))
   }
 
   function endFlight(): void {
@@ -1029,8 +1078,13 @@ async function main(): Promise<void> {
         dt,
       )
       returnRequested = false
+      if (forest.hive) {
+        const h = forest.hive
+        applyHoney(honeyInFlight(honey, Math.hypot(flight.x - h.x, flight.y - (h.y + 0.2), flight.z - h.z), dt))
+      }
       if (flight.landed) {
         endFlight()
+        applyHoney(honeyOnLand(honey))
         return
       }
       droneHud.update(droneReadout(flight, env), flight.returning)
@@ -1524,6 +1578,7 @@ async function main(): Promise<void> {
       closeMenu()
       openQuestGuide(quests, [
         { name: t('soupName'), state: t(SOUP_STATE_KEY[soup.stage]), text: t('soupHow'), color: '#d6a24a' },
+        { name: t('honeyName'), state: t(HONEY_STATE_KEY[honey.stage]), text: t('honeyHow'), color: '#e0a020' },
       ])
     })
     el.querySelector('#pause-tally')!.addEventListener('click', () => {
@@ -1553,6 +1608,8 @@ async function main(): Promise<void> {
         // handled: took the quadcopter from its crate
       } else if (trySoup()) {
         // handled: the ukha — into the pot, off the fire, or onto the table
+      } else if (tryHoney()) {
+        // handled: the honey jar — off the shelf, or back on it full
       } else if (tryChopScrub()) {
         // handled: chopped down a scrub object
       } else if (nearDoor) forest.toggleShelterDoor()
@@ -1582,8 +1639,8 @@ async function main(): Promise<void> {
   // Counts up every frame; scatter culling only sweeps every
   // SCATTER_CULL_INTERVAL_FRAMES-th one — see that constant's own comment.
   let scatterCullFrame = 0
-  // Seconds of play, for the fish swimming in the wood's water.
-  let swimClock = 0
+  // Seconds of play: the fish swim by it, and the bees keep their own time.
+  let playSeconds = 0
   // Only read in 'cycle' mode — 'day' and 'night' hold their own fixed time
   // (see world/daynight.ts's timeFor), starting at noon so a first frame
   // rendered before this ever advances still matches the old fixed look.
@@ -1681,7 +1738,7 @@ async function main(): Promise<void> {
         // A tap that missed every mushroom still tries the quest item/scrub/
         // door — touch has no separate `E` to reach any of those otherwise.
         if (target) examineTarget(target)
-        else if (!tryQuestInteract() && !tryDroneCrate() && !trySoup() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
+        else if (!tryQuestInteract() && !tryDroneCrate() && !trySoup() && !tryHoney() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
       }
     }
 
@@ -1707,6 +1764,10 @@ async function main(): Promise<void> {
       // The train, while it is out of its tunnels: where it is, and so where it is going.
       const loco = forest.trainLocomotive()
       if (loco) markers.push({ position: loco, color: TRAIN_MARKER_COLOR })
+      // The hive, once the jar is off the shelf and the honey is being fetched.
+      if (forest.hive && (honey.stage === 'jar' || honey.stage === 'drone' || honey.stage === 'filled')) {
+        markers.push({ position: forest.hive, color: HIVE_MARKER_COLOR })
+      }
       minimap.setMarkers(markers)
       minimap.update({ x: focusX, z: focusZ, heading: headingFromYaw(viewYaw) })
     }
@@ -1753,8 +1814,14 @@ async function main(): Promise<void> {
 
     cullDistantMushrooms()
     forest.updateMushroomLod(camera)
-    swimClock += dt
-    forest.updateFish(swimClock)
+    playSeconds += dt
+    forest.updateFish(playSeconds)
+    // On foot with the jar near the hive, the bees see you off.
+    if (!flight && forest.hive && jarInHand(honey) && playSeconds - beesToastAt > 10 &&
+      Math.hypot(player.x - forest.hive.x, player.z - forest.hive.z) < BEES_REACH) {
+      beesToastAt = playSeconds
+      toast(t('honeyBees'))
+    }
     if (soup.stage === 'cooking') {
       soup = tickSoup(soup, dt)
       if (soup.stage === 'ready') {
@@ -1791,6 +1858,15 @@ async function main(): Promise<void> {
     bikePrevZ = player.z
     renderer.render(forest.scene, camera)
     bikeView.render(renderer, camera)
+    const onDrone = jarOnDrone(honey)
+    const inHand = jarInHand(honey)
+    heldView.set(
+      flight ? (onDrone ? (onDrone === 'full' ? 'jar-full' : 'jar-empty') : null)
+        : inHand ? (inHand === 'full' ? 'jar-full' : 'jar-empty') : soup.stage === 'carrying' ? 'soup' : null,
+      flight ? 'drone' : 'hand',
+    )
+    heldView.update(dt, camera)
+    heldView.render(renderer, camera)
     if (loadingOpen) {
       loadingOpen = false
       loading.close()

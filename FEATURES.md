@@ -160,7 +160,8 @@ today, each with real field marks, edibility and season.
   that bound away, **red squirrels** that make for a tree, **adders** with a
   dark zigzag that slide slowly off. Between scares they graze, stroll about
   their own patch and wander back to it. Birds nest and fly between the trees,
-  bees work a wild hive, dragonflies hover over the water.
+  bees work a wild hive — a coiled straw skep on a bracketed shelf high up a
+  trunk, under a bark roof, honey at its door — dragonflies hover over the water.
 - **Fading tracks** (on by default, opt-out in settings): footprints trail
   behind you as you walk, a thin tyre track behind the bicycle, and paw
   prints or a sinuous trail behind a fleeing hare, squirrel or snake — pressed
@@ -238,6 +239,17 @@ seconds of play). When it is ready (a toast says so, and the steam thickens)
 `E` takes it off the fire; carry it into the hut and `E` sets a steaming
 bowl of ukha — broth, a piece of fish, potato and carrot, a spoon — on the
 table. It shows in Rules & Quests with where it stands, and survives a reload.
+
+### Honey
+
+The hut has a shelf on its back wall with an empty jar on it. Take it (`E`)
+and you carry it in view; walk up to the wild hive with it and the bees see
+you off. Launch the quadcopter instead and the jar hangs under it on a string
+(you see it swinging below the drone's camera); fly to the hive and hold the
+drone by it for a few seconds until the jar fills with amber honey, bring it
+home, and set the jar of honey back on the shelf (`E`). The hive shows on the
+minimap while the honey is being fetched, and Rules & Quests lists where it
+stands. The bowl of ukha, too, is carried in view on its way to the hut.
 
 ### The quadcopter
 

@@ -6,6 +6,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { ElevationProvider } from '../terrain/provider'
 import type { Vec2 } from '../geo/types'
 import { buildRodModel, buildBikeModel } from './questItemModels'
+import { buildHoneyJar } from './honeyJar'
+import { buildSoupBowl } from './soupBowl'
 
 export interface Shelter {
   x: number
@@ -253,6 +255,11 @@ const TABLE_OBSTACLE_RADIUS = 0.4
 const PAINTING_X = -0.7
 const PAINTING_Y = 1.55
 const PAINTING_Z = DEPTH / 2 - WALL_THICKNESS - 0.02
+/** The shelf on the back wall where the honey jar stands, right of the painting. */
+const SHELF_X = 0.72
+const SHELF_Y = 1.42
+const SHELF_DEPTH = 0.18
+const SHELF_Z = DEPTH / 2 - WALL_THICKNESS - SHELF_DEPTH / 2
 /** Just to the wall side of the table, along the same wall it already hugs
  *  — reads as "leaned there in passing", not centred like the cup/lamp are
  *  on the table itself. */
@@ -325,6 +332,12 @@ export function insideHut(s: Shelter, x: number, z: number): boolean {
 export function onHutFootprint(s: Shelter, x: number, z: number, margin = 0): boolean {
   const local = new THREE.Vector3(x - s.x, 0, z - s.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), -s.rotationY)
   return Math.abs(local.x) <= WIDTH / 2 + margin && Math.abs(local.z) <= DEPTH / 2 + margin
+}
+
+/** Where to stand for the honey jar on its shelf — in front of it, inside the
+ *  hut — in world metres. */
+export function jarSpotWorld(s: Shelter): { x: number; z: number } {
+  return toWorld(s, SHELF_X, SHELF_Z - 0.7)
 }
 
 /** Where the fishing rod waits once delivered — leaned against the wall by the
@@ -452,6 +465,8 @@ export interface ShelterFx {
   setRodPlaced(on: boolean): void
   /** Shows/hides the bowl of ukha on the table (quest/soup.ts), steaming. */
   setSoupPlaced(on: boolean): void
+  /** The honey jar on its shelf (quest/honey.ts): empty, full, or away. */
+  setJar(state: 'empty' | 'full' | 'none'): void
   /** Shows/hides the bicycle, parked outside against a wall — the one in
    *  `spot` (`DEFAULT_BIKE_SPOT` when none is given). */
   setBikePlaced(on: boolean, spot?: BikeSpot): void
@@ -735,53 +750,42 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
   droneBox.visible = false
   table.add(droneBox)
 
-  // A bowl of ukha, brought in from the campfire: a turned wooden bowl, the
-  // golden broth with a piece of fish, potato and carrot in it, a spoon
-  // across the rim, and a little steam. Hidden until the soup quest delivers it.
-  const soupBowl = new THREE.Group()
-  soupBowl.name = 'soupBowl'
-  const bowlMat = new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.8, side: THREE.DoubleSide })
-  const bowlProfile = [
-    new THREE.Vector2(0, 0), new THREE.Vector2(0.03, 0), new THREE.Vector2(0.032, 0.004),
-    new THREE.Vector2(0.06, 0.02), new THREE.Vector2(0.075, 0.045), new THREE.Vector2(0.07, 0.047),
-    new THREE.Vector2(0.056, 0.024), new THREE.Vector2(0.0, 0.012),
-  ]
-  const bowlMesh = new THREE.Mesh(new THREE.LatheGeometry(bowlProfile, 16), bowlMat)
-  bowlMesh.name = 'bowl'
-  soupBowl.add(bowlMesh)
-  const broth = new THREE.Mesh(
-    new THREE.CircleGeometry(0.064, 16),
-    new THREE.MeshStandardMaterial({ color: 0xd6a24a, roughness: 0.3 }),
-  )
-  broth.rotation.x = -Math.PI / 2
-  broth.position.y = 0.036
-  soupBowl.add(broth)
-  const bits: [number, number, number, number][] = [
-    [0xf2eadc, 0.018, -0.012, 0.014], [0xe8d8a0, -0.02, 0.016, 0.011], [0xe07a2a, 0.012, 0.024, 0.008], [0xe07a2a, -0.024, -0.016, 0.007],
-  ]
-  for (const [color, bx, bz, r] of bits) {
-    const bit = new THREE.Mesh(new THREE.BoxGeometry(r * 2, r, r * 1.6), new THREE.MeshStandardMaterial({ color, roughness: 0.6 }))
-    bit.position.set(bx, 0.038, bz)
-    bit.rotation.y = bx * 40
-    soupBowl.add(bit)
-  }
-  const spoon = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.006, 0.014), bowlMat)
-  spoon.position.set(0.03, 0.05, 0.02)
-  spoon.rotation.set(0, 0.5, 0.12)
-  soupBowl.add(spoon)
-  const bowlSteam: THREE.Sprite[] = []
-  for (let i = 0; i < 3; i++) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTexture(), color: 0xf4f4f0, transparent: true, opacity: 0, depthWrite: false }))
-    sprite.userData.phase = i / 3
-    soupBowl.add(sprite)
-    bowlSteam.push(sprite)
-  }
+  // A bowl of ukha, brought in from the campfire (world/soupBowl.ts). Hidden
+  // until the soup quest delivers it.
+  const soupBowlFx = buildSoupBowl()
+  const soupBowl = soupBowlFx.group
   soupBowl.position.set(-0.12, tableHeight + 0.02, -0.15)
   soupBowl.visible = false
   table.add(soupBowl)
 
   table.position.set(TABLE_X, 0, TABLE_Z)
   group.add(table)
+
+  // A shelf on the back wall, on two brackets, with the honey quest's jar on
+  // it and a clay crock beside — the everyday things a shelf in a hut holds.
+  const jarShelf = new THREE.Group()
+  jarShelf.name = 'jarShelf'
+  const shelfMat = new THREE.MeshStandardMaterial({ color: 0x6b4f33, roughness: 1 })
+  const shelfBoard = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.03, SHELF_DEPTH), shelfMat)
+  shelfBoard.name = 'shelfBoard'
+  jarShelf.add(shelfBoard)
+  for (const bx of [-0.22, 0.22]) {
+    const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.14, 0.03), shelfMat)
+    bracket.position.set(bx, -0.08, SHELF_DEPTH / 2 - 0.05)
+    bracket.rotation.x = 0.55
+    jarShelf.add(bracket)
+  }
+  const honeyJar = buildHoneyJar()
+  honeyJar.group.position.set(-0.1, 0.015, 0)
+  jarShelf.add(honeyJar.group)
+  const crock = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 0.1, 10),
+    new THREE.MeshStandardMaterial({ color: 0x9a5a36, roughness: 0.8 }),
+  )
+  crock.position.set(0.16, 0.015 + 0.05, 0.01)
+  jarShelf.add(crock)
+  jarShelf.position.set(SHELF_X, SHELF_Y, SHELF_Z)
+  group.add(jarShelf)
 
   // The fishing rod — leaned against the wall the table already hugs, tilted
   // a few degrees so its top rests on the wall rather than floating clear of
@@ -1097,18 +1101,11 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
       sprite.scale.setScalar(0.15 + t * 0.4)
       ;(sprite.material as THREE.SpriteMaterial).opacity = 0.3 * (1 - t)
     }
+    if (soupBowl.visible) soupBowlFx.update(elapsed)
     // Eases toward whichever angle toggleDoor() last set — the same feel
     // whether the door is swinging fully open or just easing the last bit
     // shut, since this always closes a fraction of the remaining distance
     // rather than moving a fixed amount per frame.
-    if (soupBowl.visible) {
-      for (const sprite of bowlSteam) {
-        const t = (elapsed * 0.3 + sprite.userData.phase) % 1
-        sprite.position.set(Math.sin(t * 6 + sprite.userData.phase * 5) * 0.02, 0.05 + t * 0.25, 0)
-        sprite.scale.setScalar(0.03 + t * 0.08)
-        ;(sprite.material as THREE.SpriteMaterial).opacity = 0.35 * (1 - t) * Math.min(1, t * 6)
-      }
-    }
     doorAngle += (doorTargetAngle - doorAngle) * Math.min(1, dt * DOOR_SWING_RATE)
     doorHinge.rotation.y = doorAngle
   }
@@ -1139,6 +1136,10 @@ export function buildShelterMesh(s: Shelter, ground?: ElevationProvider): Shelte
     },
     setSoupPlaced: (on: boolean) => {
       soupBowl.visible = on
+    },
+    setJar: (state: 'empty' | 'full' | 'none') => {
+      honeyJar.group.visible = state !== 'none'
+      honeyJar.setFull(state === 'full')
     },
     setBikePlaced: (on: boolean, spot?: BikeSpot) => {
       if (on) placeBike(spot ?? DEFAULT_BIKE_SPOT)

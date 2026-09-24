@@ -26,7 +26,7 @@ import { placeFlora, buildFloraMeshes } from '../world/flora'
 import { placeGrass, buildGrassMesh } from '../world/grass'
 import {
   placeShelter, shelterObstacle, buildShelterMesh, wallObstacles, interiorObstacles, doorPosition,
-  nearestBikeSpot, rodSpotWorld, bikeSpotWorld, insideHut as insideHutAt, onHutFootprint, hutFloorY, type ShelterFx, type BikeSpot,
+  nearestBikeSpot, rodSpotWorld, bikeSpotWorld, insideHut as insideHutAt, onHutFootprint, hutFloorY, jarSpotWorld, type ShelterFx, type BikeSpot,
 } from '../world/shelter'
 import { collectScatterCullers, sweepAll, STATIC_SCATTER_GROUP_NAMES } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
@@ -221,6 +221,12 @@ export interface Forest {
   setSoupPlaced: (on: boolean) => void
   /** The campfire's pot as the ukha cooks. */
   setPot: (state: 'empty' | 'cooking' | 'ready') => void
+  /** The honey jar on the hut's shelf (quest/honey.ts). */
+  setJar: (state: 'empty' | 'full' | 'none') => void
+  /** Where to stand for the jar's shelf, inside the hut. */
+  jarSpot: { x: number; z: number }
+  /** The wild hive, up its tree — null in a wood with no trees. */
+  hive: { x: number; y: number; z: number } | null
   setBikePlaced: (on: boolean, spot?: BikeSpot) => void
   /** Which wall of the hut is nearest `p`, where along it, and the point on
    *  the hut's outline that is (for a range check) — where a bicycle handed
@@ -845,6 +851,9 @@ export function createForest(
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
     setSoupPlaced: (on: boolean) => shelterFx!.setSoupPlaced(on),
     setPot: (state: 'empty' | 'cooking' | 'ready') => campfireFx.setPot(state),
+    setJar: (state: 'empty' | 'full' | 'none') => shelterFx!.setJar(state),
+    jarSpot: jarSpotWorld(shelter),
+    hive: hive ? { x: hive.x, y: hive.y, z: hive.z } : null,
     setBikePlaced: (on: boolean, spot?: BikeSpot) => shelterFx!.setBikePlaced(on, spot),
     bikeSpotNear: (p: { x: number; z: number }) => nearestBikeSpot(shelter, p),
     homeSpot: (id: 'rod' | 'bike', bikeSpot?: BikeSpot) =>
