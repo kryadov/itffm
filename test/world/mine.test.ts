@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {
   placeMine, mineObstacles, isInsideMine, diamondSpotInMine, mineFloorHeightAt, caveSdf, caveLattice,
-  localToWorld, worldToLocal, TUNNEL_WIDTH, TUNNEL_HEIGHT, type Mine, type MineSegment,
+  localToWorld, worldToLocal, TUNNEL_WIDTH, TUNNEL_HEIGHT, type Mine, type MineSegment, outcropBoulders,
 } from '../../src/world/mine'
 import { createMineTerrain } from '../../src/world/mineTerrain'
 import { buildMineMesh, setMineLighting } from '../../src/world/mineMesh'
@@ -350,13 +350,16 @@ describe('mineObstacles', () => {
         const w = localToWorld(m, lx, 0)
         for (const o of withMound) expect(Math.hypot(o.x - w.x, o.z - w.z)).toBeGreaterThan(o.radius + 0.3 + 0.5)
       }
-      // Every circle beyond the plain walls lies on the mound's foot or its rock face.
+      // Every circle beyond the plain walls lies on the mound's foot, its rock
+      // face, or is one of the boulders tumbled at the face's foot.
       const extra = withMound.slice(plain.length)
+      const rocks = outcropBoulders(m, terrain.deckRadius).filter((b) => b.at === 'foot')
       for (const o of extra) {
         const { lx, lz } = worldToLocal(m, o.x, o.z)
         const onFace = Math.abs(lx) < 1e-6
         const onFoot = Math.abs(caveSdf(m, lx, lz) - (terrain.deckRadius - 0.4)) < 0.3
-        expect(onFace || onFoot).toBe(true)
+        const boulder = rocks.some((b) => Math.hypot(b.lx - lx, b.lz - lz) < 1e-3)
+        expect(onFace || onFoot || boulder).toBe(true)
       }
     }
   })
@@ -804,5 +807,49 @@ describe('walking in and out (stepPlayer, the real collision and the real ground
         expect(worst, `${name}/${seed}`).toBeLessThan(0.9)
       }
     }
+  })
+})
+
+describe('the outcrop reads as rock, not a wall', () => {
+  // A live report, again (2026-09-24): "a long grey wall with a bare flat grey top".
+  it('scatters boulders along the foot of the face and its top edge, clear of the doorway', () => {
+    for (const seed of SEEDS) {
+      const { m, terrain } = setup(flat, seed)
+      const rocks = outcropBoulders(m, terrain.deckRadius)
+      expect(rocks).toEqual(outcropBoulders(m, terrain.deckRadius))
+      const foot = rocks.filter((r) => r.at === 'foot')
+      const crest = rocks.filter((r) => r.at === 'crest')
+      expect(foot.length).toBeGreaterThanOrEqual(2)
+      expect(crest.length).toBeGreaterThanOrEqual(2)
+      const half = m.segments[0].width / 2
+      for (const r of rocks) expect(Math.abs(r.lz) - r.r, `seed ${seed}`).toBeGreaterThan(half + 0.3)
+    }
+  })
+
+  it('gives every foot boulder its own collision', () => {
+    const { m, terrain } = setup(flat, 3)
+    const obstacles = mineObstacles(m, terrain.deckRadius)
+    for (const r of outcropBoulders(m, terrain.deckRadius).filter((b) => b.at === 'foot')) {
+      const w = localToWorld(m, r.lx, r.lz)
+      expect(obstacles.some((o) => Math.hypot(o.x - w.x, o.z - w.z) < 0.05 && o.radius >= r.r * 0.8)).toBe(true)
+    }
+  })
+
+  it('is mostly moss and grass on top, rock only in patches', () => {
+    const { group } = setup(flat, 3)
+    const deck = group.getObjectByName('mine-deck') as THREE.Mesh
+    const col = deck.geometry.getAttribute('color')
+    let green = 0
+    for (let i = 0; i < col.count; i++) if (col.getY(i) > col.getX(i) * 1.08 && col.getY(i) > col.getZ(i) * 1.2) green++
+    expect(green / col.count).toBeGreaterThan(0.5)
+  })
+
+  it('is a rough face, not a flat plane', () => {
+    const { group } = setup(flat, 3)
+    const face = group.getObjectByName('mine-face') as THREE.Mesh
+    const pos = face.geometry.getAttribute('position')
+    let off = 0
+    for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getX(i)) > 0.05) off++
+    expect(off / pos.count).toBeGreaterThan(0.3)
   })
 })

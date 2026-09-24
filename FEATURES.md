@@ -101,7 +101,9 @@ today, each with real field marks, edibility and season.
   tarred below and painted green above, its sheer sweeping up to a pointed
   bow and a flat transom, with thwarts, floorboards and a pair of oars inside.
 - A **mine** you can walk into — a branching cave, not a single corridor: a
-  wide, tall doorway set in a rock outcrop on the hillside, opening onto level
+  wide, tall doorway set in a rock outcrop on the hillside — a mossy hill over
+  the tunnels with an uneven crest, a layered rock face only round the door,
+  grassy slopes either side and boulders tumbled along its foot — opening onto level
   ground where a trail arrives, leads into a real maze: nine to twelve forks,
   some of them three ways, seven to fourteen dead ends and some forty metres of
   depth, solid rock always standing between passages that are not joined — with

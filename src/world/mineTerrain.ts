@@ -41,7 +41,17 @@ const LIP = 0.05
  *  slope limit (game/player.ts SLOPE_BLOCK, 1.4 — and a metre-long probe
  *  averages a foot or crest into it), even against a rising hillside: the
  *  mound is a rock outcrop you walk round, never a hill you can climb onto. */
-const FLANK = 2.6
+const FLANK = 1.7
+/** How much higher than its cover needs the mound's crest may rise, metres —
+ *  an uneven skyline rather than one long level wall (a live report,
+ *  2026-09-24). Only ever added: the cover over the tunnels stays. */
+const CREST_RISE = 1.8
+/** How far past each doorway jamb the mound's front stands as a sheer rock
+ *  face, metres; beyond it (over a short shoulder) the front slopes down like
+ *  the flanks, so the outcrop has a face round its door, not a wall the
+ *  width of the whole maze (a live report, 2026-09-24). */
+const FACE_SHOULDER = 2.8
+const SHOULDER_BLEND = 2.2
 /** The mound is at least this tall above the natural ground under it, metres,
  *  even where the real hillside already stands above the tunnel roof — a low
  *  curb would be a step the player could simply walk up onto. */
@@ -153,9 +163,15 @@ export function createMineTerrain(m: Mine, base: ElevationProvider, cell: number
     // rounded: the width it needs follows from how tall the mound is here.
     const t = (deckRadius - dOut) / (height / FLANK)
     if (t <= 0) return b
-    const s = t >= 1 ? 1 : t > 0.8 ? 1 - 1.25 * (1 - t) * (1 - t) : t
+    const shape = (u: number): number => (u >= 1 ? 1 : u > 0.8 ? 1 - 1.25 * (1 - u) * (1 - u) : Math.max(0, u))
+    let s = shape(t)
+    // Away from the doorway the front slopes back from the apron like a flank.
+    const away = smoothstep(half + FACE_SHOULDER, half + FACE_SHOULDER + SHOULDER_BLEND, Math.abs(lz))
+    if (away > 0) s = Math.min(s, s * (1 - away) + shape((lx * FLANK) / height) * away)
+    if (s <= 0) return b
     const noise = fbm2(lx / 3, lz / 3, noiseSeed, 2) * 0.12
-    return b + (height + noise) * s
+    const rise = Math.max(0, fbm2(lx / 7, lz / 7, noiseSeed + 11, 3) + 0.25) * CREST_RISE
+    return b + (height + noise + rise) * s
   }
 
   const surfaceLocal = (lx: number, lz: number, inside: boolean): number => {

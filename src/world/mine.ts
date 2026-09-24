@@ -743,6 +743,10 @@ export function mineObstacles(m: Mine, moundRadius?: number): CircleObstacle[] {
   }
 
   if (moundRadius !== undefined) {
+    // The boulders tumbled at the foot of the face stand out in front of it.
+    for (const b of outcropBoulders(m, moundRadius)) {
+      if (b.at === 'foot') out.push({ ...localToWorld(m, b.lx, b.lz), radius: b.r * 0.85 })
+    }
     // Where the mound has risen to about a metre: a cliff by then.
     const foot = moundRadius - FOOT_INSET
     let maxX = 0
@@ -756,6 +760,49 @@ export function mineObstacles(m: Mine, moundRadius?: number): CircleObstacle[] {
       for (let z = -(maxZ + reach); z <= maxZ + reach; z += RING_STEP) {
         if (Math.abs(caveSdf(m, x, z) - foot) <= RING_BAND) push(x, z)
       }
+    }
+  }
+  return out
+}
+
+/** A boulder dressing the outcrop: at the foot of the rock face (on the
+ *  apron's ground) or along its top edge (on the mound). Local metres. */
+export interface OutcropBoulder {
+  lx: number
+  lz: number
+  /** Rough radius, metres. */
+  r: number
+  at: 'foot' | 'crest'
+}
+
+/**
+ * Boulders along the outcrop: tumbled at the foot of the rock face either side
+ * of the doorway, and set along its top edge, so neither reads as one long
+ * ruled line (a live report, 2026-09-24: "a long grey wall"). Pure and
+ * deterministic; the mesh (`mineMesh.ts`) and the collision (`mineObstacles`)
+ * both read this one list.
+ */
+export function outcropBoulders(m: Mine, moundRadius: number): OutcropBoulder[] {
+  const rng = mulberry32((Math.round(m.x * 41) ^ Math.round(m.z * 43) ^ 0x6b43a9b5) >>> 0)
+  const half = m.segments[0].width / 2
+  const out: OutcropBoulder[] = []
+  const clearOfDoor = (r: number): number => half + 0.35 + r
+  for (const side of [1, -1]) {
+    // The foot: every metre or two along the face, a few gaps.
+    for (let s = half + 0.9; s < half + moundRadius;) {
+      const r = 0.45 + rng() * 0.6
+      const keep = rng() < 0.82
+      const lz = side * Math.max(s + r * 0.4, clearOfDoor(r))
+      const lx = 0.12 + rng() * 0.28
+      if (keep) out.push({ lx, lz, r, at: 'foot' })
+      s += r * 1.2 + 0.5 + rng() * 1.3
+    }
+    // The top edge, a little back from the brink.
+    for (let s = half + 0.6 + rng() * 1.5; s < half + moundRadius * 0.75;) {
+      const r = 0.35 + rng() * 0.45
+      const lz = side * Math.max(s, clearOfDoor(r))
+      out.push({ lx: 0.7 + rng() * 1.1, lz, r, at: 'crest' })
+      s += 2.2 + rng() * 2.2
     }
   }
   return out

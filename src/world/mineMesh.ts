@@ -1,7 +1,8 @@
 import * as THREE from 'three'
 import { mulberry32 } from '../util/rng'
+import { fbm2 } from '../util/noise'
 import {
-  FACE_HALF_EXTRA, FLOOR_LIFT, caveLattice, caveSdf, type Mine,
+  FACE_HALF_EXTRA, FLOOR_LIFT, caveLattice, caveSdf, outcropBoulders, type Mine,
 } from './mine'
 import type { MineTerrain } from './mineTerrain'
 
@@ -25,8 +26,17 @@ import type { MineTerrain } from './mineTerrain'
 const FLOOR_COLOR = new THREE.Color(0x5e5447)
 const WALL_COLOR = new THREE.Color(0x7a7266)
 const CEIL_COLOR = new THREE.Color(0x635b4f)
-const ROCK_COLOR = new THREE.Color(0x8c8679)
 const GRASS_COLOR = new THREE.Color(0x4d5b39)
+/** Moss and a warmer, earthier green for the outcrop's top, and the rock's
+ *  own strata: a paler band and a darker one either side of `ROCK_COLOR`. */
+const MOSS_COLOR = new THREE.Color(0x56683a)
+const SOIL_COLOR = new THREE.Color(0x5c5a3a)
+const STRATA = [new THREE.Color(0x8c8679) /* the plain rock */, new THREE.Color(0x9a8e76), new THREE.Color(0x77726a), new THREE.Color(0x857d6c)]
+/** Rows the rock face is cut into from foot to brink, so it can bulge and
+ *  recede and show its strata. */
+const FACE_ROWS = 6
+/** How far the face can recede into the hill between its edges, metres. */
+const FACE_DEPTH = 0.45
 /** Grid of the mound's surface mesh, metres. */
 const DECK_STEP = 0.5
 
@@ -303,7 +313,6 @@ function deckNormalAt(terrain: MineTerrain, x: number, z: number): [number, numb
 function buildFace(m: Mine, terrain: MineTerrain, material: THREE.Material): THREE.Mesh {
   const b = new Builder()
   const fy = m.y + FLOOR_LIFT
-  const rock = ROCK_COLOR
   const tintRng = mulberry32((Math.round(m.x * 19) ^ Math.round(m.z * 37) ^ 0x7f4a7c15) >>> 0)
   const tint = (): number => tintRng()
   const lattice = caveLattice(m)
@@ -322,14 +331,41 @@ function buildFace(m: Mine, terrain: MineTerrain, material: THREE.Material): THR
   const hint = (z: number, y: number): [number, number, number] => [-1, y, z]
   const bottom = (z: number): number => terrain.apronAt(-1e-4, z) - 0.35
 
+  const noiseSeed = (Math.round(m.x * 11) ^ Math.round(m.z * 13) ^ 0x2c1b3c6d) & 0xffff
+  const doorEdge = Math.max(Math.abs(zL), Math.abs(zR))
+  // How far a point of the face recedes into the hill: nothing at its brink
+  // (where it meets the mound) and at the doorway's jambs (where it meets the
+  // tunnel), up to FACE_DEPTH in between, lumpy like broken rock.
+  const recess = (z: number, y: number, top: number, foot: number): number => {
+    const jamb = Math.min(1, Math.max(0, (Math.abs(z) - doorEdge - 0.2) / 1.2))
+    const h = top - foot
+    const t = h > 1e-3 ? (y - foot) / h : 1
+    const brink = Math.min(1, (1 - t) * 4)
+    const n = fbm2(z / 1.6, y / 1.1, noiseSeed, 3) * 0.5 + 0.5
+    return FACE_DEPTH * n * jamb * brink
+  }
+  const rockAt = (y: number, z: number): THREE.Color => {
+    const band = Math.floor((y - fy) * 1.6 + fbm2(z / 5, y, noiseSeed + 7, 2) * 1.2)
+    const c = STRATA[((band % STRATA.length) + STRATA.length) % STRATA.length]
+    return c.clone().multiplyScalar(0.9 + tint() * 0.18)
+  }
   const strip = (z0: number, y0b: number, z1: number, y1b: number): void => {
     const t0 = terrain.deckAt(0, z0)
     const t1 = terrain.deckAt(0, z1)
     if (t0 - y0b < 0.005 && t1 - y1b < 0.005) return
-    b.quad(
-      [0, y0b, z0], [0, y1b, z1], [0, t1, z1], [0, t0, z0], hint((z0 + z1) / 2, (y0b + t0) / 2),
-      rock.clone().multiplyScalar(0.88 + tint() * 0.24),
-    )
+    for (let r = 0; r < FACE_ROWS; r++) {
+      const a = r / FACE_ROWS
+      const c = (r + 1) / FACE_ROWS
+      const ya0 = y0b + (t0 - y0b) * a
+      const yc0 = y0b + (t0 - y0b) * c
+      const ya1 = y1b + (t1 - y1b) * a
+      const yc1 = y1b + (t1 - y1b) * c
+      b.quad(
+        [recess(z0, ya0, t0, y0b), ya0, z0], [recess(z1, ya1, t1, y1b), ya1, z1],
+        [recess(z1, yc1, t1, y1b), yc1, z1], [recess(z0, yc0, t0, y0b), yc0, z0],
+        hint((z0 + z1) / 2, (ya0 + yc0) / 2), rockAt((ya0 + yc0) / 2, (z0 + z1) / 2),
+      )
+    }
   }
   // Above the doorway: from the lintel (the ceiling edge) up to the mound.
   for (let k = 0; k + 1 < doorZ.length; k++) {
@@ -390,11 +426,23 @@ function buildDeck(m: Mine, terrain: MineTerrain, material: THREE.Material): THR
     const z = j * DECK_STEP
     return [x, terrain.deckAt(x, z), z]
   }
+  const noiseSeed = (Math.round(m.x * 7) ^ Math.round(m.z * 5) ^ 0x3c6ef372) & 0xffff
+  // Moss and grass over the top, bare rock only where it is steep and in the
+  // odd patch — not a bare grey table (a live report, 2026-09-24).
   const colorAt = (x: number, z: number): THREE.Color => {
     const t = Math.min(1, dOut(x, z) / terrain.deckRadius)
-    const k = t * t * (3 - 2 * t)
-    const rockMix = ROCK_COLOR.clone().multiplyScalar(0.95 + rng() * 0.1)
-    return rockMix.lerp(GRASS_COLOR, Math.min(1, k * 1.15))
+    const rim = t * t * (3 - 2 * t)
+    const steep = 1 - deckNormalAt(terrain, x, z)[1]
+    const patch = fbm2(x / 3.5, z / 3.5, noiseSeed, 3)
+    const soil = fbm2(x / 2, z / 2, noiseSeed + 3, 2)
+    const green = MOSS_COLOR.clone().lerp(GRASS_COLOR, rim).lerp(SOIL_COLOR, Math.max(0, soil) * 0.6)
+    green.multiplyScalar(0.92 + rng() * 0.14)
+    // Steep ground shows rock only where a patch of it comes through, so a
+    // flank is grass broken by outcrops rather than one grey band.
+    const steepRock = Math.min(1, (steep - 0.4) * 3) * Math.min(1, Math.max(0, patch + 0.15) * 3)
+    const rockiness = Math.max(steepRock, Math.min(1, (patch - 0.35) * 4))
+    const rock = STRATA[Math.floor(rng() * STRATA.length)].clone().multiplyScalar(0.9 + rng() * 0.15)
+    return green.lerp(rock, Math.max(0, rockiness) * (1 - rim))
   }
   const up: [number, number, number] = [0, 1e4, 0]
   b.smooth = (x, _y, z) => deckNormalAt(terrain, x, z)
@@ -447,7 +495,63 @@ export function buildMineMesh(m: Mine, terrain: MineTerrain): THREE.Group {
   group.add(buildInterior(m, material))
   group.add(buildDeck(m, terrain, surfaceMat))
   group.add(buildFace(m, terrain, faceMat))
+  group.add(buildOutcropBoulders(m, terrain))
   return group
+}
+
+/** The outcrop's boulders (mine.ts's `outcropBoulders`): lumpy, flat-shaded
+ *  rocks in the strata's colours, moss on whatever faces up. One mesh. */
+function buildOutcropBoulders(m: Mine, terrain: MineTerrain): THREE.Mesh {
+  const rng = mulberry32((Math.round(m.x * 53) ^ Math.round(m.z * 59) ^ 0x1f83d9ab) >>> 0)
+  const positions: number[] = []
+  const colors: number[] = []
+  const v = new THREE.Vector3()
+  const n = new THREE.Vector3()
+  const mat4 = new THREE.Matrix4()
+  const q = new THREE.Quaternion()
+  for (const b of outcropBoulders(m, terrain.deckRadius)) {
+    const geo = new THREE.IcosahedronGeometry(1, 1).toNonIndexed()
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    // Lumpy: every corner pushed in or out by its own amount (shared corners
+    // agree, keyed by where they sit on the unit sphere).
+    const bump = new Map<string, number>()
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i)
+      const key = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`
+      if (!bump.has(key)) bump.set(key, 0.78 + rng() * 0.4)
+      v.multiplyScalar(bump.get(key)!)
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+    const ground = b.at === 'foot' ? terrain.apronAt(-1e-3, b.lz) : terrain.deckAt(b.lx, b.lz)
+    q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng() * Math.PI * 2)
+    mat4.compose(
+      new THREE.Vector3(b.lx, ground + b.r * (b.at === 'foot' ? 0.3 : 0.15), b.lz), q,
+      new THREE.Vector3(b.r, b.r * (0.62 + rng() * 0.2), b.r * (0.85 + rng() * 0.2)),
+    )
+    geo.applyMatrix4(mat4)
+    geo.computeVertexNormals()
+    const p = geo.getAttribute('position') as THREE.BufferAttribute
+    const nor = geo.getAttribute('normal') as THREE.BufferAttribute
+    const base = STRATA[Math.floor(rng() * STRATA.length)]
+    for (let i = 0; i < p.count; i += 3) {
+      // One colour per face: moss where it faces the sky.
+      n.fromBufferAttribute(nor, i)
+      const c = n.y > 0.72 ? MOSS_COLOR.clone().multiplyScalar(0.9 + rng() * 0.2) : base.clone().multiplyScalar(0.85 + rng() * 0.25)
+      for (let k = 0; k < 3; k++) {
+        positions.push(p.getX(i + k), p.getY(i + k), p.getZ(i + k))
+        colors.push(c.r, c.g, c.b)
+      }
+    }
+  }
+  const geom = new THREE.BufferGeometry()
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geom.computeVertexNormals()
+  const mesh = new THREE.Mesh(geom, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }))
+  mesh.name = 'mine-boulders'
+  mesh.castShadow = true
+  mesh.receiveShadow = true
+  return mesh
 }
 
 const ZERO_SCALE = new THREE.Matrix4().makeScale(0, 0, 0)
