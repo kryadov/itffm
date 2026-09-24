@@ -614,6 +614,13 @@ async function main(): Promise<void> {
         }
         if (!forest.isShelterDoorOpen()) forest.toggleShelterDoor()
       }
+      // tp=mine: back= metres (default 14) out in front of the mine's mouth, facing it.
+      if (q.get('tp') === 'mine') {
+        const back = Number(q.get('back')) || 14
+        const hx = Math.cos(forest.mine.heading)
+        const hz = Math.sin(forest.mine.heading)
+        player = { ...player, x: forest.mine.x - hx * back, z: forest.mine.z - hz * back, yaw: Math.atan2(-hx, -hz) }
+      }
       // tp=fish: on the bank 2 m from the first fish (the highest ground around it,
       // which is the bank, not the pond bed), facing it.
       if (q.get('tp') === 'fish') {

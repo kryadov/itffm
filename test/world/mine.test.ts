@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {
   placeMine, mineObstacles, isInsideMine, diamondSpotInMine, mineFloorHeightAt, caveSdf, caveLattice,
-  localToWorld, worldToLocal, TUNNEL_WIDTH, TUNNEL_HEIGHT, type Mine,
+  localToWorld, worldToLocal, TUNNEL_WIDTH, TUNNEL_HEIGHT, type Mine, type MineSegment,
 } from '../../src/world/mine'
 import { createMineTerrain } from '../../src/world/mineTerrain'
 import { buildMineMesh, setMineLighting } from '../../src/world/mineMesh'
@@ -160,8 +160,61 @@ describe('mine segment graph', () => {
   it('has exactly one diamond chamber, and every other leaf is a dead end', () => {
     const leaves = m0.segments.filter((s) => s.isLeaf)
     expect(leaves.filter((s) => s.isDiamondChamber).length).toBe(1)
-    expect(leaves.length).toBeGreaterThanOrEqual(4)
-    expect(leaves.length).toBeLessThanOrEqual(6)
+    expect(leaves.length).toBeGreaterThanOrEqual(7)
+  })
+
+  // A live request (2026-09-24): the diamond was too easy to find. The mine
+  // is bigger and branches more, and the diamond waits at the far end.
+  it('is a real maze: many dead ends and a long way round, on every seed', () => {
+    let total = 0
+    for (const seed of SEEDS) {
+      const m = placeMine(flat, 90, seed, [], shelter, [{ x: 0, z: 0 }])
+      expect(m.segments.filter((x) => x.isLeaf).length, `seed ${seed}`).toBeGreaterThanOrEqual(7)
+      for (const x of m.segments) total += Math.hypot(x.x1 - x.x0, x.z1 - x.z0)
+    }
+    expect(total / SEEDS.length).toBeGreaterThan(70)
+  })
+
+  it('puts the diamond in the dead end farthest along the tunnels from the mouth', () => {
+    for (const seed of SEEDS) {
+      const m = placeMine(flat, 90, seed, [], shelter, [{ x: 0, z: 0 }])
+      const byId = new Map(m.segments.map((x) => [x.id, x]))
+      const depth = (x: MineSegment): number => {
+        let d = 0
+        for (let c: MineSegment | undefined = x; c; c = c.parentId === null ? undefined : byId.get(c.parentId)) {
+          d += Math.hypot(c.x1 - c.x0, c.z1 - c.z0)
+        }
+        return d
+      }
+      const leaves = m.segments.filter((x) => x.isLeaf)
+      const chamber = leaves.find((x) => x.isDiamondChamber)!
+      expect(depth(chamber), `seed ${seed}`).toBeCloseTo(Math.max(...leaves.map(depth)), 6)
+    }
+  })
+
+  it('keeps solid rock between passages that are not joined, so no tunnel breaks into another', () => {
+    const segDist = (a: MineSegment, b: MineSegment): number => {
+      const d = (px: number, pz: number, s: MineSegment): number => {
+        const dx = s.x1 - s.x0
+        const dz = s.z1 - s.z0
+        const l2 = dx * dx + dz * dz
+        const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - s.x0) * dx + (pz - s.z0) * dz) / l2)) : 0
+        return Math.hypot(px - s.x0 - dx * t, pz - s.z0 - dz * t)
+      }
+      // Two segments that do not cross: the nearest pair includes an endpoint.
+      return Math.min(d(a.x0, a.z0, b), d(a.x1, a.z1, b), d(b.x0, b.z0, a), d(b.x1, b.z1, a))
+    }
+    for (const seed of SEEDS) {
+      const m = placeMine(flat, 90, seed, [], shelter, [{ x: 0, z: 0 }])
+      for (const a of m.segments) {
+        for (const b of m.segments) {
+          if (a.id >= b.id) continue
+          const joined = a.parentId === b.id || b.parentId === a.id || (a.parentId !== null && a.parentId === b.parentId)
+          if (joined) continue
+          expect(segDist(a, b), `seed ${seed}: ${a.id} and ${b.id}`).toBeGreaterThan((a.width + b.width) / 2 + 0.8)
+        }
+      }
+    }
   })
 
   it('is deterministic, and different seeds give different graphs', () => {
@@ -270,7 +323,7 @@ describe('mineObstacles', () => {
       const plain = mineObstacles(m)
       const withMound = mineObstacles(m, terrain.deckRadius)
       expect(withMound.length).toBeGreaterThan(plain.length)
-      expect(withMound.length).toBeLessThan(plain.length + 1500)
+      expect(withMound.length).toBeLessThan(plain.length + 3000)
       for (const lx of [-8, -5, -3, -1, 0, 1, 2, 3]) {
         const w = localToWorld(m, lx, 0)
         for (const o of withMound) expect(Math.hypot(o.x - w.x, o.z - w.z)).toBeGreaterThan(o.radius + 0.3 + 0.5)

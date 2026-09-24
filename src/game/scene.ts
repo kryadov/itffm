@@ -147,7 +147,7 @@ export interface Forest {
   /** The wood's one mine entrance — a fixed landmark, same as `shelter`/
    *  `campfire` above, for ui/minimap.ts's markers (see the 2026-09-15
    *  addendum). */
-  mine: { x: number; z: number }
+  mine: { x: number; z: number; heading: number }
   /** The railway's two stops (a platform each) — fixed geography like the
    *  shelter and the mine, for the minimap. */
   stations: Station[]
@@ -794,7 +794,7 @@ export function createForest(
     scene, ground: groundWithMine, trees: woodTrees, placements, mushroomObjects, extraObstacles,
     shelter: { x: shelter.x, z: shelter.z }, shelterDoor: doorPosition(shelter),
     campfire: { x: campfire.x, z: campfire.z },
-    mine: { x: mine.x, z: mine.z },
+    mine: { x: mine.x, z: mine.z, heading: mine.heading },
     stations, railPoints: railLine.points.map((p) => ({ x: p.x, z: p.z })), railLine,
     trainStopped: () => train.stopped(),
     trainLocomotive: () => train.locomotive(),

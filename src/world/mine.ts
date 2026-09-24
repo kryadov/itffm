@@ -112,29 +112,81 @@ const TRAIL_CLEARANCE = 6
 const TRAIL_SAMPLE = 2
 
 /** Root segment: length of the entrance passage, metres. */
-const ROOT_LENGTH_RANGE: [number, number] = [5, 7]
-/** How many forks the whole tree gets — leaves end up at 1 + this. */
-const BRANCH_COUNT_RANGE: [number, number] = [3, 5]
-const CHILD_LENGTH_RANGE: [number, number] = [4.5, 7.5]
-/** Half-angle, radians, each of a fork's two children turns away from the
- *  parent's own heading — wide enough that the two forks read as genuinely
+const ROOT_LENGTH_RANGE: [number, number] = [6, 8]
+/** How many forks the whole tree tries for. A live request (2026-09-24): the
+ *  diamond was too easy to find in 3-5, so the mine is a real maze now. */
+const BRANCH_COUNT_RANGE: [number, number] = [9, 12]
+const CHILD_LENGTH_RANGE: [number, number] = [5.5, 10]
+/** Half-angle, radians, each of a fork's side passages turns away from the
+ *  parent's own heading — wide enough that the forks read as genuinely
  *  different directions, not a barely-there kink. */
-const FORK_TURN_RANGE: [number, number] = [0.5, 0.95]
+const FORK_TURN_RANGE: [number, number] = [0.55, 1.0]
+/** The chance a fork splits three ways — a side passage each way and one
+ *  running on nearly straight. */
+const THREE_WAY_CHANCE = 0.35
 /** No passage may head more than this far off the entrance's own axis, so the
  *  system fans out into the hill instead of curling back through the mouth. */
-const MAX_HEADING = 1.15
+const MAX_HEADING = 1.3
 const CHILD_WIDTH_FACTOR_RANGE: [number, number] = [0.85, 1.15]
 /** The diamond chamber's own leaf is wider — a small room, not just a wider
  *  corridor. */
 const CHAMBER_WIDTH_FACTOR = 1.5
+/** The farthest any passage reaches from the mouth, metres — and never more
+ *  than half the plot, so the tunnels, their mound and the apron all fit it. */
+const MAX_REACH = 55
+/** Solid rock kept between two passages that are not joined, metres, wall to
+ *  wall — or a new passage would break into an old one and make a shortcut
+ *  (and a chamber widened afterwards would eat into its neighbour). */
+const ROCK_BETWEEN = 1.2
+/** The same, around the widened diamond chamber. */
+const CHAMBER_ROCK = 0.9
+/** Tries per passage: its length is cut back each time it would break into
+ *  another one, and it is dropped when none fits. */
+const FIT_TRIES = 4
+/** Least angle between two passages out of one fork, radians: closer, and the
+ *  rock between them is a sliver the tunnel lattice cannot draw. */
+const MIN_SIBLING_SPREAD = 0.7
+
+/** Closest distance between two segments that do not cross, local metres. */
+function segmentGap(a: MineSegment, b: MineSegment): number {
+  const d = (px: number, pz: number, s: MineSegment): number => {
+    const dx = s.x1 - s.x0
+    const dz = s.z1 - s.z0
+    const l2 = dx * dx + dz * dz
+    const t = l2 > 0 ? Math.max(0, Math.min(1, ((px - s.x0) * dx + (pz - s.z0) * dz) / l2)) : 0
+    return Math.hypot(px - s.x0 - dx * t, pz - s.z0 - dz * t)
+  }
+  // Crossing segments are 0 apart.
+  const cross = (ax: number, az: number, bx: number, bz: number, cx: number, cz: number) =>
+    (bx - ax) * (cz - az) - (bz - az) * (cx - ax)
+  const d1 = cross(a.x0, a.z0, a.x1, a.z1, b.x0, b.z0)
+  const d2 = cross(a.x0, a.z0, a.x1, a.z1, b.x1, b.z1)
+  const d3 = cross(b.x0, b.z0, b.x1, b.z1, a.x0, a.z0)
+  const d4 = cross(b.x0, b.z0, b.x1, b.z1, a.x1, a.z1)
+  if (d1 * d2 < 0 && d3 * d4 < 0) return 0
+  return Math.min(d(a.x0, a.z0, b), d(a.x1, a.z1, b), d(b.x0, b.z0, a), d(b.x1, b.z1, a))
+}
+
+/** Tunnel length from the mouth to the far end of `s`. */
+function depthOf(s: MineSegment, byId: Map<number, MineSegment>): number {
+  let d = 0
+  for (let c: MineSegment | undefined = s; c; c = c.parentId === null ? undefined : byId.get(c.parentId)) {
+    d += Math.hypot(c.x1 - c.x0, c.z1 - c.z0)
+  }
+  return d
+}
 
 /**
  * Builds the cave's own branching graph: an entrance passage, then
- * `BRANCH_COUNT_RANGE` forks off whichever leaf the RNG picks each time,
- * ending with exactly one leaf marked as the diamond chamber and the rest as
- * dead ends. See docs/superpowers/specs/2026-09-15-mine-cave-design.md §1.
+ * `BRANCH_COUNT_RANGE` forks — two ways or three — off whichever leaf the RNG
+ * picks each time (deeper ones more often, so the maze grows into the hill
+ * rather than bunching at the mouth). A passage that would break into
+ * another is cut back or dropped, so solid rock always stands between two
+ * passages that are not joined. The diamond chamber is the dead end farthest
+ * along the tunnels from the mouth; every other leaf is a dead end.
+ * See docs/superpowers/specs/2026-09-15-mine-cave-design.md §1.
  */
-function buildMineGraph(rng: () => number): MineSegment[] {
+function buildMineGraph(rng: () => number, maxReach: number): MineSegment[] {
   const rootLength = randRange(rng, ROOT_LENGTH_RANGE)
   const root: MineSegment = {
     id: 0,
@@ -150,41 +202,103 @@ function buildMineGraph(rng: () => number): MineSegment[] {
     isDiamondChamber: false,
   }
   const segments: MineSegment[] = [root]
+  const byId = new Map<number, MineSegment>([[0, root]])
   let openLeaves = [root]
   let nextId = 1
 
+  const fits = (child: MineSegment, parent: MineSegment, siblings: MineSegment[]): boolean => {
+    // The whole system must fit the plot (see placeMine).
+    if (Math.hypot(child.x1, child.z1) + (child.width * CHAMBER_WIDTH_FACTOR) / 2 > maxReach) return false
+    for (const s of segments) {
+      if (s.id === parent.id || s.parentId === parent.id) continue
+      if (segmentGap(child, s) < (child.width + s.width) / 2 + ROCK_BETWEEN) return false
+    }
+    for (const s of siblings) {
+      // Siblings share their start (and MIN_SIBLING_SPREAD keeps them apart
+      // there); their far ends must stand clear of each other.
+      if (Math.hypot(child.x1 - s.x1, child.z1 - s.z1) < (child.width + s.width) / 2 + ROCK_BETWEEN) return false
+    }
+    return true
+  }
+
   const branchCount = Math.floor(randRange(rng, BRANCH_COUNT_RANGE))
-  for (let i = 0; i < branchCount; i++) {
-    const parent = openLeaves[Math.floor(rng() * openLeaves.length)]
-    parent.isLeaf = false
-    const parentAngle = Math.atan2(parent.z1 - parent.z0, parent.x1 - parent.x0)
-    const children: MineSegment[] = []
-    for (const sign of [1, -1]) {
-      const raw = parentAngle + sign * randRange(rng, FORK_TURN_RANGE)
-      const angle = Math.max(-MAX_HEADING, Math.min(MAX_HEADING, raw))
-      const length = randRange(rng, CHILD_LENGTH_RANGE)
-      const child: MineSegment = {
-        id: nextId++,
-        parentId: parent.id,
-        x0: parent.x1,
-        z0: parent.z1,
-        x1: parent.x1 + Math.cos(angle) * length,
-        z1: parent.z1 + Math.sin(angle) * length,
-        y0: 0,
-        y1: 0,
-        width: TUNNEL_WIDTH * randRange(rng, CHILD_WIDTH_FACTOR_RANGE),
-        isLeaf: true,
-        isDiamondChamber: false,
+  // Only a real fork — two passages or three — is taken; a leaf that finds no
+  // room for one twice is left a dead end. A bounded number of tries in all.
+  const failures = new Map<number, number>()
+  let forks = 0
+  for (let attempt = 0; forks < branchCount && attempt < branchCount * 8 && openLeaves.length > 0; attempt++) {
+    // Deeper leaves are a little likelier to fork, so the maze grows into the
+    // hill rather than bunching at the mouth.
+    const weights = openLeaves.map((l) => 1 + depthOf(l, byId) / 25)
+    let pick = rng() * weights.reduce((a, b) => a + b, 0)
+    let parent = openLeaves[openLeaves.length - 1]
+    for (let k = 0; k < openLeaves.length; k++) {
+      pick -= weights[k]
+      if (pick <= 0) {
+        parent = openLeaves[k]
+        break
       }
-      segments.push(child)
-      children.push(child)
+    }
+    const parentAngle = Math.atan2(parent.z1 - parent.z0, parent.x1 - parent.x0)
+    const turns = rng() < THREE_WAY_CHANCE
+      ? [randRange(rng, FORK_TURN_RANGE), (rng() - 0.5) * 0.3, -randRange(rng, FORK_TURN_RANGE)]
+      : [randRange(rng, FORK_TURN_RANGE), -randRange(rng, FORK_TURN_RANGE)]
+    const children: MineSegment[] = []
+    for (const turn of turns) {
+      const angle = Math.max(-MAX_HEADING, Math.min(MAX_HEADING, parentAngle + turn))
+      // Clamping can fold two passages onto one heading; keep them apart.
+      if (children.some((c) => Math.abs(Math.atan2(c.z1 - c.z0, c.x1 - c.x0) - angle) < MIN_SIBLING_SPREAD)) continue
+      let length = randRange(rng, CHILD_LENGTH_RANGE)
+      const width = TUNNEL_WIDTH * randRange(rng, CHILD_WIDTH_FACTOR_RANGE)
+      for (let tryNo = 0; tryNo < FIT_TRIES; tryNo++, length *= 0.75) {
+        const child: MineSegment = {
+          id: nextId + children.length,
+          parentId: parent.id,
+          x0: parent.x1,
+          z0: parent.z1,
+          x1: parent.x1 + Math.cos(angle) * length,
+          z1: parent.z1 + Math.sin(angle) * length,
+          y0: 0,
+          y1: 0,
+          width,
+          isLeaf: true,
+          isDiamondChamber: false,
+        }
+        if (length < CHILD_LENGTH_RANGE[0] * 0.5 || !fits(child, parent, children)) continue
+        children.push(child)
+        break
+      }
+    }
+    if (children.length < 2) {
+      const failed = (failures.get(parent.id) ?? 0) + 1
+      failures.set(parent.id, failed)
+      if (failed >= 2) openLeaves = openLeaves.filter((s) => s.id !== parent.id)
+      continue
+    }
+    forks++
+    nextId += children.length
+    parent.isLeaf = false
+    for (const c of children) {
+      segments.push(c)
+      byId.set(c.id, c)
     }
     openLeaves = openLeaves.filter((s) => s.id !== parent.id).concat(children)
   }
 
-  const chamber = openLeaves[Math.floor(rng() * openLeaves.length)]
+  // The diamond waits at the far end of the longest way in, in a chamber
+  // widened as far as the rock around it allows.
+  const leaves = segments.filter((s) => s.isLeaf)
+  let chamber = leaves[0]
+  for (const l of leaves) if (depthOf(l, byId) > depthOf(chamber, byId)) chamber = l
   chamber.isDiamondChamber = true
-  chamber.width *= CHAMBER_WIDTH_FACTOR
+  const base = chamber.width
+  const neighbours = segments.filter((s) =>
+    s.id !== chamber.id && s.id !== chamber.parentId && s.parentId !== chamber.parentId)
+  for (let f = CHAMBER_WIDTH_FACTOR; f >= 1; f -= 0.1) {
+    chamber.width = base * f
+    if (neighbours.every((s) => segmentGap(chamber, s) >= (chamber.width + s.width) / 2 + CHAMBER_ROCK)) break
+    chamber.width = base
+  }
 
   return segments
 }
@@ -225,7 +339,7 @@ export function placeMine(
   // depend on where it sits, so it is built first and its size decides how far
   // from the edge the mouth may be sited.
   const graphRng = mulberry32((seed + 0x9e3779b1) >>> 0)
-  const graph = buildMineGraph(graphRng)
+  const graph = buildMineGraph(graphRng, Math.min(MAX_REACH, halfSize * 0.5))
   const reach = Math.max(...graph.map((s) => Math.hypot(s.x1, s.z1)))
   const extent = Math.max(
     APRON_EXTENT,
@@ -465,12 +579,19 @@ export function caveLattice(m: Mine): CaveLattice {
   }
 
   const vertexCache = new Map<number, CaveVertex>()
+  // Where each corner stood before the pull onto the outline, and before its
+  // jitter too — for undoing either where a cell folds (below).
+  const unpulled = new Map<CaveVertex, { x: number; z: number; gx: number; gz: number }>()
   const vertex = (i: number, j: number): CaveVertex => {
     const key = i * 100003 + j
     const hit = vertexCache.get(key)
     if (hit) return hit
     let x = i * LATTICE
     let z = j * LATTICE
+    const gx0 = x
+    const gz0 = z
+    let px = 0
+    let pz = 0
     const sdf0 = caveSdf(m, x, z)
     // On the boundary when the four cells around it are not all cave.
     const around = [occ(i - 1, j - 1), occ(i, j - 1), occ(i - 1, j), occ(i, j)]
@@ -484,8 +605,10 @@ export function caveLattice(m: Mine): CaveLattice {
         gx /= gl
         gz /= gl
         const pull = Math.max(-PULL_MAX, Math.min(PULL_MAX, sdf0 * PULL))
-        x -= gx * pull
-        z -= gz * pull
+        px = -gx * pull
+        pz = -gz * pull
+        x += px
+        z += pz
       }
       const [nx, nz] = cornerNoise(i, j, salt)
       x += nx * ROCK_JITTER_XZ
@@ -500,6 +623,7 @@ export function caveLattice(m: Mine): CaveLattice {
     const ceil = TUNNEL_HEIGHT - VAULT_DROP * (1 - smoothstep(0, VAULT_SPAN, depth)) + (i > 0 ? ny * ROCK_JITTER_Y : 0)
     const v = { x, z, ceil }
     vertexCache.set(key, v)
+    if (i > 0) unpulled.set(v, { x: x - px, z: z - pz, gx: gx0, gz: gz0 })
     return v
   }
 
@@ -521,6 +645,26 @@ export function caveLattice(m: Mine): CaveLattice {
       if (!occ(i + 1, j)) walls.push({ a: v10, b: v11, nx: -1, nz: 0 })
       if (!occ(i, j - 1)) walls.push({ a: v00, b: v10, nx: 0, nz: 1 })
       if (!occ(i, j + 1)) walls.push({ a: v11, b: v01, nx: 0, nz: -1 })
+    }
+  }
+
+  // A corner pulled onto a diagonal outline from both sides can fold a cell
+  // over. Where one does, its corners give up the pull, then the jitter too —
+  // shared corners, so the neighbours follow and the surface stays closed.
+  const folded = (c: CaveCell): boolean => {
+    const [a, b, cc, d] = c.corners
+    return (b.x - a.x) * (cc.z - a.z) - (b.z - a.z) * (cc.x - a.x) <= 1e-6 ||
+      (cc.x - a.x) * (d.z - a.z) - (cc.z - a.z) * (d.x - a.x) <= 1e-6
+  }
+  for (const stage of [0, 1]) {
+    for (const c of cells) {
+      if (!folded(c)) continue
+      for (const v of c.corners) {
+        const u = unpulled.get(v)
+        if (!u) continue
+        v.x = stage === 0 ? u.x : u.gx
+        v.z = stage === 0 ? u.z : u.gz
+      }
     }
   }
 

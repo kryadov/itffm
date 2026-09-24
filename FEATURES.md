@@ -102,8 +102,10 @@ today, each with real field marks, edibility and season.
   bow and a flat transom, with thwarts, floorboards and a pair of oars inside.
 - A **mine** you can walk into — a branching cave, not a single corridor: a
   wide, tall doorway set in a rock outcrop on the hillside, opening onto level
-  ground where a trail arrives, leads into a handful of forks and dead ends, with
-  the diamond waiting at the end of the one real path. Every passage is closed
+  ground where a trail arrives, leads into a real maze: nine to twelve forks,
+  some of them three ways, seven to fourteen dead ends and some forty metres of
+  depth, solid rock always standing between passages that are not joined — with
+  the diamond in the dead end farthest along the tunnels from the mouth. Every passage is closed
   rock (no gaps, nothing to see through), and it is dead dark inside except for
   your own lamp and a fading pool of daylight at the doorway, so the way out is
   always the lit opening behind you. Sited on a real surveyed cave/adit/
