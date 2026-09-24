@@ -1,0 +1,51 @@
+id: suillus-grevillei
+gbifKey: 5239864
+name:
+  la: Suillus grevillei
+  ru: Маслёнок лиственничный
+  en: Larch bolete
+edibility: edible
+lookalikes: [suillus-luteus]
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [40, 100]
+    color: "#e0a024"
+    surface: viscid
+    surfaceColor: "#d99a20"
+  hymenium:
+    type: pores
+    attachment: adnate
+    color: "#e6c24a"
+  stipe:
+    height: [40, 90]
+    width: [10, 20]
+    color: "#e0b440"
+    position: central
+    ring: pendant
+    volva: none
+  flesh:
+    color: "#f2dc8a"
+    bruising: brown
+  latex: none
+ecology:
+  mycorrhizal: [larix]
+  substrate: soil
+  biomes: [forest-coniferous, forest-mixed, park-urban]
+  season: [7, 8, 9, 10]
+  moisture: [0.4, 0.85]
+  gregarious: troops
+  frequency: common
+media: []
+text:
+  ru: >-
+    Ярко-жёлтый или золотисто-оранжевый маслёнок с липкой, блестящей в сырую
+    погоду шляпкой и жёлтым губчатым слоем снизу. На ножке — плёнчатое
+    кольцо. Растёт только там, где есть лиственница, часто целыми вереницами
+    вдоль посадок. Съедобен; с шляпки обычно снимают слизистую кожицу.
+  en: >-
+    A bright yellow to golden-orange bolete with a sticky cap that shines in
+    wet weather and yellow pores underneath, and a membranous ring on the
+    stem. It grows only where there is larch, often in long rows along a
+    planting. Edible; the slimy cap skin is usually peeled off.

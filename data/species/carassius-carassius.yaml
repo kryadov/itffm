@@ -1,0 +1,38 @@
+id: carassius-carassius
+gbifKey: 2366645
+name:
+  la: Carassius carassius
+  ru: Карась золотой
+  en: Crucian carp
+kind: fish
+edibility: edible
+lookalikes: []
+morphology:
+  bodyColor: "#a88a3a"
+  bellyColor: "#eed89a"
+  finColor: "#8a5a30"
+  length: [100, 350]
+  bodyDepth: 0.42
+  eyeColor: "#c8a040"
+  lowerFinColor: "#9a5a2e"
+  dorsalAt: 0.5
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub, wetland]
+  season: [5, 6, 7, 8, 9]
+  moisture: [0.88, 1]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Высокий, почти круглый золотисто-бронзовый карась с длинным спинным
+    плавником и крупной чешуёй. Самая неприхотливая рыба лесных прудов: живёт
+    в заросших, бедных кислородом водоёмах, где другим не выжить, а зимой
+    зарывается в ил. Вкусен жареным в сметане.
+  en: >-
+    A tall, almost round golden-bronze fish with a long dorsal fin and big
+    scales. The hardiest fish of a forest pond: it lives in weedy,
+    oxygen-poor water where others cannot, and in winter burrows into the
+    mud. Good fried.

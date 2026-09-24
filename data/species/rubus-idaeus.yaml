@@ -1,0 +1,35 @@
+id: rubus-idaeus
+gbifKey: 2993094
+name:
+  la: Rubus idaeus
+  ru: Малина
+  en: Raspberry
+kind: berry
+edibility: edible
+lookalikes: []
+morphology:
+  color: "#c8283e"
+  diameter: [12, 18]
+  clusterSize: [2, 6]
+  leafColor: "#4a6a34"
+  bushHeight: [800, 1600]
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-mixed, forest-broadleaved, meadow-scrub]
+  season: [7, 8]
+  moisture: [0.35, 0.75]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Колючий кустарник выше пояса, заполоняющий вырубки, гари и опушки. Ягода
+    — сборная из множества сочных костяночек, красная, легко снимается с
+    белой конической цветоложи и остаётся внутри полой. Лесная малина мельче
+    садовой, но гораздо душистее.
+  en: >-
+    A prickly shrub taller than your waist, filling clearings, burnt ground
+    and woodland edges. The fruit is a cluster of juicy red drupelets that
+    slips off its white conical core and stays hollow inside. Wild raspberries
+    are smaller than garden ones but far more fragrant.

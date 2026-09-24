@@ -170,9 +170,11 @@ describe('spawnFish species and edge cases', () => {
   })
 
   it('works with the real species data', () => {
-    const real = spawnFish(loadSpecies(), [pond], hill, ctx)
+    const all = loadSpecies()
+    const fishIds = all.filter((sp) => sp.kind === 'fish').map((sp) => sp.id)
+    const real = spawnFish(all, [pond], hill, ctx)
     expect(real.length).toBeGreaterThan(0)
-    for (const p of real) expect(['rutilus-rutilus', 'perca-fluviatilis', 'esox-lucius']).toContain(p.speciesId)
+    for (const p of real) expect(fishIds).toContain(p.speciesId)
   })
 })
 

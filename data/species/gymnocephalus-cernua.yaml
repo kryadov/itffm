@@ -1,0 +1,41 @@
+id: gymnocephalus-cernua
+gbifKey: 5209574
+name:
+  la: Gymnocephalus cernua
+  ru: Ёрш обыкновенный
+  en: Ruffe
+kind: fish
+edibility: edible
+lookalikes: [perca-fluviatilis]
+morphology:
+  bodyColor: "#8a8454"
+  bellyColor: "#e0dcc0"
+  finColor: "#6a6448"
+  length: [80, 200]
+  bodyDepth: 0.26
+  pattern: spots
+  patternColor: "#3a3622"
+  eyeColor: "#a8b8c8"
+  lowerFinColor: "#8a7a5a"
+  dorsalFins: 2
+  dorsalAt: 0.42
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub, wetland]
+  season: [4, 5, 6, 7, 8, 9, 10]
+  moisture: [0.88, 1]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Небольшая колючая рыбка, родственница окуня, но без его полос — вся в
+    тёмных крапинах, со слившимися колючим и мягким спинными плавниками и
+    слизистой кожей. Держится у дна. Мелкая и колючая, зато из ершей
+    получается самая наваристая уха.
+  en: >-
+    A small spiny cousin of the perch without its bars — speckled all over
+    with dark spots, its spiny and soft dorsal fins joined, its skin slimy. It
+    keeps near the bottom. Small and prickly, but ruffe make the richest
+    fish soup of all.

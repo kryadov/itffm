@@ -1,0 +1,53 @@
+id: russula-vesca
+gbifKey: 2551415
+name:
+  la: Russula vesca
+  ru: Сыроежка пищевая
+  en: The flirt
+edibility: edible
+lookalikes: [russula-emetica]
+morphology:
+  cap:
+    shape: convex
+    ageShape: depressed
+    diameter: [50, 100]
+    color: "#b8736a"
+    surface: smooth
+    surfaceColor: "#c48478"
+  hymenium:
+    type: gills
+    attachment: adnexed
+    color: "#f8f4ea"
+  stipe:
+    height: [30, 70]
+    width: [15, 25]
+    color: "#f8f4ec"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fbf8f2"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [quercus, betula, fagus, picea, pinus]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed, forest-coniferous]
+  season: [6, 7, 8, 9]
+  moisture: [0.35, 0.75]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Шляпка розовато-буроватая, «ветчинного» цвета, и кожица на ней чуть не
+    доходит до края, открывая белую мякоть и концы пластинок, — будто
+    приоткрытые зубы. Пластинки и ножка белые, мякоть ломкая, как у всех
+    сыроежек, вкус мягкий, ореховый. Одна из лучших сыроежек; от жгучих
+    красных её отличает этот неострый вкус и приглушённый цвет.
+  en: >-
+    A pinkish-brown, ham-coloured cap whose skin stops just short of the edge,
+    baring the white flesh and the gill ends like a glimpse of teeth. White
+    gills and stem, flesh that snaps like every Russula's, and a mild, nutty
+    taste. One of the best of its genus; the mild taste and muted colour tell
+    it from the acrid red ones.

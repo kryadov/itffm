@@ -1,0 +1,55 @@
+id: lactarius-torminosus
+gbifKey: 8122710
+name:
+  la: Lactarius torminosus
+  ru: Волнушка розовая
+  en: Woolly milkcap
+edibility: conditional
+lookalikes: [lactarius-deliciosus]
+morphology:
+  cap:
+    shape: depressed
+    ageShape: funnel
+    diameter: [40, 120]
+    color: "#e6a09a"
+    surface: fibrous
+    surfaceColor: "#f2c6bc"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#f2dcd2"
+  stipe:
+    height: [30, 70]
+    width: [10, 20]
+    color: "#efcfc4"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#fbf0ea"
+    bruising: none
+  latex: white
+ecology:
+  mycorrhizal: [betula]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-mixed, meadow-scrub]
+  season: [7, 8, 9, 10]
+  moisture: [0.4, 0.85]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Розовая шляпка с тёмными концентрическими кругами и мохнатым, «шерстяным»
+    подвёрнутым краем; на изломе выступает едкий белый млечный сок, который
+    не меняет цвет на воздухе. Растёт только под берёзами. Сырая или
+    недоваренная вызывает тяжёлое расстройство желудка — латинское название
+    значит «вызывающая колики». В России её едят только солёной, после долгого
+    вымачивания и отваривания; во многих странах считается ядовитой.
+  en: >-
+    A pink cap ringed with darker bands, its rolled edge shaggy as wool;
+    broken, it bleeds an acrid white milk that keeps its colour in the air. It
+    grows only under birch. Raw or undercooked it causes violent stomach upset
+    — the Latin name means "causing colic". In Russia and Finland it is eaten
+    only salted, after long soaking and boiling twice; many countries simply
+    count it poisonous.

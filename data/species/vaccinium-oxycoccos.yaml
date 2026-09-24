@@ -1,0 +1,36 @@
+id: vaccinium-oxycoccos
+gbifKey: 2882940
+name:
+  la: Vaccinium oxycoccos
+  ru: Клюква болотная
+  en: Cranberry
+kind: berry
+edibility: edible
+lookalikes: [vaccinium-vitis-idaea]
+morphology:
+  color: "#b0182a"
+  diameter: [8, 14]
+  clusterSize: [1, 2]
+  leafColor: "#3e5a30"
+  bushHeight: [30, 80]
+ecology:
+  mycorrhizal: []
+  substrate: moss
+  biomes: [wetland, forest-coniferous]
+  season: [9, 10]
+  moisture: [0.8, 1]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Тонкие стелющиеся нитевидные стебельки с мелкими листочками прячутся в
+    сфагнуме болот, и крупная красная ягода будто лежит прямо на мху. Кислая,
+    с горчинкой; собирают осенью, а перезимовавшая под снегом становится
+    слаще. Отличается от брусники тем, что растёт на болоте и ягоды поодиночке.
+  en: >-
+    Thin creeping thread-like stems with tiny leaves hide in the sphagnum of a
+    bog, so the big red berry seems to lie right on the moss. Sour with a
+    touch of bitterness; picked in autumn, and sweeter after a winter under
+    the snow. Unlike lingonberry it grows in the bog and its berries come
+    singly.

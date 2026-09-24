@@ -1,0 +1,56 @@
+id: paxillus-involutus
+gbifKey: 5240002
+name:
+  la: Paxillus involutus
+  ru: Свинушка тонкая
+  en: Brown roll-rim
+edibility: deadly
+lookalikes: [lactarius-deliciosus]
+morphology:
+  cap:
+    shape: depressed
+    ageShape: funnel
+    diameter: [50, 150]
+    color: "#8a6440"
+    surface: velvety
+    surfaceColor: "#7a5636"
+  hymenium:
+    type: gills
+    attachment: decurrent
+    color: "#c2a06a"
+  stipe:
+    height: [30, 80]
+    width: [10, 25]
+    color: "#9a7a52"
+    position: central
+    ring: none
+    volva: none
+  flesh:
+    color: "#e8d8b8"
+    bruising: brown
+  latex: none
+ecology:
+  mycorrhizal: [betula, pinus, picea, quercus]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, park-urban]
+  season: [7, 8, 9, 10]
+  moisture: [0.4, 0.85]
+  gregarious: scattered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Приземистый бурый гриб с воронковидной шляпкой, край которой долго остаётся
+    подвёрнутым вниз, как рулон, — отсюда английское название. Пластинки
+    спускаются на ножку и легко отслаиваются от шляпки; от нажатия всё
+    темнеет до бурого. Когда-то считалась съедобной, но её токсины
+    накапливаются: у людей, евших её годами, развивается разрушение
+    собственных эритроцитов, бывали смертельные случаи. Варка не помогает. Не
+    собирать ни при каких условиях.
+  en: >-
+    A squat brown mushroom with a funnel-shaped cap whose margin stays rolled
+    under for a long time — hence the name. The gills run down the stem and
+    peel away from the cap easily, and everything bruises brown when pressed.
+    Once thought edible, it sensitises the body: people who ate it for years
+    have developed a sudden destruction of their own red blood cells, with
+    deaths recorded. Cooking does not help. Never to be picked for the pot.

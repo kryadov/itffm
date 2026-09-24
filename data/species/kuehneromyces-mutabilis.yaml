@@ -1,0 +1,57 @@
+id: kuehneromyces-mutabilis
+gbifKey: 2533962
+name:
+  la: Kuehneromyces mutabilis
+  ru: Опёнок летний
+  en: Sheathed woodtuft
+edibility: edible
+lookalikes: [galerina-marginata, hypholoma-fasciculare, armillaria-mellea]
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [20, 60]
+    color: "#c07c38"
+    surface: smooth
+    surfaceColor: "#d8a060"
+  hymenium:
+    type: gills
+    attachment: adnate
+    color: "#9a6c44"
+  stipe:
+    height: [30, 80]
+    width: [4, 8]
+    color: "#a07a52"
+    position: central
+    ring: fugacious
+    volva: none
+  flesh:
+    color: "#e8d4b0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: []
+  substrate: deadwood
+  biomes: [forest-broadleaved, forest-mixed, forest-coniferous]
+  season: [5, 6, 7, 8, 9, 10]
+  moisture: [0.45, 0.9]
+  gregarious: clustered
+  frequency: common
+media: []
+text:
+  ru: >-
+    Густые пучки на пнях лиственных деревьев. Шляпка медово-рыжая,
+    гигрофанная: подсыхая, светлеет от центра, и гриб становится
+    двухцветным. Ножка ниже кольца покрыта мелкими торчащими чешуйками —
+    «сапожок». Съедобен и вкусен, но опасно похож на смертельно ядовитую
+    галерину окаймлённую, растущую на тех же пнях: у той ножка ниже кольца
+    гладкая, волокнистая, и подсыхает она с края. Собирать только тем, кто
+    уверенно их различает.
+  en: >-
+    Dense tufts on the stumps of broadleaved trees. The cap is honey-orange
+    and hygrophanous: it pales from the centre as it dries, so the mushroom
+    turns two-toned. Below the ring the stem is covered in small shaggy scales
+    — the "sheath". Edible and good, but dangerously like the deadly funeral
+    bell on the same stumps, whose stem below the ring is silky rather than
+    scaly and which dries from the edge in. Only for those who can tell them
+    apart with certainty.

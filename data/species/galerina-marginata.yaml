@@ -5,7 +5,7 @@ name:
   ru: Галерина окаймлённая
   en: Funeral bell
 edibility: deadly
-lookalikes: [armillaria-mellea]
+lookalikes: [armillaria-mellea, kuehneromyces-mutabilis]
 morphology:
   cap:
     shape: convex

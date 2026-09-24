@@ -1,0 +1,55 @@
+id: amanita-pantherina
+gbifKey: 8961574
+name:
+  la: Amanita pantherina
+  ru: Мухомор пантерный
+  en: Panther cap
+edibility: poisonous
+lookalikes: [amanita-muscaria, macrolepiota-procera]
+morphology:
+  cap:
+    shape: convex
+    ageShape: flat
+    diameter: [50, 110]
+    color: "#7a5a38"
+    surface: warty
+    surfaceColor: "#f4efe4"
+  hymenium:
+    type: gills
+    attachment: free
+    color: "#fbf8f0"
+  stipe:
+    height: [60, 120]
+    width: [10, 18]
+    color: "#f6f2e8"
+    position: central
+    ring: pendant
+    volva: marginate
+  flesh:
+    color: "#fbf8f0"
+    bruising: none
+  latex: none
+ecology:
+  mycorrhizal: [quercus, fagus, pinus, picea, betula]
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed]
+  season: [7, 8, 9, 10]
+  moisture: [0.35, 0.75]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Шляпка бурая или оливково-коричневая, усеянная чисто-белыми хлопьями, край
+    с короткими бороздками. Ножка белая, с тонким кольцом, а у основания —
+    клубень с чётким валиком-«воротничком». Ядовит сильнее красного мухомора:
+    те же иботеновая кислота и мусцимол вызывают возбуждение, спутанность и
+    судороги, варка их не разрушает. Опасно путать с мухомором серо-розовым,
+    у которого мякоть краснеет на изломе.
+  en: >-
+    A brown to olive-brown cap scattered with pure white flakes, its edge
+    finely grooved; a white stem with a thin ring and a bulb at the base
+    marked by a neat rolled rim. More toxic than the fly agaric: the same
+    ibotenic acid and muscimol bring agitation, confusion and seizures, and
+    cooking does not destroy them. Dangerous to mistake for the blusher,
+    whose flesh turns pink where it is cut or nibbled.

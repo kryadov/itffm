@@ -67,7 +67,7 @@ Everything you can pick — mushroom, berry, herb, nut, a fish, or a plain
 forest find — is **generated from its own species data**, not a hand-modelled
 asset, and placed by real ecology: the birch bolete grows under a birch, the
 slippery jack among young pines on sand, the oyster mushroom on dead wood.
-**46 species** across six kinds (mushroom, berry, herb, nut, fish, find) ship
+**57 species** across six kinds (mushroom, berry, herb, nut, fish, find) ship
 today, each with real field marks, edibility and season.
 
 - **Examine (`E`)** turns a find over in your hands — cap, underside, stipe,

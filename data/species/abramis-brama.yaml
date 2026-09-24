@@ -1,0 +1,38 @@
+id: abramis-brama
+gbifKey: 9809222
+name:
+  la: Abramis brama
+  ru: Лещ
+  en: Common bream
+kind: fish
+edibility: edible
+lookalikes: []
+morphology:
+  bodyColor: "#8a7a4e"
+  bellyColor: "#e8dcb8"
+  finColor: "#5a5448"
+  length: [250, 550]
+  bodyDepth: 0.38
+  eyeColor: "#d0c8a0"
+  lowerFinColor: "#6a5e4e"
+  dorsalAt: 0.48
+ecology:
+  mycorrhizal: []
+  substrate: soil
+  biomes: [forest-broadleaved, forest-coniferous, forest-mixed, meadow-scrub, wetland]
+  season: [5, 6, 7, 8, 9]
+  moisture: [0.88, 1]
+  gregarious: scattered
+  frequency: occasional
+media: []
+text:
+  ru: >-
+    Высокое, сильно сжатое с боков тело, бронзово-золотистое у крупных рыб и
+    серебристое у молодых; спина горбатая, плавники тёмные, анальный плавник
+    длинный. Держится стайками у дна тихих прудов и заводей, выдавая себя
+    пузырьками. Вкусная, хотя и костистая рыба — классика вяленья.
+  en: >-
+    A tall, deeply compressed body, bronze-gold in big fish and silvery in
+    young ones, a humped back, dark fins and a long anal fin. It keeps in
+    shoals near the bottom of still ponds and backwaters, given away by
+    streams of bubbles. Good eating though bony — a classic for drying.
