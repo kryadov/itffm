@@ -19,7 +19,11 @@ const fish = (id: string, over: Partial<Species['ecology']> = {}): Species => ({
   kind: 'fish',
   edibility: 'edible',
   lookalikes: [],
-  morphology: { bodyColor: '#000000', bellyColor: '#ffffff', finColor: '#888888', length: [100, 200] },
+  morphology: {
+    bodyColor: '#000000', bellyColor: '#ffffff', finColor: '#888888', length: [100, 200],
+    bodyDepth: 0.26, pattern: 'plain', patternColor: '#000000', eyeColor: '#d8c070', lowerFinColor: '#888888',
+    dorsalFins: 1, dorsalAt: 0.45,
+  },
   ecology: {
     mycorrhizal: [], substrate: 'soil', biomes: ['forest-mixed'], season: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     moisture: [0.85, 1], gregarious: 'scattered', frequency: 'common', ...over,

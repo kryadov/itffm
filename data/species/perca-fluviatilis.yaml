@@ -8,10 +8,17 @@ kind: fish
 edibility: edible
 lookalikes: []
 morphology:
-  bodyColor: "#5a7a3a"
-  bellyColor: "#e8dfa0"
-  finColor: "#c9542f"
+  bodyColor: "#7a8a3a"
+  bellyColor: "#eee4b0"
+  finColor: "#6a6a52"
   length: [100, 350]
+  bodyDepth: 0.3
+  pattern: bars
+  patternColor: "#28321c"
+  eyeColor: "#e0b030"
+  lowerFinColor: "#d8582a"
+  dorsalFins: 2
+  dorsalAt: 0.38
 ecology:
   mycorrhizal: []
   substrate: soil

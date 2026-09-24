@@ -239,3 +239,43 @@ describe('validateSpecies', () => {
     expect('edibility' in s).toBe(false)
   })
 })
+
+describe('validateSpecies — fish', () => {
+  const fish = {
+    ...valid,
+    id: 'perca-fluviatilis',
+    kind: 'fish',
+    edibility: 'edible',
+    morphology: { bodyColor: '#5a7a3a', bellyColor: '#e8dfa0', finColor: '#c9542f', length: [100, 350] },
+  }
+
+  it('fills in the optional shape and pattern fields with defaults', () => {
+    const s = validateSpecies(fish, 'x.yaml')
+    if (s.kind !== 'fish') throw new Error('not a fish')
+    expect(s.morphology.pattern).toBe('plain')
+    expect(s.morphology.dorsalFins).toBe(1)
+    expect(s.morphology.bodyDepth).toBeGreaterThan(0.1)
+    expect(s.morphology.lowerFinColor).toBe('#c9542f')
+  })
+
+  it('reads a full fish morphology', () => {
+    const s = validateSpecies({
+      ...fish,
+      morphology: {
+        ...fish.morphology, bodyDepth: 0.3, pattern: 'bars', patternColor: '#2a3a1a', eyeColor: '#e0a030',
+        lowerFinColor: '#d0542a', dorsalFins: 2, dorsalAt: 0.4,
+      },
+    }, 'x.yaml')
+    if (s.kind !== 'fish') throw new Error('not a fish')
+    expect(s.morphology).toMatchObject({ bodyDepth: 0.3, pattern: 'bars', dorsalFins: 2, dorsalAt: 0.4 })
+  })
+
+  it('rejects an unknown pattern and an impossible body depth, naming the field', () => {
+    expect(() => validateSpecies({ ...fish, morphology: { ...fish.morphology, pattern: 'stars' } }, 'p.yaml'))
+      .toThrow(/p\.yaml.*morphology\.pattern/)
+    expect(() => validateSpecies({ ...fish, morphology: { ...fish.morphology, bodyDepth: 0.9 } }, 'p.yaml'))
+      .toThrow(/morphology\.bodyDepth/)
+    expect(() => validateSpecies({ ...fish, morphology: { ...fish.morphology, dorsalFins: 3 } }, 'p.yaml'))
+      .toThrow(/morphology\.dorsalFins/)
+  })
+})

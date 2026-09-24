@@ -178,7 +178,11 @@ clustering in whichever one the dice happened to favour:
   after dark or inside the mine, with a manual `L` override on top.
 - **Fishing rod** — lets you catch fish while it is in your hands. Fish swim
   in the wood's own ponds and streams — in the shallows along the bank, on the
-  surface, where you can reach them — not on the land. Once delivered the rod
+  surface, where you can reach them — not on the land. Each fish is built
+  from its species like a real one: a dark back and pale belly, a forked tail,
+  its dorsal, anal and paired fins, eyes, and the marks that tell them apart
+  — the pike long with pale spots and its dorsal far back, the perch barred
+  with two dorsals and red lower fins, the roach silver with a red eye. Once delivered the rod
   leans by the hut's own table (you take it from inside the hut with `E`).
   Out in the wood it lies flat as a chunky pole with a pale handle and a reel,
   raised clear of a trail so it can be seen. A fish in your crosshair without

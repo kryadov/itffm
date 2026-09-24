@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { withPickHitbox, HITBOX_RADIUS, buildLodProxy, buildCollectibleLod, LOD_DISTANCE } from '../../src/collectible/worldMesh'
+import { withPickHitbox, HITBOX_RADIUS, buildLodProxy, buildCollectibleLod, LOD_DISTANCE, toWorldMesh } from '../../src/collectible/worldMesh'
 
 /** A stand-in for a toWorldMesh() output: baked per-vertex colour, roughly
  *  mushroom-cap-sized, with enough geometry that a cheap proxy is worth it. */
@@ -151,5 +151,22 @@ describe('buildCollectibleLod', () => {
     camera.updateMatrixWorld(true)
     lod.update(camera)
     expect(full.visible).toBe(false)
+  })
+})
+
+describe('toWorldMesh', () => {
+  it('keeps a part\'s own vertex colours (a fish\'s dark back and pale belly) instead of flattening them', () => {
+    const striped = coloredMesh(new THREE.Color(0.1, 0.2, 0.3))
+    const col = striped.geometry.getAttribute('color')
+    col.setXYZ(0, 0.9, 0.8, 0.7)
+    ;(striped.material as THREE.MeshStandardMaterial).color.set(0xffffff)
+    const flat = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial({ color: 0xff0000 }))
+    const g = new THREE.Group()
+    g.add(striped, flat)
+    const merged = toWorldMesh(g).geometry.getAttribute('color')
+    expect(merged.getX(0)).toBeCloseTo(0.9, 5)
+    expect(merged.getX(1)).toBeCloseTo(0.1, 5)
+    expect(merged.getX(merged.count - 1)).toBeCloseTo(1, 5)
+    expect(merged.getY(merged.count - 1)).toBeCloseTo(0, 5)
   })
 })

@@ -21,6 +21,9 @@ export const TREE_GENERA = [
 ] as const
 export const GREGARIOUS = ['solitary', 'scattered', 'clustered', 'troops', 'rings'] as const
 export const FREQUENCY = ['common', 'occasional', 'rare'] as const
+/** A fish's markings: none, dark bars across the flank (perch), or pale
+ *  spots on a dark flank (pike). */
+export const FISH_PATTERN = ['plain', 'bars', 'spots'] as const
 /**
  * What kind of thing a species is (see
  * docs/superpowers/specs/2026-09-08-forest-finds-design.md). Each kind gets
@@ -103,16 +106,30 @@ export interface NutMorphology {
  * a feather or a stone alike.
  */
 /** Everything the mesh generator needs to build one fish — the rod quest's
- *  own kind (docs/superpowers/specs/2026-09-13-quest-items-design.md), a
- *  fourth Species kind following the forest-finds pattern. Genuinely simple
- *  by design: a body, a belly stripe and two fins, not a render-accurate
- *  species model (see fish/build.ts's own doc comment). */
+ *  own kind (docs/superpowers/specs/2026-09-13-quest-items-design.md). The
+ *  fields after `length` are optional in the YAML; the parser fills in a
+ *  plain, one-dorsal, perch-proportioned fish for any left out. */
 export interface FishMorphology {
+  /** The back and flanks; the back is drawn a shade darker. */
   bodyColor: string
   bellyColor: string
+  /** Dorsal and pectoral fins. */
   finColor: string
   /** Overall body length, mm. */
   length: Range
+  /** Greatest body depth as a fraction of length: a pike ~0.17, a bream ~0.38. */
+  bodyDepth: number
+  pattern: (typeof FISH_PATTERN)[number]
+  /** Colour of the bars or spots. */
+  patternColor: string
+  eyeColor: string
+  /** Pelvic, anal and tail fins — a perch's and a roach's are red. */
+  lowerFinColor: string
+  /** One dorsal fin, or two (a perch's spiny first and soft second). */
+  dorsalFins: 1 | 2
+  /** Where along the body, nose 0 to tail 1, the (first) dorsal fin's middle
+   *  stands — a pike's sits far back, 0.75. */
+  dorsalAt: number
 }
 
 export interface FindMorphology {
@@ -314,13 +331,37 @@ function parseHerbMorphology(raw: unknown, file: string): HerbMorphology {
   }
 }
 
+function fraction(obj: unknown, field: string, file: string, prefix: string, lo: number, hi: number): number {
+  const v = get(obj, field, file, prefix)
+  if (typeof v !== 'number' || v < lo || v > hi) {
+    throw new SpeciesError(file, path(prefix, field), `expected a number from ${lo} to ${hi}`)
+  }
+  return v
+}
+
 function parseFishMorphology(raw: unknown, file: string): FishMorphology {
   const mo = get(raw, 'morphology', file, '')
+  const p = 'morphology'
+  const bodyColor = color(mo, 'bodyColor', file, p)
+  const finColor = color(mo, 'finColor', file, p)
+  let dorsalFins: 1 | 2 = 1
+  if (hasField(mo, 'dorsalFins')) {
+    const v = get(mo, 'dorsalFins', file, p)
+    if (v !== 1 && v !== 2) throw new SpeciesError(file, path(p, 'dorsalFins'), 'expected 1 or 2')
+    dorsalFins = v
+  }
   return {
-    bodyColor: color(mo, 'bodyColor', file, 'morphology'),
-    bellyColor: color(mo, 'bellyColor', file, 'morphology'),
-    finColor: color(mo, 'finColor', file, 'morphology'),
-    length: range(mo, 'length', file, 'morphology'),
+    bodyColor,
+    bellyColor: color(mo, 'bellyColor', file, p),
+    finColor,
+    length: range(mo, 'length', file, p),
+    bodyDepth: hasField(mo, 'bodyDepth') ? fraction(mo, 'bodyDepth', file, p, 0.1, 0.6) : 0.26,
+    pattern: hasField(mo, 'pattern') ? oneOf(mo, 'pattern', FISH_PATTERN, file, p) : 'plain',
+    patternColor: hasField(mo, 'patternColor') ? color(mo, 'patternColor', file, p) : bodyColor,
+    eyeColor: hasField(mo, 'eyeColor') ? color(mo, 'eyeColor', file, p) : '#d8c070',
+    lowerFinColor: hasField(mo, 'lowerFinColor') ? color(mo, 'lowerFinColor', file, p) : finColor,
+    dorsalFins,
+    dorsalAt: hasField(mo, 'dorsalAt') ? fraction(mo, 'dorsalAt', file, p, 0.2, 0.85) : 0.45,
   }
 }
 

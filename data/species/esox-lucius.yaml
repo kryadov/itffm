@@ -10,8 +10,14 @@ lookalikes: []
 morphology:
   bodyColor: "#4a5a2e"
   bellyColor: "#e8e6d0"
-  finColor: "#8a5a3a"
+  finColor: "#8a6a3a"
   length: [300, 700]
+  bodyDepth: 0.17
+  pattern: spots
+  patternColor: "#c8c890"
+  eyeColor: "#d8b040"
+  lowerFinColor: "#a0603a"
+  dorsalAt: 0.8
 ecology:
   mycorrhizal: []
   substrate: soil

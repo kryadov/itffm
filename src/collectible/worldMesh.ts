@@ -20,13 +20,16 @@ export function toWorldMesh(group: THREE.Group): THREE.Mesh {
   group.updateMatrixWorld(true)
   const parts: THREE.BufferGeometry[] = []
 
-  const paint = (geo: THREE.BufferGeometry, color: THREE.Color) => {
+  // A part that already carries its own vertex colours (a fish's dark back
+  // and pale belly, its bars and spots) keeps them, tinted by its material.
+  const paint = (geo: THREE.BufferGeometry, color: THREE.Color, own: boolean) => {
     const count = geo.getAttribute('position').count
     const colors = new Float32Array(count * 3)
+    const existing = own ? geo.getAttribute('color') : undefined
     for (let i = 0; i < count; i++) {
-      colors[i * 3] = color.r
-      colors[i * 3 + 1] = color.g
-      colors[i * 3 + 2] = color.b
+      colors[i * 3] = color.r * (existing ? existing.getX(i) : 1)
+      colors[i * 3 + 1] = color.g * (existing ? existing.getY(i) : 1)
+      colors[i * 3 + 2] = color.b * (existing ? existing.getZ(i) : 1)
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
     // Merging needs identical attribute sets; a stray tangent or uv2 would
@@ -40,18 +43,20 @@ export function toWorldMesh(group: THREE.Group): THREE.Mesh {
   group.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
-    const color = (mesh.material as THREE.MeshStandardMaterial).color
+    const material = mesh.material as THREE.MeshStandardMaterial
+    const color = material.color
+    const own = material.vertexColors && mesh.geometry.getAttribute('color') !== undefined
 
     const instanced = mesh as THREE.InstancedMesh
     if (instanced.isInstancedMesh) {
       const m = new THREE.Matrix4()
       for (let i = 0; i < instanced.count; i++) {
         instanced.getMatrixAt(i, m)
-        parts.push(paint(instanced.geometry.clone().applyMatrix4(m).applyMatrix4(mesh.matrixWorld), color))
+        parts.push(paint(instanced.geometry.clone().applyMatrix4(m).applyMatrix4(mesh.matrixWorld), color, own))
       }
       return
     }
-    parts.push(paint(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld), color))
+    parts.push(paint(mesh.geometry.clone().applyMatrix4(mesh.matrixWorld), color, own))
   })
 
   const merged = new THREE.Mesh(
