@@ -6,6 +6,19 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.103.0
+A big batch. Two new quests: cook a caught fish into ukha over the campfire
+and carry it to the hut's table, and fetch honey from the wild hive with the
+quadcopter (an empty jar off a new shelf in the hut, hung under the drone —
+the bees will not let you near on foot). Fish are built like real fish, each
+species with its own marks, and they swim. Reed beds along the water, bats in
+the mine, airliners, helicopters, an An-2 and balloons crossing the sky. The
+mine is a real maze with the diamond at its far end (and its mound no longer
+buries the hut). The hut has a plank floor and a rug and stands level; the
+boat is a real wooden rowing boat; the hive a coiled straw skep. Crouching
+toggles with Ctrl or C. Smoke and steam are soft puffs, not grey squares.
+Eleven new species (57 in all).
+
 ## v0.102.1
 The bicycle you carry sits low in the view now, the top of its tyre ahead of
 the bar and the rest running out past the bottom of the screen, instead of
