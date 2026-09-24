@@ -57,6 +57,7 @@ import { spawnMushrooms, fairyRingMarkers, type Placement } from '../ecology/spa
 import { spawnFish } from '../world/fishSpawn'
 import { swimPose } from '../fish/swim'
 import { placeReeds, buildReedMesh } from '../world/reeds'
+import { createAircraft, type AircraftKind } from '../world/aircraft'
 import { buildFairyRingMesh } from '../world/fairyRing'
 import { loadSpecies } from '../species/load'
 import { buildPlacementObject } from '../collectible/placement'
@@ -181,6 +182,8 @@ export interface Forest {
   updateDayNight: (t: number, camPos: THREE.Vector3) => void
   /** Drifts the cloud layer with the camera — call every frame. */
   updateClouds: (camPos: THREE.Vector3, dt: number) => void
+  /** Debug (`&sky=`): sends that kind of aircraft over the camera right now. */
+  summonAircraft: (kind: AircraftKind, camX: number, camZ: number) => void
   /** Switches between clear/rain/snow/fog — cheap, call only on change. */
   /** `instant` (the default) snaps to it; otherwise it blends in over a few
    *  seconds — what the auto weather's changes use. */
@@ -347,6 +350,8 @@ export function createForest(
   // first) feeds it how much daylight spills in at the mouth.
   let mineGroup: THREE.Group | null = null
   let weatherFx: ReturnType<typeof buildWeather> | null = null
+  // How dark it is, for anything that lights up at night on its own (aircraft).
+  let lastNight = 0
   const updateDayNight = (t: number, camPos: THREE.Vector3): void => {
     const sample = sampleDayNight(t)
     const elevation = sunElevation(t)
@@ -370,6 +375,7 @@ export function createForest(
     // dusk should read as a gradient, not a light switch.
     const sunVis = Math.max(0, elevation)
     const night = nightFactor(t)
+    lastNight = night
     sky.update(camPos, sample.sky, sample.sun, sunPosition, sunVis, night, moonPhaseNow, weatherFx?.haze() ?? 0)
     shelterFx?.setNight(night)
     trainFx?.setNight(night)
@@ -381,8 +387,12 @@ export function createForest(
   // A clear sky by default — the settings menu (M) reaches setCover/setWeather.
   const clouds = buildClouds(seed + 12)
   scene.add(clouds.mesh)
+  // Aircraft cross the sky now and then — none seen in fog.
+  const aircraft = createAircraft(scene, mulberry32(seed + 71))
   const updateClouds = (camPos: THREE.Vector3, dt: number): void => {
-    clouds.update(camPos, dt, source.ground.heightAt(camPos.x, camPos.z))
+    const groundY = source.ground.heightAt(camPos.x, camPos.z)
+    clouds.update(camPos, dt, groundY)
+    aircraft.update(dt, camPos.x, camPos.z, lastNight, (weatherFx?.haze() ?? 0) > 0.5, groundY)
   }
 
   const weather = buildWeather(seed + 13, scene.fog as THREE.Fog)
@@ -796,6 +806,7 @@ export function createForest(
     crateSpot: (end: 0 | 1) => crateSpots[end],
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
+    summonAircraft: (kind: AircraftKind, camX: number, camZ: number) => aircraft.summon(kind, camX, camZ),
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
     setDroneBoxPlaced: (on: boolean) => shelterFx!.setDroneBoxPlaced(on),
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),

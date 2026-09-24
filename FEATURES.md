@@ -135,6 +135,11 @@ today, each with real field marks, edibility and season.
   fog. Any one weather (clear, rain, snow, fog) can be pinned in settings
   instead. A **day/night cycle** with a real sun and moon, changeable in
   settings or left on a self-running cycle.
+- **Aircraft overhead** now and then, one at a time: an airliner or a bizjet
+  high up in the gaps between the clouds with a faint contrail, a turboprop,
+  and low over the trees a helicopter with spinning rotors, an old An-2
+  biplane or a drifting hot-air balloon. At night they show navigation lights
+  and a blinking strobe; in fog you see none.
 - A **self-running accelerated calendar**: the game clock runs faster than
   real time, so a single play session moves through real seasons instead of
   staying stuck on the day you started, driving what's in season and how

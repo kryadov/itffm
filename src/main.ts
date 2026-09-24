@@ -630,6 +630,11 @@ async function main(): Promise<void> {
           player = { ...player, x: best.x, z: best.z, yaw: Math.atan2(-(fish.x - best.x), -(fish.z - best.z)) }
         }
       }
+      // sky=airliner (or jet, turboprop, biplane, helicopter, balloon): send one over now.
+      const skyQ = q.get('sky')
+      if (skyQ && ['airliner', 'jet', 'turboprop', 'biplane', 'helicopter', 'balloon'].includes(skyQ)) {
+        forest.summonAircraft(skyQ as 'airliner', player.x, player.z)
+      }
       // weather=rain (or clear, snow, fog): this session only, not saved — to look at one.
       const wq = q.get('weather')
       if (wq === 'clear' || wq === 'rain' || wq === 'snow' || wq === 'fog') {
