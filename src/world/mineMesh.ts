@@ -66,6 +66,24 @@ void main() {
 }
 `
 
+const CAVE_VERTEX_INSTANCED = /* glsl */ `
+attribute vec3 color;
+varying vec3 vColor;
+varying vec3 vViewPos;
+varying vec3 vWorldPos;
+void main() {
+  vColor = color;
+  vec4 p = vec4(position, 1.0);
+  #ifdef USE_INSTANCING
+  p = instanceMatrix * p;
+  #endif
+  vec4 mv = modelViewMatrix * p;
+  vViewPos = mv.xyz;
+  vWorldPos = (modelMatrix * p).xyz;
+  gl_Position = projectionMatrix * mv;
+}
+`
+
 // The lamp is the same 9-candela PointLight the wood outside uses, a little
 // over-driven here: a tunnel has no sky, no bounce and no fog to carry light,
 // so the same lamp reads dimmer in it than on a night meadow.
@@ -145,6 +163,24 @@ function caveMaterial(mouthWorld: THREE.Vector3): { material: THREE.ShaderMateri
   })
   material.name = 'mine-cave'
   return { material, uniforms }
+}
+
+/**
+ * A second material lit exactly as the cave is — the same uniforms, so
+ * `setMineLighting` lights it too — for things that live in the tunnels (the
+ * bats, world/bats.ts). Instancing-aware; the geometry needs a `color`
+ * attribute, like the cave's own.
+ */
+export function caveLitMaterial(group: THREE.Object3D): THREE.ShaderMaterial {
+  const uniforms = group.userData.caveUniforms as CaveUniforms
+  const material = new THREE.ShaderMaterial({
+    uniforms,
+    vertexShader: CAVE_VERTEX_INSTANCED,
+    fragmentShader: CAVE_FRAGMENT,
+    side: THREE.DoubleSide,
+  })
+  material.name = 'mine-cave-lit'
+  return material
 }
 
 /** Feed the cave material what the player carries. Cheap; call every frame. */

@@ -621,6 +621,17 @@ async function main(): Promise<void> {
         const hz = Math.sin(forest.mine.heading)
         player = { ...player, x: forest.mine.x - hx * back, z: forest.mine.z - hz * back, yaw: Math.atan2(-hx, -hz) }
       }
+      // tp=bats: in the mine, 2.5 m down the passage from the first bat colony, facing it.
+      if (q.get('tp') === 'bats') {
+        const spot = forest.debugBatSpot()
+        if (spot) {
+          forest.debugEnterMine()
+          player = {
+            ...player, x: spot.stand.x, z: spot.stand.z,
+            yaw: Math.atan2(-(spot.roost.x - spot.stand.x), -(spot.roost.z - spot.stand.z)),
+          }
+        }
+      }
       // tp=fish: on the bank 2 m from the first fish (the highest ground around it,
       // which is the bank, not the pond bed), facing it.
       if (q.get('tp') === 'fish') {

@@ -108,7 +108,11 @@ today, each with real field marks, edibility and season.
   the diamond in the dead end farthest along the tunnels from the mouth. Every passage is closed
   rock (no gaps, nothing to see through), and it is dead dark inside except for
   your own lamp and a fading pool of daylight at the doorway, so the way out is
-  always the lit opening behind you. Sited on a real surveyed cave/adit/
+  always the lit opening behind you. **Bats** live in it: a few colonies
+  hang head down from the ceiling at the dead ends, wings wrapped round them,
+  and come near one and it takes wing — the whole colony flickers up and down
+  the passage in your light for a few seconds, then settles back where it was.
+  Sited on a real surveyed cave/adit/
   mineshaft mouth where one exists, or picked procedurally otherwise, so every
   wood has one.
 - A **railway** winding through the wood: a narrow-gauge line with real bends

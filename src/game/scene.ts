@@ -31,9 +31,10 @@ import {
 import { collectScatterCullers, sweepAll, STATIC_SCATTER_GROUP_NAMES } from '../world/instanceCulling'
 import { placeCampfire, campfireObstacle, buildCampfireMesh } from '../world/campfire'
 import { placeFisherHut, fisherHutObstacle, buildFisherHutMesh, buildBoatMesh } from '../world/fisherHut'
-import { placeMine, mineObstacles, diamondSpotInMine, type Mine } from '../world/mine'
+import { placeMine, mineObstacles, diamondSpotInMine, worldToLocal, localToWorld, type Mine } from '../world/mine'
+import { placeBatRoosts, buildBats } from '../world/bats'
 import { createMineTerrain } from '../world/mineTerrain'
-import { buildMineMesh, setMineLighting, clearScatterOnMine } from '../world/mineMesh'
+import { buildMineMesh, setMineLighting, clearScatterOnMine, caveLitMaterial } from '../world/mineMesh'
 import {
   placeRailLine, buildRailMesh, stationsFor, stationOccupies, portalOccupies, RAIL_SEED_OFFSET,
   type RailLine, type Station,
@@ -182,6 +183,11 @@ export interface Forest {
   updateDayNight: (t: number, camPos: THREE.Vector3) => void
   /** Drifts the cloud layer with the camera — call every frame. */
   updateClouds: (camPos: THREE.Vector3, dt: number) => void
+  /** Debug (`&tp=bats`): where the first bat colony hangs and a spot in the
+   *  passage a few metres from it (world), and a switch that puts the player
+   *  "in the tunnels" without walking through the doorway. */
+  debugBatSpot: () => { roost: { x: number; z: number }; stand: { x: number; z: number } } | null
+  debugEnterMine: () => void
   /** Debug (`&sky=`): sends that kind of aircraft over the camera right now. */
   summonAircraft: (kind: AircraftKind, camX: number, camZ: number) => void
   /** Switches between clear/rain/snow/fog — cheap, call only on change. */
@@ -591,6 +597,11 @@ export function createForest(
   scene.add(buildPathMeshes(trails, groundWithMine, halfSize))
   mineGroup = buildMineMesh(mine, mineTerrain)
   scene.add(mineGroup)
+  // Bats roost at a few of the dead ends, lit by the lamp like the rock.
+  const batRoosts = placeBatRoosts(mine, seed + 81)
+  const bats = buildBats(batRoosts, caveLitMaterial(mineGroup))
+  mineGroup.add(bats.group)
+  let batClock = 0
   // Clear the mound and the doorstep of everything the scatter already put
   // there at the raw ground height (a trunk standing in a passage, a bush
   // under the mound): the meshes go (world/mineMesh.ts), and so do their
@@ -666,6 +677,8 @@ export function createForest(
   const critterGroups: CritterGroup[] = [hares, squirrels, snakes]
   const updateCritters = (dt: number, playerX: number, playerZ: number): void => {
     for (const g of critterGroups) g.update(dt, playerX, playerZ)
+    batClock += dt
+    bats.update(batClock, worldToLocal(mine, playerX, playerZ), mineTerrain.ctx.inside)
   }
   // Moose, a few to a wood, on open ground with room for their size.
   const mooseHomes = placeCritterHomes(staticGround, halfSize, seed + 50, 3, [...treeCircles, ...extraObstacles], 3)
@@ -807,6 +820,14 @@ export function createForest(
     isShelterDoorOpen: () => shelterFx!.isDoorOpen(), toggleShelterDoor: () => shelterFx!.toggleDoor(),
     occluders, updateDayNight, updateClouds,
     summonAircraft: (kind: AircraftKind, camX: number, camZ: number) => aircraft.summon(kind, camX, camZ),
+    debugBatSpot: () => {
+      const r = batRoosts[0]
+      if (!r) return null
+      return { roost: localToWorld(mine, r.lx, r.lz), stand: localToWorld(mine, r.lx - r.ax * 2.5, r.lz - r.az * 2.5) }
+    },
+    debugEnterMine: () => {
+      mineTerrain.ctx.inside = true
+    },
     setWeather, updateWeather, setFlashlight, updateFlashlight, playerInsideMine, diamondSpot, updatePlayerLamp,
     setDroneBoxPlaced: (on: boolean) => shelterFx!.setDroneBoxPlaced(on),
     setRodPlaced: (on: boolean) => shelterFx!.setRodPlaced(on),
