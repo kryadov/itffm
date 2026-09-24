@@ -26,6 +26,19 @@ describe('createForest obstacle assembly', () => {
   })
 })
 
+describe('createForest keeps the water clear', () => {
+  // A live report (2026-09-24): trunks stood in the demo wood's pond.
+  it('drops every tree standing in a pond, mesh and collision alike', () => {
+    const pond = [{ x: -8, z: -8 }, { x: 8, z: -8 }, { x: 8, z: 8 }, { x: -8, z: 8 }]
+    const trees = [
+      { x: 0, z: 0, y: 0, genus: 'betula' as const, radius: 0.3, height: 18 },
+      { x: 5, z: -3, y: 0, genus: 'pinus' as const, radius: 0.3, height: 22 },
+    ]
+    const forest = createForest({ ground, trees, biomeAt, water: [pond] }, 1, 30, 20)
+    for (const t of forest.trees) expect(Math.abs(t.x) <= 8 && Math.abs(t.z) <= 8, `tree at ${t.x},${t.z}`).toBe(false)
+  })
+})
+
 describe('createForest deferred placements', () => {
   const source: ForestSource = { ground, trees: [], biomeAt }
   const build = (defer: boolean) => createForest(source, 1, 60, 20, 10, defer)

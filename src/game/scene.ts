@@ -627,8 +627,13 @@ export function createForest(
   // obstacle, and nothing keeps its own collision without its mesh.
   // The stations' platforms are kept clear the same way (a shelter and a bench
   // stand there): "reserved" is either.
+  // Nothing stands in the water either: a pond or a stream is no place for a
+  // trunk, a bush or a boulder (a live report, 2026-09-24: trees stood in the
+  // demo wood's pond).
+  const inWater = wetTest(source.water ?? [], 0.3)
   const reserved = (x: number, z: number, margin = 0): boolean =>
-    mineTerrain.occupies(x, z, margin) || stationOccupies(stations, x, z, margin) || portalOccupies(railLine, x, z, margin)
+    mineTerrain.occupies(x, z, margin) || stationOccupies(stations, x, z, margin) || portalOccupies(railLine, x, z, margin) ||
+    inWater(x, z)
   for (const child of scene.children) {
     if (STATIC_SCATTER_GROUP_NAMES.has(child.name)) {
       clearScatterOnMine(child, (x, z) => reserved(x, z) || onHutFootprint(shelter, x, z, 0.3))
