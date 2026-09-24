@@ -44,6 +44,9 @@ export interface PlayerInput {
   /** 1 while the jump key is HELD, else 0 — how the quadcopter climbs. Absent
    *  from a touch input, which has no such key. */
   lift?: number
+  /** 1 while a crouch key is HELD, else 0 — how the quadcopter descends
+   *  (crouching itself is a toggle, see `game/controls.ts`). */
+  descend?: number
   dt: number
 }
 

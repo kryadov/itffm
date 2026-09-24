@@ -58,6 +58,8 @@ export interface TouchControls {
   read(dt: number): PlayerInput
   setSensitivity(v: number): void
   setInvertY(v: boolean): void
+  /** Stands the player up (or crouches them) from outside — getting on the bicycle. */
+  setCrouching(v: boolean): void
   /** The screen point (NDC) of a tap completed since the last call, or null.
    *  Consuming clears it — a tap fires the interact it stands for exactly
    *  once, the same as the edge-triggered jump key in game/controls.ts. */
@@ -102,6 +104,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       read: () => NEUTRAL,
       setSensitivity: () => {},
       setInvertY: () => {},
+      setCrouching: () => {},
       consumeTap: () => null,
       dispose: () => {},
     }
@@ -122,7 +125,9 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
   let dYaw = 0
   let dPitch = 0
   let pendingTap: { x: number; y: number } | null = null
+  // A toggle, like the keyboard's (game/controls.ts): one tap down, the next up.
   let crouching = false
+  let crouchHeld = false
 
   // A real button, not a canvas zone — a held press is simpler as its own
   // element (its own pointerdown/up, no interference with the stick/look
@@ -139,12 +144,16 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
   const pressCrouch = (e: PointerEvent): void => {
     e.preventDefault()
     crouchBtn.setPointerCapture(e.pointerId)
-    crouchBtn.style.background = 'rgba(126,196,107,.55)'
-    crouching = true
+    crouching = !crouching
+    crouchHeld = true
+    showCrouch()
   }
   const releaseCrouch = (): void => {
-    crouchBtn.style.background = 'rgba(15,19,14,.55)'
-    crouching = false
+    crouchHeld = false
+  }
+  /** Lit while crouched, so the toggle's state is visible. */
+  function showCrouch(): void {
+    crouchBtn.style.background = crouching ? 'rgba(126,196,107,.55)' : 'rgba(15,19,14,.55)'
   }
   crouchBtn.addEventListener('pointerdown', pressCrouch)
   crouchBtn.addEventListener('pointerup', releaseCrouch)
@@ -243,7 +252,9 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       const { forward, strafe } = stick
         ? joystickVector(stick.curX - stick.startX, stick.curY - stick.startY, STICK_RADIUS)
         : { forward: 0, strafe: 0 }
-      const input: PlayerInput = { forward, strafe, dYaw, dPitch, crouching, sprinting: false, jumping: false, dt }
+      const input: PlayerInput = {
+        forward, strafe, dYaw, dPitch, crouching, sprinting: false, jumping: false, descend: crouchHeld ? 1 : 0, dt,
+      }
       dYaw = 0
       dPitch = 0
       return input
@@ -253,6 +264,10 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
     },
     setInvertY(v: boolean): void {
       invertY = v
+    },
+    setCrouching(v: boolean): void {
+      crouching = v
+      showCrouch()
     },
     consumeTap(): { x: number; y: number } | null {
       const t = pendingTap

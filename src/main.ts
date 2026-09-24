@@ -947,7 +947,7 @@ async function main(): Promise<void> {
     if (!flight) return
     if (!modalOpen()) {
       const input = touch.active ? touch.read(dt) : controls.read(dt)
-      const lift = Math.max(-1, Math.min(1, (input.lift ?? 0) - (input.crouching || input.sprinting ? 1 : 0)))
+      const lift = Math.max(-1, Math.min(1, (input.lift ?? 0) - ((input.descend ?? (input.crouching ? 1 : 0)) || input.sprinting ? 1 : 0)))
       const env = { ground: combinedGround, obstacles: droneObstacles(flight), pilot: { x: player.x, z: player.z } }
       flight = stepDrone(
         flight,
@@ -1542,7 +1542,13 @@ async function main(): Promise<void> {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
       const biome = inHome ? source.biomeAt(player.x, player.z) : 'forest-mixed'
       const speed = save.prefs.walkSpeedMultiplier * biomeSpeedFactor(biome) * ridingSpeedFactor(isRiding())
-      const input = touch.active ? touch.read(dt) : controls.read(dt)
+      let input = touch.active ? touch.read(dt) : controls.read(dt)
+      // No crouching on the bicycle: getting on it stands you up.
+      if (isRiding() && input.crouching) {
+        input = { ...input, crouching: false }
+        controls.setCrouching(false)
+        touch.setCrouching(false)
+      }
       const stepObstacles = worldStream ? [...currentObstacles(), ...worldStream.obstacles()] : currentObstacles()
       const prevBobPhase = player.bobPhase
       const trackPrevX = player.x

@@ -2,6 +2,19 @@ import type { PlayerInput } from './player'
 
 const BASE_SENSITIVITY = 0.0022
 
+/** Keys that crouch and stand up again. */
+export const CROUCH_KEYS: readonly string[] = ['ControlLeft', 'ControlRight', 'KeyC']
+
+/**
+ * Crouching is a toggle: one press down, the next up — holding Ctrl while
+ * walking turned WASD into browser shortcuts (Ctrl+W closes the tab; a live
+ * request, 2026-09-24). `repeat` is whether the key was already down (the
+ * browser repeats keydown while it is held).
+ */
+export function nextCrouch(on: boolean, code: string, repeat: boolean): boolean {
+  return CROUCH_KEYS.includes(code) && !repeat ? !on : on
+}
+
 /**
  * Keyboard and mouse into a PlayerInput. Pointer lock on click: without it the
  * mouse runs into the edge of the window and you cannot look around.
@@ -17,6 +30,8 @@ export function createControls(
   read(dt: number): PlayerInput
   setSensitivity(v: number): void
   setInvertY(v: boolean): void
+  /** Stands the player up (or crouches them) from outside — getting on the bicycle. */
+  setCrouching(v: boolean): void
   dispose(): void
 } {
   const keys = new Set<string>()
@@ -25,11 +40,13 @@ export function createControls(
   let jumpPending = false
   let sens = sensitivity
   let invertY = false
+  let crouchOn = false
 
   const down = (e: KeyboardEvent) => {
     // Edge-triggered: the browser repeats keydown while a key is held, but a
     // jump command should fire once per press, not once per repeat event.
     if (e.code === 'Space' && !keys.has('Space')) jumpPending = true
+    crouchOn = nextCrouch(crouchOn, e.code, keys.has(e.code))
     keys.add(e.code)
   }
   const up = (e: KeyboardEvent) => keys.delete(e.code)
@@ -67,7 +84,8 @@ export function createControls(
           (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),
         dYaw,
         dPitch,
-        crouching: keys.has('ControlLeft'),
+        crouching: crouchOn,
+        descend: CROUCH_KEYS.some((k) => keys.has(k)) ? 1 : 0,
         sprinting: keys.has('ShiftLeft'),
         jumping: jumpPending,
         lift: keys.has('Space') ? 1 : 0,
@@ -83,6 +101,9 @@ export function createControls(
     },
     setInvertY(v: boolean) {
       invertY = v
+    },
+    setCrouching(v: boolean) {
+      crouchOn = v
     },
     dispose() {
       removeEventListener('keydown', down)

@@ -43,7 +43,8 @@ have to start the game just to change either.
 | Keys | Action |
 |---|---|
 | `W` `A` `S` `D` | Walk |
-| `Shift` | Crouch — to look under a cap (in the quadcopter: down) |
+| `Shift` | Run (in the quadcopter: down) |
+| `Ctrl` or `C` | Crouch — press once to crouch and walk crouched, again to stand; not on the bicycle (in the quadcopter: hold to go down) |
 | `Space` | Jump (in the quadcopter: up) |
 | `E` | Examine a find, pick up/deliver a quest item, chop scrub (once the hatchet is owned), open/close the hut's door |
 | `F` | Flashlight |
