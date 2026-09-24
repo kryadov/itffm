@@ -6,6 +6,12 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.103.1
+The mine no longer reads as a long grey wall: it is a mossy hill with an
+uneven crest over the tunnels, a layered rock face only round its door,
+grassy slopes either side and boulders tumbled along its foot. And no more
+trees, bushes or boulders standing in ponds and streams.
+
 ## v0.103.0
 A big batch. Two new quests: cook a caught fish into ukha over the campfire
 and carry it to the hut's table, and fetch honey from the wild hive with the
