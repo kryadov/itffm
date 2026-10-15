@@ -444,7 +444,7 @@ export function placeMine(
 }
 
 /** A point `lx` deep and `lz` across from the entrance, in world metres. */
-export function localToWorld(m: Mine, lx: number, lz: number): { x: number; z: number } {
+export function localToWorld(m: Pick<Mine, 'x' | 'z' | 'heading'>, lx: number, lz: number): { x: number; z: number } {
   const cos = Math.cos(m.heading)
   const sin = Math.sin(m.heading)
   return { x: m.x + lx * cos - lz * sin, z: m.z + lx * sin + lz * cos }
@@ -704,6 +704,34 @@ export function caveLattice(m: Mine): CaveLattice {
   const lattice = { cells, walls }
   latticeCache.set(m, lattice)
   return lattice
+}
+
+/** The thicket over the mouth: how far its arc stands from the doorway,
+ *  how many bushes, and how big. Sized so the bushes overlap (no way through
+ *  for a 0.3 m player) but one taken out of the middle leaves a gap of at
+ *  least 0.8 m: a single swing of the hatchet opens the way. */
+const THICKET_ARC_RADIUS = 2.5
+const THICKET_BUSHES = 7
+const THICKET_RADIUS_RANGE: [number, number] = [0.65, 0.85]
+
+/**
+ * Scrub grown over the mine's mouth: a half-ring of bushes on the apron, its
+ * two ends against the rock face either side of the doorway, so the only way
+ * in is through it — with the hatchet, once it is home (main.ts's
+ * `tryChopScrub`, the same as any quest-detour scrub). Same shape as
+ * `quest/placement.ts`'s `QuestObstacle`, ids `mine-scrub-<i>`.
+ */
+export function mineThicket(m: Pick<Mine, 'x' | 'z' | 'heading'>, seed: number): { x: number; z: number; radius: number; id: string }[] {
+  const rng = mulberry32(seed)
+  const out: { x: number; z: number; radius: number; id: string }[] = []
+  for (let i = 0; i < THICKET_BUSHES; i++) {
+    // From one end of the face (+lz), round the front (-lx), to the other.
+    const a = Math.PI / 2 + (i / (THICKET_BUSHES - 1)) * Math.PI
+    const lx = Math.min(0, Math.cos(a) * THICKET_ARC_RADIUS)
+    const lz = Math.sin(a) * THICKET_ARC_RADIUS
+    out.push({ ...localToWorld(m, lx, lz), radius: randRange(rng, THICKET_RADIUS_RANGE), id: `mine-scrub-${i}` })
+  }
+  return out
 }
 
 /**

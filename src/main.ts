@@ -61,6 +61,7 @@ import { QUEST_ITEM_IDS, type QuestItemId, type Quests } from './quest/types'
 import { chopScrub } from './quest/scrub'
 import { lampIsOn } from './quest/lamp'
 import { buildScrubMesh } from './world/scrub'
+import { mineThicket } from './world/mine'
 import { jitterDiamondGeometry, DIAMOND_GEM_SEED } from './world/diamondGem'
 import {
   buildAxeModel, buildLampModel, buildBikeModel, buildRodPickupModel, layFlatOnGround, ROD_PICKUP_HALF_LENGTH,
@@ -170,6 +171,8 @@ const ANIMAL_GROUPS = new Set(['moose', 'bears', 'boars', 'beavers', 'hares', 's
  *  as anything else the wood already seeds). Each item then derives its own
  *  seed from this one (see quest/placement.ts's placeQuestItems). */
 const QUEST_SEED_OFFSET = 31
+/** The scrub over the mine's mouth draws its bush sizes from seed + this. */
+const MINE_THICKET_SEED_OFFSET = 83
 /** How far from the line of a standing train, metres, the diamond can still be handed over:
  *  the whole width of a platform. */
 const TRAIN_HANDIN_REACH = 3.2
@@ -580,7 +583,12 @@ async function main(): Promise<void> {
   // done and the player chops one down. `baseObstacles` (trees + everything
   // else `createForest` already built) never changes, so only this list
   // needs to be recombined with it on every physics step.
-  let scrubObstacles: QuestObstacle[] = QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles)
+  // The mine's mouth is overgrown too (world/mine.ts's mineThicket): no
+  // way in to the diamond until the hatchet is home to cut through.
+  let scrubObstacles: QuestObstacle[] = [
+    ...QUEST_ITEM_IDS.flatMap((id) => questPlacements[id].obstacles),
+    ...mineThicket(forest.mine, seed + MINE_THICKET_SEED_OFFSET),
+  ]
   const baseObstacles: Obstacle[] = [
     ...forest.trees.map((tr) => ({ x: tr.x, z: tr.z, radius: tr.radius })),
     ...forest.extraObstacles,
@@ -1313,6 +1321,13 @@ async function main(): Promise<void> {
         hud.setTarget(t('conductor'))
         return
       }
+    }
+    // A bush in the crosshair (a quest detour's, or over the mine's mouth):
+    // named, and until the hatchet is home, saying that is what it takes.
+    if (nearestScrubInView(camera, [...scrubMeshes.values()], REACH)) {
+      nearDoor = false
+      hud.setTarget(t('scrubName'), quests.axe.state === 'done' ? undefined : t('needAxe'))
+      return
     }
     // Nothing else nearby — a mushroom never spawns inside the hut, so this
     // and an aimed mushroom are not really in tension in practice.

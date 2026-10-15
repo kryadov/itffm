@@ -6,6 +6,12 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.105.0
+The mine's mouth is overgrown: a half-ring of scrub stands between the
+rock faces either side of the door, and only the hatchet gets you through —
+one bush cut from the middle is enough. Any bush in the crosshair is named
+now, with "needs the hatchet" until the hatchet is home.
+
 ## v0.104.0
 Touch screens get a ✋ action button — everything `E` does on a keyboard
 (picking, the door, quest items, chopping), lit when something is in the

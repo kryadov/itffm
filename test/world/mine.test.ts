@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import {
   placeMine, mineObstacles, isInsideMine, diamondSpotInMine, mineFloorHeightAt, caveSdf, caveLattice,
-  localToWorld, worldToLocal, TUNNEL_WIDTH, TUNNEL_HEIGHT, type Mine, type MineSegment, outcropBoulders,
+  localToWorld, worldToLocal, mineThicket, TUNNEL_WIDTH, TUNNEL_HEIGHT, type Mine, type MineSegment, outcropBoulders,
 } from '../../src/world/mine'
 import { createMineTerrain } from '../../src/world/mineTerrain'
 import { buildMineMesh, setMineLighting } from '../../src/world/mineMesh'
@@ -663,11 +663,11 @@ function fresh(m: Mine, lx: number, lz: number, yawToward: { x: number; z: numbe
 /** Walks the player along a list of local waypoints; returns what happened. */
 function walk(
   m: Mine, base: ElevationProvider, start: { lx: number; lz: number }, waypoints: { x: number; z: number }[],
-  opts: { inside?: boolean; maxSteps?: number } = {},
+  opts: { inside?: boolean; maxSteps?: number; extra?: { x: number; z: number; radius: number }[] } = {},
 ) {
   const terrain = createMineTerrain(m, base, CELL)
   terrain.ctx.inside = opts.inside ?? false
-  const obstacles = mineObstacles(m)
+  const obstacles = [...mineObstacles(m), ...(opts.extra ?? [])]
   const firstW = localToWorld(m, waypoints[0].x, waypoints[0].z)
   let p = fresh(m, start.lx, start.lz, firstW)
   let last = terrain.surface.heightAt(p.x, p.z)
@@ -851,5 +851,45 @@ describe('the outcrop reads as rock, not a wall', () => {
     let off = 0
     for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getX(i)) > 0.05) off++
     expect(off / pos.count).toBeGreaterThan(0.3)
+  })
+})
+
+describe('mineThicket — the scrub grown over the mouth', () => {
+  const m = placeMine(flat, HALF, 3, [], shelter, [{ x: 11, z: -6 }])
+
+  it('is the same for one seed, and every bush has its own id', () => {
+    expect(mineThicket(m, 5)).toEqual(mineThicket(m, 5))
+    const ids = mineThicket(m, 5).map((o) => o.id)
+    expect(new Set(ids).size).toBe(ids.length)
+    expect(ids.every((id) => id.startsWith('mine-scrub-'))).toBe(true)
+  })
+
+  it('stands in front of the mouth, never inside the hill', () => {
+    for (const o of mineThicket(m, 5)) expect(worldToLocal(m, o.x, o.z).lx).toBeLessThanOrEqual(0.01)
+  })
+
+  for (const [name, base] of TERRAINS) {
+    for (const seed of SEEDS) {
+      it(`${name}/${seed}: keeps a player out — straight on and from either side`, () => {
+        const mm = placeMine(base, HALF, seed, [], shelter, [{ x: 8 + seed, z: -6 }])
+        const extra = mineThicket(mm, seed)
+        for (const start of [{ lx: -8, lz: 0 }, { lx: -6, lz: 5 }, { lx: -6, lz: -5 }]) {
+          const w = walk(mm, base, start, [{ x: 0.3, z: 0 }, { x: 3, z: 0 }], { extra, maxSteps: 1500 })
+          expect(w.reached, `got in from ${start.lx},${start.lz}`).toBe(false)
+        }
+      })
+    }
+  }
+
+  it('one bush chopped from the middle of the band opens the way in', () => {
+    const band = mineThicket(m, 5)
+    for (let i = 1; i < band.length - 1; i++) {
+      const gone = band[i]
+      const at = worldToLocal(m, gone.x, gone.z)
+      const extra = band.filter((o) => o !== gone)
+      const start = { lx: at.lx * 3, lz: at.lz * 3 }
+      const w = walk(m, flat, start, [{ x: at.lx, z: at.lz }, { x: 0.3, z: 0 }, { x: 3, z: 0 }], { extra, maxSteps: 3000 })
+      expect(w.reached, `through the gap of bush ${i}`).toBe(true)
+    }
   })
 })

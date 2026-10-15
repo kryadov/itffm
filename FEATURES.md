@@ -200,7 +200,10 @@ clustering in whichever one the dice happened to favour:
 
 - **Hatchet** — once delivered, `E` while facing a bush/thicket clears it;
   the wood's various detour thickets (including ones blocking the other
-  quest items) become choppable.
+  quest items) become choppable. The mine's mouth is overgrown with a
+  half-ring of scrub from rock to rock, so the hatchet comes before the
+  mine: one bush cut from the middle opens the way in. Aiming at a bush
+  names it, and says "needs the hatchet" until you have it.
 - **Lamp** — a warm light that follows you once owned, on automatically
   after dark or inside the mine, with a manual `L` override on top.
 - **Fishing rod** — lets you catch fish while it is in your hands. Fish swim
