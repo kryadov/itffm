@@ -17,6 +17,12 @@ const TAP_TIME_THRESHOLD = 350
  *  exists once it is already being dragged. */
 const ANCHOR_LEFT = 90
 const ANCHOR_BOTTOM = 110
+/** The action button (the touch `E`) sits this far above the look pad's
+ *  centre, px — right over the thumb that is already on that side. */
+const ACTION_ABOVE = 110
+/** What the touch `E` looks like — on the button itself and in the HUD's
+ *  "name — ✋" prompt, so the prompt points at the button it means. */
+export const ACTION_GLYPH = '✋'
 
 // No touch sprint control — the crouch button is the only gesture this
 // scheme spends a dedicated screen element on; a run is out of scope here.
@@ -36,6 +42,15 @@ export function joystickVector(dx: number, dy: number, radius: number): { forwar
   if (len < 1e-6) return { forward: 0, strafe: 0 }
   const scale = Math.min(len, radius) / radius / len
   return { forward: -dy * scale, strafe: dx * scale }
+}
+
+/** A drag offset pulled back onto a circle of `radius` once it goes past it,
+ *  direction kept — where a stick's knob is drawn for a thumb that has
+ *  dragged further than the ring. */
+export function clampToRadius(dx: number, dy: number, radius: number): { x: number; y: number } {
+  const len = Math.hypot(dx, dy)
+  const k = len > radius ? radius / len : 1
+  return { x: dx * k, y: dy * k }
 }
 
 /** A tap: barely moved, released quickly — as opposed to a drag (moved past
@@ -64,6 +79,15 @@ export interface TouchControls {
    *  Consuming clears it — a tap fires the interact it stands for exactly
    *  once, the same as the edge-triggered jump key in game/controls.ts. */
   consumeTap(): { x: number; y: number } | null
+  /** Whether the action button was pressed since the last call — the touch
+   *  `E`. Consuming clears it, like `consumeTap`. */
+  consumeAction(): boolean
+  /** Lights the action button while there is something in the crosshair to
+   *  act on. */
+  setActionReady(ready: boolean): void
+  /** Hides every on-screen control — they sit above #ui, so an overlay
+   *  (the encyclopedia, an inspection card) would otherwise have them on top. */
+  setVisible(visible: boolean): void
   dispose(): void
 }
 
@@ -96,7 +120,11 @@ interface LookTouch {
  * this unconditionally next to the mouse/keyboard `createControls` and simply
  * prefer whichever one is `active`.
  */
-export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchControls {
+export function createTouchControls(
+  dom: HTMLElement,
+  sensitivity = 1,
+  labels: { move: string; look: string } = { move: '', look: '' },
+): TouchControls {
   const active = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches
   if (!active) {
     return {
@@ -106,6 +134,9 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       setInvertY: () => {},
       setCrouching: () => {},
       consumeTap: () => null,
+      consumeAction: () => false,
+      setActionReady: () => {},
+      setVisible: () => {},
       dispose: () => {},
     }
   }
@@ -175,21 +206,79 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
   ring.style.cssText = ringStyle
   const knob = document.createElement('div')
   knob.style.cssText = knobStyle
-  document.body.append(ring, knob)
+  // The look side gets the same ring and knob, mirrored on the right: the
+  // whole right half still turns the view, but a new player had nothing on
+  // screen saying so (a live report, 2026-10-16) — only the walking stick.
+  const lookRing = document.createElement('div')
+  lookRing.style.cssText = ringStyle
+  const lookKnob = document.createElement('div')
+  lookKnob.style.cssText = knobStyle
+  // One-word captions over each ring, until that control is first used.
+  const captionStyle =
+    'position:fixed;transform:translate(-50%,-100%);margin-top:-50px;font:13px system-ui,sans-serif;' +
+    'color:#eee;text-shadow:0 1px 3px #000;opacity:.85;pointer-events:none;z-index:41;' +
+    'white-space:nowrap;transition:opacity .6s'
+  const moveCaption = document.createElement('div')
+  moveCaption.style.cssText = captionStyle
+  moveCaption.textContent = labels.move
+  const lookCaption = document.createElement('div')
+  lookCaption.style.cssText = captionStyle
+  lookCaption.textContent = labels.look
+  const fadeCaption = (el: HTMLElement): void => {
+    el.style.opacity = '0'
+  }
+  document.body.append(ring, knob, lookRing, lookKnob, moveCaption, lookCaption)
+
+  // The touch `E`: everything the key does (pick, quest item, door, scrub,
+  // pot, jar), aimed by the crosshair the same way. A tap on the thing
+  // itself still works too, but nothing on screen ever said so.
+  const actionBtn = document.createElement('button')
+  actionBtn.textContent = ACTION_GLYPH
+  actionBtn.style.cssText =
+    'position:fixed;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;' +
+    'border:1px solid rgba(255,255,255,.35);background:rgba(15,19,14,.55);color:#eee;' +
+    'font-size:28px;line-height:1;padding:0;pointer-events:auto;touch-action:none;z-index:42;' +
+    'transition:background .15s,border-color .15s'
+  let actionPending = false
+  let actionReady = false
+  let visible = true
+  const pressAction = (e: PointerEvent): void => {
+    e.preventDefault()
+    actionPending = true
+  }
+  actionBtn.addEventListener('pointerdown', pressAction)
+  document.body.append(actionBtn)
 
   const anchorX = (): number => ANCHOR_LEFT
   const anchorY = (): number => innerHeight - ANCHOR_BOTTOM
+  const lookX = (): number => innerWidth - ANCHOR_LEFT
 
   const placeKnob = (x: number, y: number): void => {
     knob.style.left = `${x}px`
     knob.style.top = `${y}px`
   }
+  const placeLookKnob = (dx: number, dy: number): void => {
+    const p = clampToRadius(dx, dy, STICK_RADIUS)
+    lookKnob.style.left = `${lookX() + p.x}px`
+    lookKnob.style.top = `${anchorY() + p.y}px`
+  }
   const placeAtAnchor = (): void => {
     ring.style.left = `${anchorX()}px`
     ring.style.top = `${anchorY()}px`
     placeKnob(anchorX(), anchorY())
+    lookRing.style.left = `${lookX()}px`
+    lookRing.style.top = `${anchorY()}px`
+    placeLookKnob(0, 0)
+    moveCaption.style.left = `${anchorX()}px`
+    moveCaption.style.top = `${anchorY()}px`
+    lookCaption.style.left = `${lookX()}px`
+    lookCaption.style.top = `${anchorY()}px`
+    actionBtn.style.left = `${lookX()}px`
+    actionBtn.style.top = `${anchorY() - ACTION_ABOVE}px`
   }
   placeAtAnchor()
+  // A phone turned on its side moves every bottom-anchored control.
+  addEventListener('resize', placeAtAnchor)
 
   const onLeft = (x: number): boolean => x < innerWidth / 2
 
@@ -211,11 +300,9 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
     if (stick && e.pointerId === stick.id) {
       stick.curX = e.clientX
       stick.curY = e.clientY
-      const dx = stick.curX - stick.startX
-      const dy = stick.curY - stick.startY
-      const len = Math.hypot(dx, dy)
-      const clamp = len > STICK_RADIUS ? STICK_RADIUS / len : 1
-      placeKnob(stick.startX + dx * clamp, stick.startY + dy * clamp)
+      const p = clampToRadius(stick.curX - stick.startX, stick.curY - stick.startY, STICK_RADIUS)
+      placeKnob(stick.startX + p.x, stick.startY + p.y)
+      fadeCaption(moveCaption)
     }
     if (look && e.pointerId === look.id) {
       dYaw -= (e.clientX - look.lastX) * BASE_SENSITIVITY * sens
@@ -224,7 +311,10 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       look.lastY = e.clientY
       if (!look.moved && Math.hypot(e.clientX - look.startX, e.clientY - look.startY) >= TAP_MOVE_THRESHOLD) {
         look.moved = true
+        fadeCaption(lookCaption)
       }
+      // The pad's knob shows the drag, wherever on the right half it began.
+      placeLookKnob(e.clientX - look.startX, e.clientY - look.startY)
     }
   }
 
@@ -238,6 +328,7 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
         pendingTap = screenToNdc(look.startX, look.startY, innerWidth, innerHeight)
       }
       look = null
+      placeLookKnob(0, 0)
     }
   }
 
@@ -274,7 +365,27 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       pendingTap = null
       return t
     },
+    consumeAction(): boolean {
+      const a = actionPending
+      actionPending = false
+      return a
+    },
+    setActionReady(ready: boolean): void {
+      if (ready === actionReady) return // called every frame
+      actionReady = ready
+      actionBtn.style.background = ready ? 'rgba(126,196,107,.6)' : 'rgba(15,19,14,.55)'
+      actionBtn.style.borderColor = ready ? 'rgba(200,255,180,.8)' : 'rgba(255,255,255,.35)'
+    },
+    setVisible(v: boolean): void {
+      if (v === visible) return // called every frame
+      visible = v
+      for (const el of [ring, knob, lookRing, lookKnob, moveCaption, lookCaption, actionBtn, crouchBtn]) {
+        el.style.display = v ? '' : 'none'
+      }
+    },
     dispose(): void {
+      removeEventListener('resize', placeAtAnchor)
+      actionBtn.removeEventListener('pointerdown', pressAction)
       dom.removeEventListener('pointerdown', onDown)
       dom.removeEventListener('pointermove', onMove)
       dom.removeEventListener('pointerup', onUp)
@@ -284,6 +395,11 @@ export function createTouchControls(dom: HTMLElement, sensitivity = 1): TouchCon
       crouchBtn.removeEventListener('pointercancel', releaseCrouch)
       ring.remove()
       knob.remove()
+      lookRing.remove()
+      lookKnob.remove()
+      moveCaption.remove()
+      lookCaption.remove()
+      actionBtn.remove()
       crouchBtn.remove()
     },
   }

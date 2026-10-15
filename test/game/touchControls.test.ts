@@ -1,4 +1,4 @@
-import { joystickVector, isTap, screenToNdc } from '../../src/game/touchControls'
+import { joystickVector, isTap, screenToNdc, clampToRadius } from '../../src/game/touchControls'
 
 describe('joystickVector', () => {
   it('is neutral at the drag origin', () => {
@@ -59,5 +59,17 @@ describe('screenToNdc', () => {
 
   it('maps the bottom-right corner to (1, -1)', () => {
     expect(screenToNdc(800, 600, 800, 600)).toEqual({ x: 1, y: -1 })
+  })
+})
+
+describe('clampToRadius', () => {
+  it('leaves a drag inside the radius as it is', () => {
+    expect(clampToRadius(10, -20, 40)).toEqual({ x: 10, y: -20 })
+  })
+
+  it('pulls a drag past the radius back onto the rim, keeping its direction', () => {
+    const p = clampToRadius(300, 400, 40)
+    expect(p.x).toBeCloseTo(24, 5)
+    expect(p.y).toBeCloseTo(32, 5)
   })
 })

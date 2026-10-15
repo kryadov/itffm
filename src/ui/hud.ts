@@ -10,6 +10,11 @@ export interface TouchButtons {
   active: boolean
   onEncyclopedia: () => void
   onTally: () => void
+  /** What stands for `E` on this device, in the prompt (the touch action
+   *  button's own glyph on touch). */
+  actionKey: string
+  /** Told whether the prompt is showing — the touch action button lights up. */
+  onTarget: (shown: boolean) => void
 }
 
 function cornerButton(id: string, slot: number, title: string, glyph: string): string {
@@ -77,8 +82,9 @@ export function createHud(
 
   return {
     setTarget(name, locked) {
-      if (name) hint.textContent = `${name} — ${locked ?? 'E'}`
+      if (name) hint.textContent = `${name} — ${locked ?? touch.actionKey}`
       hint.style.opacity = name ? '1' : '0'
+      touch.onTarget(!!name && !locked)
     },
     setBasket(n, cap) {
       basket.textContent = `🧺 ${n} / ${cap}`

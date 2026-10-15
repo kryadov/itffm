@@ -6,6 +6,14 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.104.0
+Touch screens get a ✋ action button — everything `E` does on a keyboard
+(picking, the door, quest items, chopping), lit when something is in the
+crosshair — and a visible look pad on the right with "walk" / "look around"
+captions for a first-time player. On-screen controls now hide under
+overlays, follow a phone turned sideways, and no longer throw a pointer-lock
+error on every toast.
+
 ## v0.103.2
 No more black screen after a new release. The offline cache used to serve
 the previous release's page, whose game files could already be gone — and a

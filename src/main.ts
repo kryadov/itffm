@@ -7,7 +7,7 @@ import { createWorldStream } from './game/worldStream'
 import { DEFAULT_WORLD_SIZE } from './ui/worldSize'
 import { loadForestData, type LoadStage } from './game/loadForest'
 import { createControls } from './game/controls'
-import { createTouchControls } from './game/touchControls'
+import { createTouchControls, ACTION_GLYPH } from './game/touchControls'
 import { AudioEngine } from './audio/audio'
 import { crossedFootstep, footstepSubstrate } from './audio/footsteps'
 import { footSide } from './world/tracks'
@@ -429,7 +429,10 @@ async function main(): Promise<void> {
   // pointer — and simply preferred over mouse/keyboard whenever it is
   // `active`, rather than merging both: a hybrid device summing both inputs
   // is a far rarer problem than the code to handle it is worth right now.
-  const touch = createTouchControls(renderer.domElement, save.prefs.mouseSensitivity)
+  const touch = createTouchControls(renderer.domElement, save.prefs.mouseSensitivity, {
+    move: t('touchMove'),
+    look: t('touchLook'),
+  })
   controls.setInvertY(save.prefs.invertMouseY)
   touch.setInvertY(save.prefs.invertMouseY)
   // resume() needs a user gesture (autoplay policy) — the place-picker click
@@ -456,6 +459,8 @@ async function main(): Promise<void> {
     },
     {
       active: touch.active,
+      actionKey: touch.active ? ACTION_GLYPH : 'E',
+      onTarget: (shown) => touch.setActionReady(shown),
       onEncyclopedia: () => {
         if (!modalOpen()) openEncyclopedia(save, getLang())
       },
@@ -1248,8 +1253,11 @@ async function main(): Promise<void> {
   // last overlay leaving the DOM re-requests the lock right there, still
   // inside the closing keypress or click's own user gesture.
   new MutationObserver(() => {
+    // Not on touch: there is no pointer lock there, and every toast landing
+    // in #ui would otherwise throw.
+    if (touch.active) return
     if (!modalOpen() && document.pointerLockElement !== renderer.domElement) {
-      renderer.domElement.requestPointerLock()
+      renderer.domElement.requestPointerLock()?.catch(() => {})
     }
   }).observe(ui, { childList: true })
 
@@ -1593,6 +1601,22 @@ async function main(): Promise<void> {
     renderer.setSize(innerWidth, innerHeight)
   })
 
+  /** `E`, and the touch action button: whatever is in reach, in this order. */
+  function interactAimed(): void {
+    if (tryQuestInteract()) {
+      // handled: picked up or delivered a quest item
+    } else if (tryDroneCrate()) {
+      // handled: took the quadcopter from its crate
+    } else if (trySoup()) {
+      // handled: the ukha — into the pot, off the fire, or onto the table
+    } else if (tryHoney()) {
+      // handled: the honey jar — off the shelf, or back on it full
+    } else if (tryChopScrub()) {
+      // handled: chopped down a scrub object
+    } else if (nearDoor) forest.toggleShelterDoor()
+    else examineAimed()
+  }
+
   addEventListener('keydown', (e) => {
     if (modalOpen()) return
     if (e.code === 'KeyR') {
@@ -1601,20 +1625,7 @@ async function main(): Promise<void> {
         if (!flight.returning) returnRequested = true
       } else launchFlight()
     }
-    if (e.code === 'KeyE' && !flight) {
-      if (tryQuestInteract()) {
-        // handled: picked up or delivered a quest item
-      } else if (tryDroneCrate()) {
-        // handled: took the quadcopter from its crate
-      } else if (trySoup()) {
-        // handled: the ukha — into the pot, off the fire, or onto the table
-      } else if (tryHoney()) {
-        // handled: the honey jar — off the shelf, or back on it full
-      } else if (tryChopScrub()) {
-        // handled: chopped down a scrub object
-      } else if (nearDoor) forest.toggleShelterDoor()
-      else examineAimed()
-    }
+    if (e.code === 'KeyE' && !flight) interactAimed()
     if (e.code === 'Tab') {
       e.preventDefault()
       openEncyclopedia(save, getLang())
@@ -1671,6 +1682,10 @@ async function main(): Promise<void> {
     if (flight) stepFlight(dt)
     else droneBattery = Math.min(1, droneBattery + dt / 60) // charging on the ground
 
+    // Read every frame, so a press during a flight or under an overlay is
+    // dropped rather than firing late.
+    const actionPressed = touch.consumeAction()
+    touch.setVisible(!modalOpen())
     // While an overlay is up the player stands still: the mouse/thumb belongs to it.
     if (!flight && !modalOpen()) {
       const inHome = Math.abs(player.x) <= halfSize && Math.abs(player.z) <= halfSize
@@ -1740,6 +1755,7 @@ async function main(): Promise<void> {
         if (target) examineTarget(target)
         else if (!tryQuestInteract() && !tryDroneCrate() && !trySoup() && !tryHoney() && !tryChopScrub(tapPoint) && nearDoor) forest.toggleShelterDoor()
       }
+      if (actionPressed) interactAimed()
     }
 
     bobScale = easeToward(bobScale, isRiding() ? 0 : 1, dt, 8)

@@ -56,8 +56,14 @@ have to start the game just to change either.
 | `H` | This same control list, in-game |
 | `Esc` | Pause menu — a second `Esc` closes it again, same as "Continue" |
 
-On a phone or tablet, the same actions come from an on-screen stick, a
-swipe-to-look zone, and a tap.
+On a phone or tablet, the same actions come from on-screen controls: a
+walking stick on the left, a look pad on the right (the whole right half of
+the screen turns the view; the pad shows the drag), and a ✋ action button
+above it that does whatever `E` does — pick, open the door, take a quest
+item, chop scrub. It lights up when something is in the crosshair, and the
+prompt reads "— ✋" instead of "— E". Tapping a mushroom directly still
+picks it too. "walk" and "look around" captions sit over the two pads until
+each is first used, and every control steps aside while an overlay is open.
 
 ---
 
