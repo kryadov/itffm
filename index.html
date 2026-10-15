@@ -12,6 +12,37 @@
       #app { position: fixed; inset: 0; }
       #ui { position: fixed; inset: 0; pointer-events: none; font-family: system-ui, sans-serif; color: #eee; }
     </style>
+    <script>
+      // Self-heal: if the game's own JS fails to load (a service worker from
+      // an older release serving a page whose files are gone — see
+      // public/sw.js), drop the worker and its cache and reload once, rather
+      // than leave a black screen that only Ctrl+F5 cures.
+      addEventListener(
+        'error',
+        function (e) {
+          var el = e.target
+          var src = el && (el.src || el.href)
+          if (!src || src.indexOf('/assets/') < 0 || !navigator.onLine) return
+          try {
+            if (sessionStorage.getItem('itffm-healed')) return
+            sessionStorage.setItem('itffm-healed', '1')
+          } catch (_) {
+            return
+          }
+          var regs = navigator.serviceWorker ? navigator.serviceWorker.getRegistrations() : Promise.resolve([])
+          regs
+            .then(function (rs) {
+              return Promise.all(rs.map(function (r) { return r.unregister() }))
+            })
+            .then(function () {
+              return window.caches ? caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k) })) }) : null
+            })
+            .catch(function () {})
+            .then(function () { location.reload() })
+        },
+        true,
+      )
+    </script>
   </head>
   <body>
     <div id="app"></div>

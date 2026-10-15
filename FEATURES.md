@@ -317,7 +317,8 @@ species, finds, quest state, notes, preferences) saves to IndexedDB.
 Works offline once loaded once, and installs to the home screen like an
 app on a phone or tablet. A long session gets told when a new version has
 shipped: a banner offers to reload now or later, rather than reloading on
-its own and dropping whatever you're doing.
+its own and dropping whatever you're doing. Opening the page online always
+loads the newest release — no hard refresh (Ctrl+F5) needed after an update.
 
 ---
 

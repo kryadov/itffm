@@ -6,6 +6,14 @@ game right now is `FEATURES.md`. A release is a `vX.Y.Z` tag, published to
 [GitHub Pages](https://kryadov.github.io/itffm/) by a green build off
 `master`.
 
+## v0.103.2
+No more black screen after a new release. The offline cache used to serve
+the previous release's page, whose game files could already be gone — and a
+Ctrl+F5 to escape it set the same trap for the next release. The page now
+comes from the network whenever there is one (the cache is for offline
+only), old files are cleaned out, and if the game's files still fail to load
+the page drops its cache and reloads itself once.
+
 ## v0.103.1
 The mine no longer reads as a long grey wall: it is a mossy hill with an
 uneven crest over the tunnels, a layered rock face only round its door,
