@@ -646,7 +646,7 @@ describe('the mouth on the meadow', () => {
         expect(worst, `${name}/${seed}`).toBeLessThan(0.01)
       }
     }
-  })
+  }, 180_000) // ~25 s on its own, much longer beside the rest of the suite
 })
 
 // ---------------------------------------------------------------------------
