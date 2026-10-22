@@ -353,8 +353,9 @@ describe('createWorldStream', () => {
     const culled = new THREE.Matrix4()
     trunkMesh.getMatrixAt(0, culled)
     expect(culled.equals(before)).toBe(false)
-    const scale = new THREE.Vector3()
-    culled.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale)
+    // Column length, not decompose(): since three r183 (mrdoob/three.js#32440)
+    // decompose() reports scale 1 for any singular matrix, a culled one included.
+    const scale = new THREE.Vector3().setFromMatrixScale(culled)
     expect(scale.x).toBeCloseTo(0, 5)
 
     // Player back at the chunk itself (radius wide enough to cover any tree

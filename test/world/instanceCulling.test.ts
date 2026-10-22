@@ -1,6 +1,12 @@
 import * as THREE from 'three'
 import { collectScatterCullers, sweepAll, STATIC_SCATTER_GROUP_NAMES } from '../../src/world/instanceCulling'
 
+// The column lengths of the matrix, read directly. Not Matrix4.decompose():
+// since three r183 (mrdoob/three.js#32440) decompose() reports scale (1, 1, 1)
+// and an identity rotation for any singular matrix instead of producing NaN,
+// so it can no longer tell a zero-scaled (culled) instance from a real one.
+const scaleOfMatrix = (m: THREE.Matrix4): THREE.Vector3 => new THREE.Vector3().setFromMatrixScale(m)
+
 function instancedGroup(name: string, positions: [number, number][]): THREE.Group {
   const group = new THREE.Group()
   group.name = name
@@ -46,9 +52,7 @@ describe('instanceCulling', () => {
     const scaleOf = (i: number): THREE.Vector3 => {
       const m = new THREE.Matrix4()
       mesh.getMatrixAt(i, m)
-      const scale = new THREE.Vector3()
-      m.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale)
-      return scale
+      return scaleOfMatrix(m)
     }
     expect(scaleOf(0).x).toBeCloseTo(1, 5) // 0m away: real scale
     expect(scaleOf(1).x).toBeCloseTo(1.1, 5) // 10m away: real scale
@@ -128,9 +132,7 @@ describe('instanceCulling', () => {
       const mesh = (group as THREE.Group).children[0] as THREE.InstancedMesh
       const m = new THREE.Matrix4()
       mesh.getMatrixAt(0, m)
-      const scale = new THREE.Vector3()
-      m.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale)
-      expect(scale.x).toBeCloseTo(0, 5)
+      expect(scaleOfMatrix(m).x).toBeCloseTo(0, 5)
     }
   })
 })

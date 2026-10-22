@@ -424,7 +424,9 @@ describe('moose, bears, boar and beavers', () => {
     let bulls = 0
     for (let i = 0; i < n; i++) {
       antlers.getMatrixAt(i, m)
-      m.decompose(new THREE.Vector3(), new THREE.Quaternion(), s)
+      // Column length, not decompose(): since three r183 (mrdoob/three.js#32440)
+      // decompose() reports scale 1 for a cow's zero-scaled antlers too.
+      s.setFromMatrixScale(m)
       if (s.x > 0.5) bulls++
     }
     expect(bulls).toBeGreaterThan(0)
