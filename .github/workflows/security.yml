@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   trivy:
-    uses: kryadov/repo-guard/.github/workflows/trivy.yml@f4757588fa83374b0fd4af0744a45997e4a1a4af # v1.0.0
+    uses: kryadov/repo-guard/.github/workflows/trivy.yml@e7721e635ccc5ae02771295d7d5db3b354d08609 # v1.1.0
     permissions:
       contents: read
       security-events: write
