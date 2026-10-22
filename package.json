@@ -13,11 +13,11 @@
     "silhouette-sheet": "node scripts/silhouette-sheet.mjs"
   },
   "dependencies": {
-    "three": "^0.186.1",
+    "three": "^0.169.0",
     "yaml": "^2.5.0"
   },
   "devDependencies": {
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.169.0",
     "typescript": "^5.6.0",
     "vite": "^8.3.4",
     "vitest": "^5.0.4"
